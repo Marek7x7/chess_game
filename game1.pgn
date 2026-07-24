@@ -1,0 +1,19 @@
+[Event "Play vs Bot"]
+[Site "Chess.com"]
+[Date "2026.07.22"]
+[Round "?"]
+[White "Marek7x7"]
+[Black "Wendy-BOT"]
+[Result "0-1"]
+[TimeControl "?"]
+[WhiteElo "800"]
+[BlackElo "1500"]
+[Termination "Wendy won by checkmate"]
+[ECO "C55"]
+[EndDate "2026.07.22"]
+[Link "https://www.chess.com/game/computer/1797004352?move=0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Qe2 Be7 5. O-O b5 6. Bd5 a6 7. Nxe5 Nxd5 8.
+exd5 Nd4 9. Qe4 c5 10. c3 d6 11. cxd4 dxe5 12. d6 Qxd6 13. Qxa8 O-O 14. dxc5
+Qxc5 15. d4 Qd6 16. Bh6 gxh6 17. Rc1 Bf5 18. Qxf8+ Kxf8 19. dxe5 Qxe5 20. g4 Bd3
+21. Rc8+ Kg7 22. Rg8+ Kxg8 23. Nc3 Bd6 24. f4 Qxf4 25. Ne2 Bxe2 26. h3 Qh2# 0-1

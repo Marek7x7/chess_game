@@ -1,0 +1,37 @@
+[Event "Play vs Bot"]
+[Site "Chess.com"]
+[Date "2026.07.23"]
+[Round "-"]
+[White "Marek7x7"]
+[Black "Wendy-BOT"]
+[Result "0-1"]
+[CurrentPosition "6k1/p1p5/P7/2p2p2/2b4p/8/3r4/4r1K1 w - - 8 35"]
+[Timezone "UTC"]
+[ECO "C47"]
+[ECOUrl "https://www.chess.com/openings/Four-Knights-Game-Italian-Variation"]
+[UTCDate "2026.07.23"]
+[UTCTime "22:33:27"]
+[WhiteElo "800"]
+[BlackElo "1500"]
+[TimeControl "?"]
+[Termination "Wendy BOT won by checkmate"]
+[StartTime "22:33:27"]
+[EndDate "2026.07.23"]
+[EndTime "23:33:54"]
+[Link "https://www.chess.com/analysis/game/computer/1808153916/analysis"]
+[WhiteUrl "https://images.chesscomfiles.com/uploads/v1/user/196937693.46fbbcbb.50x50o.e8951cfbe8fd.jpeg"]
+[WhiteCountry "3"]
+[WhiteTitle ""]
+[BlackUrl "https://images.chesscomfiles.com/uploads/v1/user/66746050.adfcf725.50x50o.d52666e0e879.png"]
+[BlackCountry "3"]
+[BlackTitle ""]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Nc3 Nxe4 5. Nxe4 d5 6. Bd3 dxe4 7. Bxe4 f5 $2 8.
+Bxc6+ $1 bxc6 9. Nxe5 Qe7 $2 10. Rf1 $4 (10. O-O Qf6 11. Re1 Be7 12. Qh5+ g6 13. Qf3
+Bb7 14. Qd3 Qe6 15. b3 Qd5 16. Ba3 $3 c5 17. Qxd5 Bxd5 18. c4 Bb7 19. d4 O-O 20.
+Nd7 Rfe8 21. Bxc5 Bg5 22. d5 a5 23. g3 Kf7 24. f4 Bh6 25. Ne5+ Kg8 26. h4 Bg7
+27. Rad1 Ba6 28. a4 Bf6 29. Kf2 Bb7) 10... Qxe5+ 11. Qe2 Qxe2+ 12. Kxe2 Be7 13.
+Kd1 O-O 14. Re1 Bh4 15. c4 Bxf2 16. Ke2 $2 Bxe1 17. Kxe1 Bb7 18. d3 Rfd8 19. Ke2
+c5 20. Be3 Bxg2 21. b3 h6 22. Rg1 Bb7 23. Rd1 g5 24. Kf1 Bf3 25. Bxg5 $2 hxg5 26.
+h4 $2 Bxd1 27. a4 gxh4 28. a5 Rxd3 29. a6 Bxb3 30. Ke2 Bxc4 31. Ke1 Re8+ 32. Kf2
+Ree3 33. Kf1 Rd2+ 34. Kg1 Re1# 0-1
