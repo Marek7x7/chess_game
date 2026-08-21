@@ -1,2 +1,46 @@
+# ====================================================================
+# CMake Build Artifacts
+# ====================================================================
+build/
+Build/
+build-*/
+out/
 bin/
+
+# Individual CMake files if generated in root by accident
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+Makefile
+
+# ====================================================================
+# Compiled Objects, Libraries, and Executables
+# ====================================================================
+*.d
 *.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+*.a
+*.lib
+
+# ====================================================================
+# IDE Configurations and OS Metadata
+# ====================================================================
+# VS Code
+.vscode/
+
+# CLion / JetBrains
+.idea/
+*.Visualstudio
+
+# Mac OS metadata
+.DS_Store
