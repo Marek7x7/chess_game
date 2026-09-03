@@ -103,6 +103,23 @@ private:
     void recomputeHash();
     void recomputeEval();
     int kingTerm() const; // White king's PST bonus minus Black's, at current phase
+
+    // Lightweight make/unmake for pure legality filtering (legalMoves()):
+    // updates piece placement and king-square tracking only -- the minimum
+    // isInCheck() needs. Deliberately does NOT touch the Zobrist hash,
+    // incremental eval score, castling rights, or en-passant target, since
+    // legalMoves() immediately reverses the move after one isInCheck() call
+    // and never needs any of that state. Do not use these outside a
+    // make-check-unmake sequence that never observes hashKey()/rawEval()/
+    // castling or en-passant state in between -- they are intentionally
+    // left stale/wrong while a light move is applied.
+    struct LightUndo {
+        PieceType movedType; // Pawn if this move was a promotion
+        Color movedColor;
+    };
+    void makeMoveLight(const Move& m, LightUndo& undo);
+    void unmakeMoveLight(const Move& m, const LightUndo& undo);
+
     MoveList pseudoLegalMoves(Color color) const;
     void addSlidingMoves(MoveList& moves, int x, int y, Color color,
                          const int dirs[][2], int numDirs) const;

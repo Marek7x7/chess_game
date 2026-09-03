@@ -525,21 +525,44 @@ bool Board::isSquareAttacked(int x, int y, Color byColor) const {
 }
 
 bool Board::isInCheck(Color color) const {
-    for (int x = 0; x < 8; x++) {
-        for (int y = 0; y < 8; y++) {
-            if (squares[x][y].type == PieceType::King && squares[x][y].color == color)
-                return isSquareAttacked(x, y, opponent(color));
-        }
-    }
-    return false; // no king on board (shouldn't happen)
+    // kingX/kingY are already tracked incrementally by makeMove() (for the
+    // king's PST term -- see kingTerm()), so the king's square is known for
+    // free; no need to rescan all 64 squares to find it.
+    int ci = colorIndex(color);
+    return isSquareAttacked(kingX[ci], kingY[ci], opponent(color));
 }
 
 MoveList Board::legalMoves(Color color) const {
+    // Logically const (this queries, never mutates, the position from the
+    // caller's perspective), but avoiding a per-candidate Board copy means
+    // using make/unmake in place instead: each candidate is applied,
+    // checked, and reversed before the next one, so *this is bit-for-bit
+    // unchanged by the time this returns. const_cast is sound here only
+    // because no Board in this codebase is ever declared with genuine const
+    // storage (every "const Board" in the codebase is a const *reference*
+    // to a non-const object) -- transiently mutating an object that was
+    // actually declared const would be undefined behavior even though the
+    // value is restored before anyone observes it.
+    //
+    // Uses the LIGHTWEIGHT make/unmake (piece placement + king tracking
+    // only), not the full makeMove/unmakeMove: this loop never reads
+    // hashKey()/rawEval()/castling rights/en-passant target for any
+    // candidate, only isInCheck() (which itself only reads squares[][] and
+    // kingX/kingY), so there's nothing to gain from updating the rest --
+    // only cost.
+    Board& self = const_cast<Board&>(*this);
     MoveList result;
     for (const Move& m : pseudoLegalMoves(color)) {
-        Board copy = *this;
-        copy.makeMove(m);
-        if (!copy.isInCheck(color)) result.push_back(m);
+        LightUndo undo;
+        self.makeMoveLight(m, undo);
+        // isInCheck(color): check the side that just moved (the candidate
+        // mover), not the side to move next. Getting this backwards would
+        // silently pass most positions (moving into check is rare) but
+        // wrongly accept illegal moves in pinned-piece/discovered-check
+        // positions specifically -- see the perft("pin") case added to
+        // verify this explicitly rather than assuming it.
+        if (!self.isInCheck(color)) result.push_back(m);
+        self.unmakeMoveLight(m, undo);
     }
     return result;
 }
@@ -697,6 +720,80 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     kingY[0] = undo.prevKingY[0];
     kingY[1] = undo.prevKingY[1];
     turn = color;
+}
+
+// Piece-placement and king-tracking only -- no hash, no eval, no castling
+// rights, no en-passant target. See the LightUndo comment in board.hpp for
+// the invariant this depends on.
+void Board::makeMoveLight(const Move& m, LightUndo& undo) {
+    Piece moving = squares[m.fromX][m.fromY];
+    Color color = moving.color;
+    undo.movedType = moving.type;
+    undo.movedColor = color;
+
+    if (m.isEnPassant) {
+        // The captured pawn is NOT on the destination square -- it's on the
+        // same file as the destination but the same rank the capturing
+        // pawn started on.
+        squares[m.toX][m.fromY] = Piece{};
+    } else if (m.isCastle) {
+        int homeY = m.fromY;
+        if (m.toX == 6) {
+            squares[5][homeY] = squares[7][homeY];
+            squares[7][homeY] = Piece{};
+        } else {
+            squares[3][homeY] = squares[0][homeY];
+            squares[0][homeY] = Piece{};
+        }
+    }
+    // Ordinary captures need no extra step: squares[m.toX][m.toY] below
+    // simply overwrites whatever was there.
+
+    squares[m.toX][m.toY] = moving;
+    squares[m.fromX][m.fromY] = Piece{};
+    if (m.promotion != PieceType::None) squares[m.toX][m.toY].type = m.promotion;
+
+    if (moving.type == PieceType::King) {
+        int ci = colorIndex(color);
+        kingX[ci] = m.toX;
+        kingY[ci] = m.toY;
+    }
+}
+
+void Board::unmakeMoveLight(const Move& m, const LightUndo& undo) {
+    Color color = undo.movedColor;
+    Color enemy = opponent(color);
+
+    if (m.isEnPassant) {
+        squares[m.toX][m.toY] = Piece{};
+        squares[m.toX][m.fromY] = Piece{PieceType::Pawn, enemy};
+    } else if (m.captured != PieceType::None) {
+        squares[m.toX][m.toY] = Piece{m.captured, enemy};
+    } else {
+        squares[m.toX][m.toY] = Piece{};
+    }
+
+    squares[m.fromX][m.fromY] = Piece{undo.movedType, color};
+
+    if (m.isCastle) {
+        int homeY = m.fromY;
+        if (m.toX == 6) {
+            squares[7][homeY] = Piece{PieceType::Rook, color};
+            squares[5][homeY] = Piece{};
+        } else {
+            squares[0][homeY] = Piece{PieceType::Rook, color};
+            squares[3][homeY] = Piece{};
+        }
+    }
+
+    // Both a plain king move and a castling move set fromX/fromY to the
+    // king's original square, so this unconditionally restores the right
+    // square either way -- no need to have stashed it in LightUndo.
+    if (undo.movedType == PieceType::King) {
+        int ci = colorIndex(color);
+        kingX[ci] = m.fromX;
+        kingY[ci] = m.fromY;
+    }
 }
 
 GameStatus Board::status() const {
