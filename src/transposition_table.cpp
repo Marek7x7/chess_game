@@ -1,7 +1,13 @@
 #include "transposition_table.hpp"
 
+#include <stdexcept>
+
 TranspositionTable::TranspositionTable(size_t sizePowerOfTwo)
-    : table(sizePowerOfTwo), mask(sizePowerOfTwo - 1), shards(kNumShards) {}
+    : table(sizePowerOfTwo), mask(sizePowerOfTwo - 1), shards(kNumShards) {
+    if (sizePowerOfTwo == 0 || (sizePowerOfTwo & (sizePowerOfTwo - 1)) != 0) {
+        throw std::invalid_argument("TranspositionTable: sizePowerOfTwo must be a power of two");
+    }
+}
 
 std::mutex& TranspositionTable::shardFor(uint64_t key) const {
     return shards[(key & mask) & (kNumShards - 1)];

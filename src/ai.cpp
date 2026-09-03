@@ -56,153 +56,14 @@ std::string movesStr(const std::vector<Move>& moves) {
 }
 
 // ---------------------------------------------------------------------
-// Material + piece-square-table evaluation.
+// Evaluation. Material + piece-square-table score is maintained
+// incrementally by Board itself (see Board::rawEval()); this just applies
+// the side-to-move sign flip.
 // ---------------------------------------------------------------------
-
-int pieceValue(PieceType t) {
-    switch (t) {
-        case PieceType::Pawn: return 100;
-        case PieceType::Knight: return 320;
-        case PieceType::Bishop: return 330;
-        case PieceType::Rook: return 500;
-        case PieceType::Queen: return 900;
-        default: return 0;
-    }
-}
-
-// Standard "simplified evaluation function" piece-square tables (centipawns),
-// written in published order: row 0 = rank 8, row 7 = rank 1, column 0 = file a.
-constexpr int kPawnTable[8][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},
-    {50, 50, 50, 50, 50, 50, 50, 50},
-    {10, 10, 20, 30, 30, 20, 10, 10},
-    {5, 5, 10, 25, 25, 10, 5, 5},
-    {0, 0, 0, 20, 20, 0, 0, 0},
-    {5, -5, -10, 0, 0, -10, -5, 5},
-    {5, 10, 10, -20, -20, 10, 10, 5},
-    {0, 0, 0, 0, 0, 0, 0, 0},
-};
-constexpr int kKnightTable[8][8] = {
-    {-50, -40, -30, -30, -30, -30, -40, -50},
-    {-40, -20, 0, 0, 0, 0, -20, -40},
-    {-30, 0, 10, 15, 15, 10, 0, -30},
-    {-30, 5, 15, 20, 20, 15, 5, -30},
-    {-30, 0, 15, 20, 20, 15, 0, -30},
-    {-30, 5, 10, 15, 15, 10, 5, -30},
-    {-40, -20, 0, 5, 5, 0, -20, -40},
-    {-50, -40, -30, -30, -30, -30, -40, -50},
-};
-constexpr int kBishopTable[8][8] = {
-    {-20, -10, -10, -10, -10, -10, -10, -20},
-    {-10, 0, 0, 0, 0, 0, 0, -10},
-    {-10, 0, 5, 10, 10, 5, 0, -10},
-    {-10, 5, 5, 10, 10, 5, 5, -10},
-    {-10, 0, 10, 10, 10, 10, 0, -10},
-    {-10, 10, 10, 10, 10, 10, 10, -10},
-    {-10, 5, 0, 0, 0, 0, 5, -10},
-    {-20, -10, -10, -10, -10, -10, -10, -20},
-};
-constexpr int kRookTable[8][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},
-    {5, 10, 10, 10, 10, 10, 10, 5},
-    {-5, 0, 0, 0, 0, 0, 0, -5},
-    {-5, 0, 0, 0, 0, 0, 0, -5},
-    {-5, 0, 0, 0, 0, 0, 0, -5},
-    {-5, 0, 0, 0, 0, 0, 0, -5},
-    {-5, 0, 0, 0, 0, 0, 0, -5},
-    {0, 0, 0, 5, 5, 0, 0, 0},
-};
-constexpr int kQueenTable[8][8] = {
-    {-20, -10, -10, -5, -5, -10, -10, -20},
-    {-10, 0, 0, 0, 0, 0, 0, -10},
-    {-10, 0, 5, 5, 5, 5, 0, -10},
-    {-5, 0, 5, 5, 5, 5, 0, -5},
-    {0, 0, 5, 5, 5, 5, 0, -5},
-    {-10, 5, 5, 5, 5, 5, 0, -10},
-    {-10, 0, 5, 0, 0, 0, 0, -10},
-    {-20, -10, -10, -5, -5, -10, -10, -20},
-};
-constexpr int kKingMidTable[8][8] = {
-    {-30, -40, -40, -50, -50, -40, -40, -30},
-    {-30, -40, -40, -50, -50, -40, -40, -30},
-    {-30, -40, -40, -50, -50, -40, -40, -30},
-    {-30, -40, -40, -50, -50, -40, -40, -30},
-    {-20, -30, -30, -40, -40, -30, -30, -20},
-    {-10, -20, -20, -20, -20, -20, -20, -10},
-    {20, 20, 0, 0, 0, 0, 20, 20},
-    {20, 30, 10, 0, 0, 10, 30, 20},
-};
-constexpr int kKingEndTable[8][8] = {
-    {-50, -40, -30, -20, -20, -30, -40, -50},
-    {-30, -20, -10, 0, 0, -10, -20, -30},
-    {-30, -10, 20, 30, 30, 20, -10, -30},
-    {-30, -10, 30, 40, 40, 30, -10, -30},
-    {-30, -10, 30, 40, 40, 30, -10, -30},
-    {-30, -10, 20, 30, 30, 20, -10, -30},
-    {-30, -30, 0, 0, 0, 0, -30, -30},
-    {-50, -30, -30, -30, -30, -30, -30, -50},
-};
-
-// Looks up `table` (published rank-8-first order) for a piece of `color` on
-// (x, y), where y=0 is rank 1 in Board's own coordinate system. Mirrors for
-// Black so both sides use the same "toward the center / toward the back
-// rank" pattern.
-int pst(const int table[8][8], Color color, int x, int y) {
-    int effectiveY = (color == Color::White) ? y : 7 - y;
-    int row = 7 - effectiveY;
-    return table[row][x];
-}
-
-int kingPst(Color color, int x, int y, double phase) {
-    int mid = pst(kKingMidTable, color, x, y);
-    int end = pst(kKingEndTable, color, x, y);
-    return static_cast<int>(mid * phase + end * (1.0 - phase) + 0.5);
-}
-
-// 0 (endgame) .. 1 (opening/middlegame), based on remaining non-pawn material.
-double gamePhase(const Board& board) {
-    constexpr int kMaxPhase = 24; // 4 knights+4 bishops (1 each) + 4 rooks (2 each) + 2 queens (4 each)
-    int phaseUnits = 0;
-    for (int x = 0; x < 8; x++) {
-        for (int y = 0; y < 8; y++) {
-            switch (board.at(x, y).type) {
-                case PieceType::Knight:
-                case PieceType::Bishop: phaseUnits += 1; break;
-                case PieceType::Rook: phaseUnits += 2; break;
-                case PieceType::Queen: phaseUnits += 4; break;
-                default: break;
-            }
-        }
-    }
-    return std::min(1.0, phaseUnits / static_cast<double>(kMaxPhase));
-}
 
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
-    double phase = gamePhase(board);
-    int score = 0; // positive = good for White
-    for (int x = 0; x < 8; x++) {
-        for (int y = 0; y < 8; y++) {
-            Piece p = board.at(x, y);
-            if (p.isEmpty()) continue;
-            int posBonus = 0;
-            switch (p.type) {
-                case PieceType::Pawn: posBonus = pst(kPawnTable, p.color, x, y); break;
-                case PieceType::Knight: posBonus = pst(kKnightTable, p.color, x, y); break;
-                case PieceType::Bishop: posBonus = pst(kBishopTable, p.color, x, y); break;
-                case PieceType::Rook: posBonus = pst(kRookTable, p.color, x, y); break;
-                case PieceType::Queen: posBonus = pst(kQueenTable, p.color, x, y); break;
-                case PieceType::King: posBonus = kingPst(p.color, x, y, phase); break;
-                default: break;
-            }
-            // Positional bonuses are scaled down relative to material so a
-            // few plies of accumulated piece-square swings can't outweigh a
-            // clean material gain (deep search will otherwise construct
-            // exactly the line that exploits an oversized positional term).
-            int total = pieceValue(p.type) + posBonus / 2;
-            score += (p.color == Color::White) ? total : -total;
-        }
-    }
+    int score = board.rawEval(); // positive = good for White
     return (color == Color::White) ? score : -score;
 }
 
@@ -215,21 +76,8 @@ constexpr int kMateScore = 1'000'000;
 constexpr int kMateThreshold = kMateScore - 1000;
 constexpr int kMaxCheckExtensions = 16;
 
-// sizeof(TTEntry) is 56 bytes (measured). This table is shared by every
-// search thread (see findBestMove) instead of being privately owned per
-// thread, so it must absorb the *combined* node volume of every thread
-// searching the full root position, not one thread's slice of it.
-// Diagnosis against real games showed ~90-100M total nodes visited per
-// move at EXPERT settings (12 threads x ~7-9M nodes each, under the old
-// per-thread-subset design); 1<<22 (4,194,304) entries x 56 bytes ~= 224
-// MiB comfortably covers that per-move working set, and is still a cheap,
-// disposable allocation (rebuilt fresh every move, never persisted across
-// the game). It's also a real upgrade over the old *aggregate* capacity
-// (12 private tables x 1<<18 entries x 56 bytes ~= 168 MiB) despite being
-// a single table: that old capacity was fragmented across threads that
-// could never see each other's entries, so effectively none of it was
-// shared; this consolidates it into one table every thread benefits from.
-constexpr size_t kTTSize = size_t(1) << 22;
+// kTTSize is declared in ai.hpp (needed there so callers can construct the
+// persistent TranspositionTable they now own and pass into findBestMove).
 
 struct TimeUp {};
 
@@ -264,7 +112,7 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
     return ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
 }
 
-void orderMoves(const Board& board, std::vector<Move>& moves, const Move& ttMove, const SearchContext& ctx,
+void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx,
                  int ply, Color color) {
     std::sort(moves.begin(), moves.end(), [&](const Move& a, const Move& b) {
         return moveScore(board, a, ttMove, ctx, ply, color) > moveScore(board, b, ttMove, ctx, ply, color);
@@ -289,12 +137,19 @@ int fromTT(int score, int ply) {
     return score;
 }
 
-int negamax(const Board& board, int depth, int ply, int alpha, int beta, Color color, SearchContext& ctx,
+int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, SearchContext& ctx,
             int extensionsLeft);
 
 // Searches captures/promotions (all moves if in check) until the position is
 // "quiet," to avoid evaluating mid-capture-sequence (the horizon effect).
-int quiescence(const Board& board, int alpha, int beta, Color color, int ply, SearchContext& ctx) {
+//
+// Mutates `board` in place via make/unmake instead of copying it per move.
+// If checkTime() throws TimeUp mid-recursion, the unwind skips the pending
+// unmakeMove() calls on every frame between here and searchRootFull's catch,
+// leaving `board` with unbalanced moves applied. That's safe only because
+// the catch site in searchRootFull never reads `board` again afterward — if
+// that ever changes, this would need a scope-guard around each make/unmake.
+int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchContext& ctx) {
     ctx.nodes++;
     checkTime(ctx);
     if (ply >= kMaxPly - 1) return evaluate(board, color);
@@ -307,7 +162,7 @@ int quiescence(const Board& board, int alpha, int beta, Color color, int ply, Se
         if (standPat > alpha) alpha = standPat;
     }
 
-    std::vector<Move> candidates;
+    MoveList candidates;
     if (inCheck) {
         candidates = board.legalMoves(color);
         if (candidates.empty()) return -(kMateScore - ply);
@@ -320,9 +175,10 @@ int quiescence(const Board& board, int alpha, int beta, Color color, int ply, Se
 
     int best = inCheck ? INT_MIN : standPat;
     for (const Move& m : candidates) {
-        Board copy = board;
-        copy.makeMove(m);
-        int score = -quiescence(copy, -beta, -alpha, opponent(color), ply + 1, ctx);
+        Board::UndoState undo;
+        board.makeMove(m, undo);
+        int score = -quiescence(board, -beta, -alpha, opponent(color), ply + 1, ctx);
+        board.unmakeMove(m, undo);
         if (score > best) best = score;
         if (best > alpha) alpha = best;
         if (alpha >= beta) break;
@@ -336,7 +192,7 @@ int quiescence(const Board& board, int alpha, int beta, Color color, int ply, Se
 // ply whenever the side to move is in check lets the search see past that
 // forcing sequence. `extensionsLeft` bounds the total extensions per line so
 // a long forced-check sequence can't blow up recursion depth or search time.
-int negamax(const Board& board, int depth, int ply, int alpha, int beta, Color color, SearchContext& ctx,
+int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, SearchContext& ctx,
             int extensionsLeft) {
     ctx.nodes++;
     checkTime(ctx);
@@ -363,7 +219,7 @@ int negamax(const Board& board, int depth, int ply, int alpha, int beta, Color c
         }
     }
 
-    std::vector<Move> moves = board.legalMoves(color);
+    MoveList moves = board.legalMoves(color);
     if (moves.empty()) {
         if (board.isInCheck(color)) return -(kMateScore - ply);
         return 0; // stalemate
@@ -373,9 +229,10 @@ int negamax(const Board& board, int depth, int ply, int alpha, int beta, Color c
     Move bestMove = moves.front();
     int best = INT_MIN;
     for (const Move& m : moves) {
-        Board copy = board;
-        copy.makeMove(m);
-        int score = -negamax(copy, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
+        Board::UndoState undo;
+        board.makeMove(m, undo);
+        int score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
+        board.unmakeMove(m, undo);
         if (score > best) {
             best = score;
             bestMove = m;
@@ -429,7 +286,7 @@ bool isBetterAtSameDepth(const RootSearchResult& a, const RootSearchResult& b) {
 // TT/killer/history-driven ordering as the deterministic baseline. Jitter
 // only ever reorders candidates — it never removes one from consideration
 // at any depth — so every thread's search remains fully sound.
-RootSearchResult searchRootFull(const Board& board, Color aiColor, const std::vector<Move>& rootMoves, int maxDepth,
+RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<Move>& rootMoves, int maxDepth,
                                  std::chrono::steady_clock::time_point deadline, TranspositionTable& tt,
                                  size_t threadIndex) {
     RootSearchResult result;
@@ -464,10 +321,11 @@ RootSearchResult searchRootFull(const Board& board, Color aiColor, const std::ve
         bool completed = true;
         try {
             for (const Move& m : moves) {
-                Board copy = board;
-                copy.makeMove(m);
+                Board::UndoState undo;
+                board.makeMove(m, undo);
                 int score =
-                    -negamax(copy, depth - 1, 1, -beta, -alpha, opponent(aiColor), ctx, kMaxCheckExtensions);
+                    -negamax(board, depth - 1, 1, -beta, -alpha, opponent(aiColor), ctx, kMaxCheckExtensions);
+                board.unmakeMove(m, undo);
                 if (score > depthBest) {
                     depthBest = score;
                     depthBestMove = m;
@@ -494,15 +352,55 @@ RootSearchResult searchRootFull(const Board& board, Color aiColor, const std::ve
 
 } // namespace
 
-Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudgetMs) {
+BenchResult benchSearch(const Board& board, Color color, int depth) {
+    // searchRootFull() (below) is outside Step 3's scope and still takes a
+    // std::vector<Move>&, so convert once here at the root (not a hot path).
+    MoveList rootMoveList = board.legalMoves(color);
+    std::vector<Move> rootMoves(rootMoveList.begin(), rootMoveList.end());
+    BenchResult result;
+    if (rootMoves.empty()) return result;
+
+    Board local = board;
+    TranspositionTable tt(kTTSize);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::hours(24);
+    RootSearchResult r = searchRootFull(local, color, rootMoves, depth, deadline, tt, 0);
+    result.move = r.move;
+    result.score = r.score;
+    result.nodes = r.nodes;
+    return result;
+}
+
+Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudgetMs, TranspositionTable& tt) {
     std::vector<Move> book = lookupBook(board);
     static std::mt19937 rng(std::random_device{}());
     if (!book.empty()) {
-        std::uniform_int_distribution<size_t> dist(0, book.size() - 1);
-        return book[dist(rng)];
+        // Cheap, unconditional safety net: even though hashKey() is a
+        // complete encoding of position state (verified: pieces, side to
+        // move, all four castling rights, en passant target), a book move
+        // is only ever trustworthy if it's actually legal right now. Falls
+        // through to normal search instead of returning a stale/bogus move
+        // on any hash collision or book/board mismatch.
+        MoveList legal = board.legalMoves(aiColor);
+        std::vector<Move> legalBookMoves;
+        for (const Move& bm : book) {
+            for (const Move& lm : legal) {
+                if (bm.fromX == lm.fromX && bm.fromY == lm.fromY && bm.toX == lm.toX && bm.toY == lm.toY &&
+                    bm.promotion == lm.promotion) {
+                    legalBookMoves.push_back(lm);
+                    break;
+                }
+            }
+        }
+        if (!legalBookMoves.empty()) {
+            std::uniform_int_distribution<size_t> dist(0, legalBookMoves.size() - 1);
+            return legalBookMoves[dist(rng)];
+        }
     }
 
-    std::vector<Move> rootMoves = board.legalMoves(aiColor);
+    // searchRootFull() is outside Step 3's scope and still takes a
+    // std::vector<Move>&, so convert once here at the root (not a hot path).
+    MoveList rootMoveList = board.legalMoves(aiColor);
+    std::vector<Move> rootMoves(rootMoveList.begin(), rootMoveList.end());
     if (rootMoves.size() == 1) return rootMoves.front();
 
     if (g_aiDebugLog) {
@@ -515,7 +413,7 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     // plies further — exactly where accurate defense/king activity matters
     // most. Difficulty presets otherwise apply the same depth cap regardless
     // of material left on the board.
-    double phase = gamePhase(board);
+    double phase = board.gamePhase();
     int effectiveMaxDepth = maxDepth;
     if (phase < 0.5) effectiveMaxDepth += 2;
     if (phase < 0.2) effectiveMaxDepth += 2;
@@ -538,14 +436,18 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         std::fprintf(stderr, "[ai] numThreads=%zu rootMoves: %s\n", numThreads, movesStr(rootMoves).c_str());
     }
 
-    TranspositionTable sharedTT(kTTSize);
-
     std::vector<std::future<RootSearchResult>> futures;
     futures.reserve(numThreads);
     for (size_t t = 0; t < numThreads; t++) {
-        futures.push_back(
-            std::async(std::launch::async, [board, aiColor, rootMoves, effectiveMaxDepth, deadline, &sharedTT, t] {
-                return searchRootFull(board, aiColor, rootMoves, effectiveMaxDepth, deadline, sharedTT, t);
+        // Each thread needs its own mutable board to make/unmake moves into,
+        // so capture a fresh non-const copy per thread rather than the
+        // outer `const Board&` (capturing that by value would still carry
+        // the const through into the closure, `mutable` notwithstanding).
+        Board threadBoard = board;
+        futures.push_back(std::async(
+            std::launch::async,
+            [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, &tt, t]() mutable {
+                return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t);
             }));
     }
 

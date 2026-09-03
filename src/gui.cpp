@@ -317,6 +317,12 @@ struct App {
     int aiTimeBudgetMs = kDifficultyPresets[1].timeBudgetMs;
     std::optional<std::future<Move>> aiFuture;
 
+    // Persists across the whole session (and across games, and across the
+    // opponent's moves), rather than being rebuilt per move: a search often
+    // benefits from what a previous search already learned about the same
+    // subtrees, especially when the opponent plays a predicted response.
+    TranspositionTable tt{kTTSize};
+
     DragState dragState = DragState::None;
     int selX = -1, selY = -1;
     int mouseX = 0, mouseY = 0;
@@ -701,8 +707,8 @@ int runGui() {
                     Board snapshot = app.board;
                     Color aiColor = app.board.sideToMove();
                     int depth = app.aiDepthCap, budget = app.aiTimeBudgetMs;
-                    app.aiFuture = std::async(std::launch::async, [snapshot, aiColor, depth, budget] {
-                        return findBestMove(snapshot, aiColor, depth, budget);
+                    app.aiFuture = std::async(std::launch::async, [snapshot, aiColor, depth, budget, &tt = app.tt] {
+                        return findBestMove(snapshot, aiColor, depth, budget, tt);
                     });
                 } else if (app.aiFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
                     Move m = app.aiFuture->get();

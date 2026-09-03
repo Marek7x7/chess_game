@@ -15,3 +15,8 @@ struct Piece {
 inline Color opponent(Color c) {
     return c == Color::White ? Color::Black : Color::White;
 }
+
+// Standard centipawn material values. Shared by Board's incremental
+// evaluation and by AI move-ordering (MVV-LVA), so both stay in sync off one
+// definition.
+int pieceValue(PieceType t);

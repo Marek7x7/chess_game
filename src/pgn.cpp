@@ -106,7 +106,7 @@ bool resolveSanMove(const Board& board, const std::string& sanIn, Move& out) {
     if (san.empty()) return false;
 
     Color color = board.sideToMove();
-    std::vector<Move> legal = board.legalMoves(color);
+    MoveList legal = board.legalMoves(color);
 
     if (san == "O-O-O") {
         for (const Move& m : legal) {
