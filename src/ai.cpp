@@ -9,6 +9,7 @@
 #include <random>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -361,25 +362,55 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
         moves.reserve(scored.size());
         for (const auto& sm : scored) moves.push_back(sm.second);
 
-        int alpha = INT_MIN + 1, beta = INT_MAX - 1;
-        Move depthBestMove = moves.front();
-        int depthBest = INT_MIN;
-        bool completed = true;
-        try {
-            for (const Move& m : moves) {
-                Board::UndoState undo;
-                board.makeMove(m, undo);
-                int score =
-                    -negamax(board, depth - 1, 1, -beta, -alpha, opponent(aiColor), ctx, kMaxCheckExtensions);
-                board.unmakeMove(m, undo);
-                if (score > depthBest) {
-                    depthBest = score;
-                    depthBestMove = m;
+        // Runs the root move loop within a given (alpha, beta) window.
+        // Factored out so aspiration windows (below) can retry the same
+        // depth with a wider window on failure without duplicating the loop.
+        auto searchWindow = [&](int aLo, int aHi) -> std::tuple<bool, int, Move> {
+            int lo = aLo, hi = aHi;
+            Move bestMoveLocal = moves.front();
+            int bestLocal = INT_MIN;
+            bool completedLocal = true;
+            try {
+                for (const Move& m : moves) {
+                    Board::UndoState undo;
+                    board.makeMove(m, undo);
+                    int score =
+                        -negamax(board, depth - 1, 1, -hi, -lo, opponent(aiColor), ctx, kMaxCheckExtensions);
+                    board.unmakeMove(m, undo);
+                    if (score > bestLocal) {
+                        bestLocal = score;
+                        bestMoveLocal = m;
+                    }
+                    if (bestLocal > lo) lo = bestLocal;
                 }
-                if (depthBest > alpha) alpha = depthBest;
+            } catch (const TimeUp&) {
+                completedLocal = false;
             }
-        } catch (const TimeUp&) {
-            completed = false;
+            return {completedLocal, bestLocal, bestMoveLocal};
+        };
+
+        // Once a prior depth has completed, its score is usually close to
+        // this depth's true score, so search a narrow window around it
+        // first -- most of the tree fails low/high against a wide window
+        // that alpha-beta then has to spend nodes narrowing down anyway.
+        // Any window failure (score lands outside the narrow window, so
+        // its exact value wasn't determined) falls back to a full-window
+        // re-search of the same depth, guaranteeing a correct result --
+        // this is a pure search-order optimization, never a source of
+        // incorrect scores.
+        constexpr int kAspirationMargin = 50;
+        int alpha = INT_MIN + 1, beta = INT_MAX - 1;
+        if (result.depthReached > 0) {
+            long long lo = static_cast<long long>(result.score) - kAspirationMargin;
+            long long hi = static_cast<long long>(result.score) + kAspirationMargin;
+            alpha = static_cast<int>(std::max<long long>(INT_MIN + 1, lo));
+            beta = static_cast<int>(std::min<long long>(INT_MAX - 1, hi));
+        }
+
+        auto [completed, depthBest, depthBestMove] = searchWindow(alpha, beta);
+        if (completed && (depthBest <= alpha || depthBest >= beta) &&
+            !(alpha == INT_MIN + 1 && beta == INT_MAX - 1)) {
+            std::tie(completed, depthBest, depthBestMove) = searchWindow(INT_MIN + 1, INT_MAX - 1);
         }
 
         if (!completed) break;
