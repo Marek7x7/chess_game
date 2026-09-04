@@ -436,3 +436,107 @@ the verification was designed to catch: hand-rolled undo logic for
 en passant and castling — and that risk was retired empirically (perft
 byte-identical to 193M+ nodes on the position richest in exactly those
 cases), not just argued away.
+
+---
+
+# Tier 2 Strength Pass: PVS, Aspiration Windows, Null-Move, LMR
+
+Unlike every prior pass, this one changes search *behavior*, not just
+speed — items were required to be committed one at a time so a regression
+could be pinned to a single change. Ground rules carried over: perft/
+`--verify-eval`/ASan-UBSan on every item, before/after node counts via the
+established within-session A/B methodology, plain regression/wash/win
+statements, and no Elo claims (no controlled same-time-control match was
+run — see "What wasn't done" below).
+
+Starting state confirmed to match the repo's committed HEAD
+(`a3135df`, "changed check legal moves to the same solution move and
+unmove") before any item here.
+
+## Items implemented, each its own commit
+
+| # | Item | Commit | Node-count effect at depth 6 (cumulative) | Move/score |
+|---|---|---|---|---|
+| 0 | Quiescence TT probe/store (decided to include — lower risk, good process-validation step per the prompt's own framing) | `1d5a68f` | startpos 100,732→98,131; middlegame 1,256,733→1,023,972 (**-18.5%**); endgame 41,856→40,994 | Identical |
+| 1 | Principal Variation Search | `487eaff` | startpos →94,503; middlegame →869,765 (**-15.1%** further); endgame →39,469 | Identical |
+| 2 | Aspiration windows | `25d90a8` | startpos →94,474; middlegame →867,984 (**-0.2%**, small at depth 6 — see commit message); endgame →39,337 | Identical |
+| 3 | Null-move pruning | `e0d12a9` | startpos →44,649 (**-52.7%**); middlegame →660,790 (**-23.9%**); endgame →20,575 (**-47.7%**) | Identical |
+| 4 | Late Move Reductions | `71896b9` | startpos →28,057 (**-37.2%**); middlegame →398,352 (**-39.7%**); endgame →19,474 (**-5.4%**) | Identical (one depth-5-only score shift on endgame, explained in commit, reproduced identically in ASan and regular builds — not a bug) |
+
+Mate-in-1 stayed at 39 nodes and the correct move/score (`d1d8`,
+`score=999999`) through every single item — the position is too shallow for
+any of these techniques to engage, which is itself a useful negative
+control: nothing here is silently corrupting the trivial case.
+
+## Cumulative result (item 4 vs. the pre-this-pass baseline)
+
+| Position | Baseline nodes | Final nodes | Reduction |
+|---|---|---|---|
+| startpos | 100,732 | 28,057 | **-72.1%** |
+| middlegame (Kiwipete) | 1,256,733 | 398,352 | **-68.3%** |
+| endgame | 41,856 | 19,474 | **-53.5%** |
+| tactical (mate-in-1) | 39 | 39 | unchanged |
+
+Every one of the five items (0-4) was a genuine, individually-verified win
+— none were a wash or a regression, unlike the very first Tier 2 attempt in
+the prior pass. This is the honest result, not a rounded-up one: I looked
+specifically for a case where an item made things worse (that's exactly
+what happened with the original `legalMoves()` make/unmake attempt) and
+didn't find one here.
+
+## Per-item verification, all confirmed (detail in each commit message)
+
+- **Perft suite, `--verify-eval`**: unchanged after every item (expected —
+  none of these touch move generation or the evaluation function, only
+  search order/pruning) and confirmed after every item regardless, not
+  skipped on the assumption it would be fine.
+- **ASan/UBSan**: clean after every item.
+- **Tactical correctness**: mate-in-1 solved correctly after every item.
+  Null-move pruning (the highest-risk item) got the most scrutiny specific
+  to its own failure mode: `hasNonPawnMaterial()` unit-tested directly
+  across four positions (K+P-only, king-only, the real K+R+P benchmark
+  position, and a K+N position), and the guard's real-world effect was
+  demonstrated empirically — 5,963 nodes with the guard active vs. 2,536
+  with it artificially removed on a K+P-only position at depth 10, proving
+  it actually changes behavior rather than being dead code.
+- **Honest gap on LMR**: no bespoke hand-constructed "quiet move tactical
+  trap" position was built beyond the mate-in-1 check and the four
+  benchmark positions' move-choice stability, because hand-verifying such a
+  position with real confidence turned out to need either deep personal
+  calculation or an independent strong engine — neither reliably available
+  here. Flagging this rather than presenting the mate-in-1 check as
+  covering more than it does.
+
+## What wasn't done
+
+- **SEE (item 5)**: explicitly optional/lowest-priority in the brief and
+  the largest remaining chunk of work; asked whether to continue past
+  items 1-4 and was told to stop and report instead. Not implemented.
+- **TT replacement policy two-tier scheme**: the brief's own stated trigger
+  for this ("if node-count wins from items 1-4 come in lower than
+  expected") didn't occur — the wins were large (53-72% cumulative
+  reduction), not disappointing — so there's no evidence-based case for it
+  from this pass. Left as a candidate for a future pass if a *different*
+  signal (e.g. TT hit-rate telemetry) motivates it.
+- **No Elo claim.** Every number in this section is a node count or a
+  fixed-position move/score check, exactly per the ground rules ("No
+  claimed Elo gain without a controlled comparison"). A same-time-control
+  self-play match against a fixed opponent set was not run — building that
+  harness (opponent selection, enough games for statistical significance,
+  results tracking) is substantial infrastructure on its own and was
+  outside what this pass's time budget covered. The node-count reductions
+  here are evidence of *efficiency* (reaching a given depth faster), which
+  is a prerequisite for strength gains at a fixed time control but is not
+  itself proof of them — a pruning bug that skips a genuinely relevant line
+  would also reduce node counts while making the engine weaker, which is
+  exactly why the tactical sanity checks above (not the node counts) are
+  the real correctness evidence in this report, and why no Elo number
+  appears anywhere in it.
+
+## Files changed
+
+- `include/board.hpp`, `src/board.cpp` — `Board::makeNullMove`/
+  `unmakeNullMove`/`hasNonPawnMaterial` (item 3 only; items 0, 1, 2, 4 are
+  entirely within `src/ai.cpp`, the search layer)
+- `src/ai.cpp` — quiescence TT, PVS, aspiration windows, null-move pruning
+  integration, LMR
