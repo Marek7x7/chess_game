@@ -722,6 +722,35 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     turn = color;
 }
 
+void Board::makeNullMove(NullMoveUndo& undo) {
+    const ZobristKeys& z = zobrist();
+    undo.prevHash = hash;
+    undo.prevEnPassantX = enPassantX;
+    undo.prevEnPassantY = enPassantY;
+    if (enPassantX != -1) hash ^= z.enPassantFile[enPassantX];
+    enPassantX = enPassantY = -1;
+    hash ^= z.sideToMove;
+    turn = opponent(turn);
+}
+
+void Board::unmakeNullMove(const NullMoveUndo& undo) {
+    hash = undo.prevHash;
+    enPassantX = undo.prevEnPassantX;
+    enPassantY = undo.prevEnPassantY;
+    turn = opponent(turn);
+}
+
+bool Board::hasNonPawnMaterial(Color color) const {
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            const Piece& p = squares[x][y];
+            if (p.color != color) continue;
+            if (p.type != PieceType::Pawn && p.type != PieceType::King) return true;
+        }
+    }
+    return false;
+}
+
 // Piece-placement and king-tracking only -- no hash, no eval, no castling
 // rights, no en-passant target. See the LightUndo comment in board.hpp for
 // the invariant this depends on.

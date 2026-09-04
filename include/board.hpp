@@ -75,6 +75,25 @@ public:
     // the exact pair from that call, applied with no other move in between.
     void unmakeMove(const Move& m, const UndoState& undo);
 
+    // "Passes" -- flips the side to move without moving any piece, for
+    // null-move pruning. Clears the en passant target the same way a real
+    // move would (the capture window is always exactly one ply). Piece
+    // placement, material/eval, and king squares are all unaffected since
+    // nothing moved.
+    struct NullMoveUndo {
+        uint64_t prevHash;
+        int prevEnPassantX, prevEnPassantY;
+    };
+    void makeNullMove(NullMoveUndo& undo);
+    void unmakeNullMove(const NullMoveUndo& undo);
+
+    // True if `color` has any piece other than pawns/king. Used to guard
+    // null-move pruning: passing is unsound in king+pawn endgames (the side
+    // to move is often in zugzwang there -- any move, including a "free"
+    // one, makes the position worse), so null-move must never be tried when
+    // this is false.
+    bool hasNonPawnMaterial(Color color) const;
+
     GameStatus status() const; // status of the side to move
 
     // Finds the legal move matching the given squares/promotion, or nullptr fields if none.

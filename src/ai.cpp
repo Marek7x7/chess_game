@@ -224,7 +224,8 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     ctx.nodes++;
     checkTime(ctx);
 
-    if (extensionsLeft > 0 && board.isInCheck(color)) {
+    bool inCheck = board.isInCheck(color);
+    if (extensionsLeft > 0 && inCheck) {
         depth++;
         extensionsLeft--;
     }
@@ -246,9 +247,43 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         }
     }
 
+    // Null-move pruning: "pass" (give the opponent a free move) and search
+    // at a reduced depth with a minimal window around beta. If the
+    // position is still so good after passing that it fails high, a real
+    // move is almost certainly at least that good too, so prune without
+    // searching the real moves properly.
+    //
+    // Guarded against the two classic failure modes: never in check (no
+    // legal "pass" exists from check, and the resulting position would be
+    // nonsense), and never without at least one piece besides pawns/king
+    // (`hasNonPawnMaterial`) -- king+pawn endgames are exactly where
+    // zugzwang (passing being *better* than every legal move) shows up, so
+    // "if passing is fine, a real move is even better" breaks down hardest
+    // there; this is the highest-risk part of this technique and the guard
+    // this codebase's endgame benchmark position specifically exercises.
+    // Also skipped near mate scores, since a reduced-depth null search
+    // can't be trusted to find or avoid a forced mate.
+    //
+    // If checkTime() throws TimeUp inside the null-move search, the
+    // pending unmakeNullMove() below is skipped -- safe under the same
+    // existing invariant as every other make/unmake in this function: the
+    // unwind only ever stops at searchRootFull's catch, which never reads
+    // `board` again.
+    constexpr int kNullMoveMinDepth = 3;
+    constexpr int kNullMoveReduction = 2;
+    if (!inCheck && depth >= kNullMoveMinDepth && beta < kMateThreshold && beta > -kMateThreshold &&
+        board.hasNonPawnMaterial(color)) {
+        Board::NullMoveUndo nu;
+        board.makeNullMove(nu);
+        int nullScore =
+            -negamax(board, depth - 1 - kNullMoveReduction, ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
+        board.unmakeNullMove(nu);
+        if (nullScore >= beta) return beta;
+    }
+
     MoveList moves = board.legalMoves(color);
     if (moves.empty()) {
-        if (board.isInCheck(color)) return -(kMateScore - ply);
+        if (inCheck) return -(kMateScore - ply);
         return 0; // stalemate
     }
     orderMoves(board, moves, ttMove, ctx, ply, color);
