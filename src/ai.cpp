@@ -288,33 +288,56 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     }
     orderMoves(board, moves, ttMove, ctx, ply, color);
 
+    constexpr int kLmrStartIndex = 4; // first 4 moves (index 0-3) always searched at full depth
+    constexpr int kLmrMinDepth = 3;
+
     Move bestMove = moves.front();
     int best = INT_MIN;
-    bool firstMove = true;
+    int moveIndex = 0;
     for (const Move& m : moves) {
         Board::UndoState undo;
         board.makeMove(m, undo);
+
+        // LMR candidate check: quiet (no capture/promotion), ordered late,
+        // not a killer, at enough depth to meaningfully reduce. isInCheck()
+        // (whether THIS move checks the opponent) is the one relatively
+        // expensive part, so it's only evaluated once the cheap conditions
+        // already qualify -- a checking move is excluded from reduction
+        // since, like the check-extension above, a fixed-depth search cut
+        // short right after a check is exactly where tactics hide.
+        bool isKiller = ply < kMaxPly && (sameMove(m, ctx.killers[ply][0]) || sameMove(m, ctx.killers[ply][1]));
+        bool lmrCandidate = moveIndex >= kLmrStartIndex && depth >= kLmrMinDepth && m.captured == PieceType::None &&
+                             m.promotion == PieceType::None && !isKiller;
+        bool doLMR = lmrCandidate && !board.isInCheck(opponent(color));
+        int reduction = doLMR ? 1 : 0;
+
         // PVS: the first move (typically the TT move / best-ordered guess)
         // gets the full window, since it's expected to be the actual best
         // move and we want its exact score. Every later move is searched
         // with a zero/null window first -- a cheap "is this better than
-        // what we already have?" test -- and only re-searched with the
-        // full window if it unexpectedly fails high (score > alpha),
+        // what we already have?" test -- optionally at reduced depth too
+        // if it's an LMR candidate -- and re-searched (first at full depth
+        // if it was reduced, then with the full window if it's still
+        // between alpha and beta) only when it unexpectedly fails high,
         // meaning it might actually be better and its exact value matters.
-        // With good move ordering (which this engine already has via
-        // TT/MVV-LVA/killers/history), most non-first moves fail low on
-        // the null window and never need the expensive full re-search.
+        // With good move ordering (already in place via TT/MVV-LVA/
+        // killers/history) most non-first moves fail low and never need
+        // either re-search.
         int score;
-        if (firstMove) {
+        if (moveIndex == 0) {
             score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
         } else {
-            score = -negamax(board, depth - 1, ply + 1, -alpha - 1, -alpha, opponent(color), ctx, extensionsLeft);
+            score = -negamax(board, depth - 1 - reduction, ply + 1, -alpha - 1, -alpha, opponent(color), ctx,
+                              extensionsLeft);
+            if (reduction > 0 && score > alpha) {
+                score = -negamax(board, depth - 1, ply + 1, -alpha - 1, -alpha, opponent(color), ctx, extensionsLeft);
+            }
             if (score > alpha && score < beta) {
                 score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
             }
         }
         board.unmakeMove(m, undo);
-        firstMove = false;
+        moveIndex++;
         if (score > best) {
             best = score;
             bestMove = m;
