@@ -254,11 +254,31 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
 
     Move bestMove = moves.front();
     int best = INT_MIN;
+    bool firstMove = true;
     for (const Move& m : moves) {
         Board::UndoState undo;
         board.makeMove(m, undo);
-        int score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
+        // PVS: the first move (typically the TT move / best-ordered guess)
+        // gets the full window, since it's expected to be the actual best
+        // move and we want its exact score. Every later move is searched
+        // with a zero/null window first -- a cheap "is this better than
+        // what we already have?" test -- and only re-searched with the
+        // full window if it unexpectedly fails high (score > alpha),
+        // meaning it might actually be better and its exact value matters.
+        // With good move ordering (which this engine already has via
+        // TT/MVV-LVA/killers/history), most non-first moves fail low on
+        // the null window and never need the expensive full re-search.
+        int score;
+        if (firstMove) {
+            score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
+        } else {
+            score = -negamax(board, depth - 1, ply + 1, -alpha - 1, -alpha, opponent(color), ctx, extensionsLeft);
+            if (score > alpha && score < beta) {
+                score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
+            }
+        }
         board.unmakeMove(m, undo);
+        firstMove = false;
         if (score > best) {
             best = score;
             bestMove = m;
