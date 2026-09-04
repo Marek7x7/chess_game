@@ -154,6 +154,22 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
     checkTime(ctx);
     if (ply >= kMaxPly - 1) return evaluate(board, color);
 
+    // Quiescence's own conceptual search depth is 0, so any stored entry
+    // (from a full negamax search or a prior quiescence visit) is at least
+    // as deep -- the `ttEntry.depth >= depth` gate that guards negamax's
+    // probe is unconditionally true here and is omitted accordingly.
+    uint64_t key = board.hashKey();
+    Move ttMove{};
+    TTEntry ttEntry;
+    if (ctx.tt.probe(key, ttEntry)) {
+        if (ttEntry.hasMove) ttMove = ttEntry.best;
+        int ttScore = fromTT(ttEntry.score, ply);
+        if (ttEntry.flag == TTFlag::Exact) return ttScore;
+        if (ttEntry.flag == TTFlag::LowerBound) alpha = std::max(alpha, ttScore);
+        else if (ttEntry.flag == TTFlag::UpperBound) beta = std::min(beta, ttScore);
+        if (alpha >= beta) return ttScore;
+    }
+
     bool inCheck = board.isInCheck(color);
     int standPat = 0;
     if (!inCheck) {
@@ -171,18 +187,28 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
             if (m.captured != PieceType::None || m.promotion == PieceType::Queen) candidates.push_back(m);
         }
     }
-    orderMoves(board, candidates, Move{}, ctx, ply, color);
+    orderMoves(board, candidates, ttMove, ctx, ply, color);
 
+    int origAlpha = alpha;
+    Move bestMove{};
+    bool haveBestMove = false;
     int best = inCheck ? INT_MIN : standPat;
     for (const Move& m : candidates) {
         Board::UndoState undo;
         board.makeMove(m, undo);
         int score = -quiescence(board, -beta, -alpha, opponent(color), ply + 1, ctx);
         board.unmakeMove(m, undo);
-        if (score > best) best = score;
+        if (score > best) {
+            best = score;
+            bestMove = m;
+            haveBestMove = true;
+        }
         if (best > alpha) alpha = best;
         if (alpha >= beta) break;
     }
+
+    TTFlag flag = best <= origAlpha ? TTFlag::UpperBound : (best >= beta ? TTFlag::LowerBound : TTFlag::Exact);
+    ctx.tt.store(key, 0, toTT(best, ply), flag, bestMove, haveBestMove);
     return best;
 }
 
