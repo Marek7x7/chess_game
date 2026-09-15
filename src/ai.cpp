@@ -565,7 +565,7 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     // reason to cap thread count by the number of root moves anymore — that
     // cap only made sense when each thread owned a disjoint, non-empty
     // bucket to search.
-    size_t numThreads = std::max(1u, std::thread::hardware_concurrency() / 2);
+    size_t numThreads = std::max(1u, std::thread::hardware_concurrency() - 2);
 
     if (g_aiDebugLog) {
         std::fprintf(stderr, "[ai] numThreads=%zu rootMoves: %s\n", numThreads, movesStr(rootMoves).c_str());

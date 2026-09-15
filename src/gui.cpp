@@ -37,6 +37,20 @@ constexpr DifficultyPreset kDifficultyPresets[4] = {
     {"EXPERT", 20, 6000},
 };
 
+// Layout for Screen::CustomSetup: a shrunk, editable board flanked by two
+// piece palettes (one per side, same width), all inside the normal
+// kWindowW-wide canvas -- 80 + 480 + 80 == 640 with no leftover slack.
+constexpr int kSetupSquare = 60;
+constexpr int kSetupBoardPx = kSetupSquare * 8;
+constexpr int kPaletteSlot = 80;
+constexpr int kSetupBoardX = kPaletteSlot;
+constexpr int kSetupBoardY = 56;
+
+constexpr PieceType kPaletteOrder[6] = {
+    PieceType::Pawn, PieceType::Knight, PieceType::Bishop,
+    PieceType::Rook, PieceType::Queen, PieceType::King,
+};
+
 // ---------------------------------------------------------------------
 // Low-level drawing primitives (plain SDL2, no extra libraries)
 // ---------------------------------------------------------------------
@@ -277,6 +291,19 @@ int toScreenY(int y, bool flipped) { return (flipped ? y : (7 - y)) * kSquare; }
 int toBoardX(int screenX, bool flipped) { int c = screenX / kSquare; return flipped ? 7 - c : c; }
 int toBoardY(int screenY, bool flipped) { int rw = screenY / kSquare; return flipped ? rw : 7 - rw; }
 
+// Same idea as toScreenX/Y/toBoardX/Y above, but for the smaller, inset
+// board used by Screen::CustomSetup. Callers must confirm a point falls
+// inside the setup board rect (pointInRect against kSetupBoardX/Y sized
+// kSetupBoardPx) before converting it with the BoardX/Y direction -- the
+// subtraction below can go negative for an off-board point (e.g. a click in
+// a palette), and integer division truncates toward zero rather than
+// flooring, so an out-of-bounds point can silently alias into a
+// valid-looking column instead of an obviously invalid one.
+int setupToScreenX(int x, bool flipped) { return kSetupBoardX + (flipped ? (7 - x) : x) * kSetupSquare; }
+int setupToScreenY(int y, bool flipped) { return kSetupBoardY + (flipped ? y : (7 - y)) * kSetupSquare; }
+int setupToBoardX(int screenX, bool flipped) { int c = (screenX - kSetupBoardX) / kSetupSquare; return flipped ? 7 - c : c; }
+int setupToBoardY(int screenY, bool flipped) { int rw = (screenY - kSetupBoardY) / kSetupSquare; return flipped ? rw : 7 - rw; }
+
 // ---------------------------------------------------------------------
 // UI widgets
 // ---------------------------------------------------------------------
@@ -287,6 +314,17 @@ struct Button {
 };
 
 bool pointInRect(int x, int y, const SDL_Rect& r) { return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h; }
+
+// Finds which CustomSetup palette slot (if any) contains (px, py), and
+// reports the piece type/color that slot stamps. Piece order top-to-bottom
+// is defined once via kPaletteOrder and shared with rendering.
+bool paletteSlotAt(int px, int py, const SDL_Rect (&black)[6], const SDL_Rect (&white)[6], PieceType& outType, Color& outColor) {
+    for (int i = 0; i < 6; i++) {
+        if (pointInRect(px, py, black[i])) { outType = kPaletteOrder[i]; outColor = Color::Black; return true; }
+        if (pointInRect(px, py, white[i])) { outType = kPaletteOrder[i]; outColor = Color::White; return true; }
+    }
+    return false;
+}
 
 void drawButton(SDL_Renderer* r, const Button& b, SDL_Color bg, SDL_Color fg, float textSize) {
     SDL_SetRenderDrawColor(r, bg.r, bg.g, bg.b, bg.a);
@@ -302,7 +340,7 @@ std::string colorName(Color c) { return c == Color::White ? "WHITE" : "BLACK"; }
 // Application state
 // ---------------------------------------------------------------------
 
-enum class Screen { MenuMain, MenuColor, MenuDifficulty, Game };
+enum class Screen { MenuMain, MenuColor, MenuDifficulty, CustomSetup, Game };
 enum class DragState { None, Selected, Dragging };
 
 struct App {
@@ -333,6 +371,17 @@ struct App {
     bool promotionPending = false;
     int promoFromX = -1, promoFromY = -1, promoToX = -1, promoToY = -1;
 
+    // Staging state for the "Custom" board-setup flow (Screen::CustomSetup).
+    bool customMode = false;
+    Piece customGrid[8][8]; // Piece{} = empty; Board's squares are private so this can't be `board` itself
+    bool customDragActive = false;
+    bool customDragFromBoard = false; // false = stamped from a palette (infinite); true = repositioning
+    PieceType customDragType = PieceType::None;
+    Color customDragColor = Color::None;
+    int customDragFromX = -1, customDragFromY = -1; // valid only when customDragFromBoard
+    int customMouseX = 0, customMouseY = 0;
+    std::string customErrorMsg; // empty = no error shown
+
     bool running = true;
 };
 
@@ -343,6 +392,94 @@ void startGame(App& app) {
     app.hasLastMove = false;
     app.promotionPending = false;
     app.aiFuture.reset();
+    app.screen = Screen::Game;
+}
+
+// Clears the custom-setup staging grid to empty. Called every time
+// MenuDifficulty routes into Screen::CustomSetup, so re-entry after an
+// earlier custom session is guaranteed empty, not just the very first visit.
+void resetCustomSetup(App& app) {
+    for (int x = 0; x < 8; x++)
+        for (int y = 0; y < 8; y++)
+            app.customGrid[x][y] = Piece{};
+    app.customDragActive = false;
+    app.customErrorMsg.clear();
+    app.flipped = app.humanColor == Color::Black; // Custom mode is always vs-AI, so vsAi is implicitly true
+}
+
+// Inverse of Board::fromFEN's placement parsing: rank 8 down to rank 1,
+// file a to h, digits for consecutive empty squares, '/' between ranks.
+std::string customGridToFenPlacement(const Piece (&grid)[8][8]) {
+    std::string placement;
+    for (int y = 7; y >= 0; y--) {
+        int emptyRun = 0;
+        for (int x = 0; x < 8; x++) {
+            const Piece& p = grid[x][y];
+            if (p.isEmpty()) { emptyRun++; continue; }
+            if (emptyRun > 0) { placement += static_cast<char>('0' + emptyRun); emptyRun = 0; }
+            placement += p.symbol();
+        }
+        if (emptyRun > 0) placement += static_cast<char>('0' + emptyRun);
+        if (y > 0) placement += '/';
+    }
+    return placement;
+}
+
+// Grid-only legality gate for a custom position, checked before any Board is
+// built from it. Board::fromFEN trusts its input completely: a color with
+// zero kings leaves that color's internally-tracked king square stale (still
+// wherever the default-constructed standard position put it), and a color
+// with 2+ kings only ever tracks the last one scanned -- either way
+// isInCheck()/legalMoves() would silently check the wrong square. Pawns on
+// the back ranks are rejected too since pawn-move generation assumes that
+// never happens in a reachable chess position.
+bool validateCustomPosition(const Piece (&grid)[8][8], std::string& reason) {
+    int whiteKings = 0, blackKings = 0;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            if (grid[x][y].type != PieceType::King) continue;
+            if (grid[x][y].color == Color::White) whiteKings++; else blackKings++;
+        }
+    }
+    if (whiteKings != 1 || blackKings != 1) { reason = "NEED EXACTLY ONE KING PER SIDE"; return false; }
+    for (int x = 0; x < 8; x++) {
+        if (grid[x][0].type == PieceType::Pawn || grid[x][7].type == PieceType::Pawn) {
+            reason = "NO PAWNS ON THE BACK RANKS";
+            return false;
+        }
+    }
+    return true;
+}
+
+// Validates the staged grid, and additionally rejects a position where the
+// side moving second is already in check -- nothing in this engine stops
+// the side to move from legally "capturing" such a king outright (no move
+// generator special-cases the king as a capture target), which would
+// silently corrupt check/checkmate detection for the rest of the game. On
+// success, builds the Board and switches to Screen::Game exactly like
+// startGame() does for the standard-position flow.
+void finishCustomSetup(App& app, Color sideToMoveFirst) {
+    std::string reason;
+    if (!validateCustomPosition(app.customGrid, reason)) {
+        app.customErrorMsg = reason;
+        return;
+    }
+    std::string fen = customGridToFenPlacement(app.customGrid) +
+                       (sideToMoveFirst == Color::White ? " w - -" : " b - -");
+    Board candidate = Board::fromFEN(fen);
+    if (candidate.isInCheck(opponent(sideToMoveFirst))) {
+        app.customErrorMsg = "OPPONENT KING ALREADY IN CHECK";
+        return;
+    }
+    app.board = candidate;
+    app.flipped = app.humanColor == Color::Black;
+    app.dragState = DragState::None;
+    app.hasLastMove = false;
+    app.promotionPending = false;
+    app.aiFuture.reset();
+    app.customMode = false;
+    app.customDragActive = false;
+    app.customErrorMsg.clear();
     app.screen = Screen::Game;
 }
 
@@ -396,14 +533,16 @@ const SDL_Color kSelectHighlight{255, 215, 0, 110};
 const SDL_Color kMoveHighlight{60, 160, 60, 130};
 const SDL_Color kLastMoveHighlight{80, 130, 220, 90};
 const SDL_Color kCheckHighlight{220, 40, 40, 140};
+const SDL_Color kErrorColor{235, 90, 90, 255};
 
-void renderMenuMain(App& app, Button& twoPlayers, Button& vsComputer) {
+void renderMenuMain(App& app, Button& twoPlayers, Button& vsComputer, Button& custom) {
     SDL_Renderer* r = app.renderer;
     SDL_SetRenderDrawColor(r, kBg.r, kBg.g, kBg.b, kBg.a);
     SDL_RenderClear(r);
     drawTextCentered(r, kWindowW / 2.0f, 90, 48, kTitleColor, "CHESS");
     drawButton(r, twoPlayers, kButtonBg, kButtonFg, 20);
     drawButton(r, vsComputer, kButtonBg, kButtonFg, 20);
+    drawButton(r, custom, kButtonBg, kButtonFg, 20);
 }
 
 void renderMenuColor(App& app, Button& white, Button& black) {
@@ -421,6 +560,66 @@ void renderMenuDifficulty(App& app, Button (&presetButtons)[4]) {
     SDL_RenderClear(r);
     drawTextCentered(r, kWindowW / 2.0f, 60, 32, kTitleColor, "DIFFICULTY");
     for (const Button& b : presetButtons) drawButton(r, b, kButtonBg, kButtonFg, 20);
+}
+
+void renderCustomSetup(App& app, const SDL_Rect (&blackPalette)[6], const SDL_Rect (&whitePalette)[6],
+                        Button& blackStartBtn, Button& whiteStartBtn, Button& backBtn) {
+    SDL_Renderer* r = app.renderer;
+    SDL_SetRenderDrawColor(r, kBg.r, kBg.g, kBg.b, kBg.a);
+    SDL_RenderClear(r);
+
+    drawTextCentered(r, kWindowW / 2.0f, 20, 24, kTitleColor, "CUSTOM SETUP");
+
+    // Board squares.
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            SDL_Rect rect{setupToScreenX(x, app.flipped), setupToScreenY(y, app.flipped), kSetupSquare, kSetupSquare};
+            SDL_Color base = ((x + y) % 2 == 0) ? kDarkSquare : kLightSquare;
+            SDL_SetRenderDrawColor(r, base.r, base.g, base.b, base.a);
+            SDL_RenderFillRect(r, &rect);
+        }
+    }
+
+    // Palette slots: a filled/outlined square plus a centered piece icon.
+    // Palettes never deplete -- they're just a fixed reference of what's
+    // available to stamp, not inventory being consumed.
+    for (int i = 0; i < 6; i++) {
+        for (const SDL_Rect* slot : {&blackPalette[i], &whitePalette[i]}) {
+            SDL_SetRenderDrawColor(r, kButtonBg.r, kButtonBg.g, kButtonBg.b, kButtonBg.a);
+            SDL_RenderFillRect(r, slot);
+            SDL_SetRenderDrawColor(r, kButtonFg.r, kButtonFg.g, kButtonFg.b, kButtonFg.a);
+            SDL_RenderDrawRect(r, slot);
+        }
+        float bcx = blackPalette[i].x + blackPalette[i].w / 2.0f, bcy = blackPalette[i].y + blackPalette[i].h / 2.0f;
+        float wcx = whitePalette[i].x + whitePalette[i].w / 2.0f, wcy = whitePalette[i].y + whitePalette[i].h / 2.0f;
+        drawPieceIcon(r, kPaletteOrder[i], Color::Black, bcx, bcy, static_cast<float>(kPaletteSlot));
+        drawPieceIcon(r, kPaletteOrder[i], Color::White, wcx, wcy, static_cast<float>(kPaletteSlot));
+    }
+
+    // Board pieces. A piece mid-drag from the board was already cleared out
+    // of customGrid at pickup time, so there's nothing to skip here -- it's
+    // simply absent until it's dropped somewhere.
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            Piece p = app.customGrid[x][y];
+            if (p.isEmpty()) continue;
+            int cx = setupToScreenX(x, app.flipped) + kSetupSquare / 2;
+            int cy = setupToScreenY(y, app.flipped) + kSetupSquare / 2;
+            drawPieceIcon(r, p.type, p.color, static_cast<float>(cx), static_cast<float>(cy), static_cast<float>(kSetupSquare));
+        }
+    }
+    if (app.customDragActive) {
+        drawPieceIcon(r, app.customDragType, app.customDragColor, static_cast<float>(app.customMouseX),
+                      static_cast<float>(app.customMouseY), static_cast<float>(kSetupSquare));
+    }
+
+    drawButton(r, blackStartBtn, kButtonBg, kButtonFg, 18);
+    drawButton(r, whiteStartBtn, kButtonBg, kButtonFg, 18);
+    drawButton(r, backBtn, kButtonBg, kButtonFg, 14);
+
+    if (!app.customErrorMsg.empty()) {
+        drawTextCentered(r, kWindowW / 2.0f, 624, 16, kErrorColor, app.customErrorMsg);
+    }
 }
 
 void renderGame(App& app, Button& quitBtn, Button& newGameBtn) {
@@ -606,6 +805,17 @@ int runGui() {
         {{kWindowW / 2 - 110, 270, 220, 50}, kDifficultyPresets[2].label},
         {{kWindowW / 2 - 110, 340, 220, 50}, kDifficultyPresets[3].label},
     };
+    Button customBtn{{kWindowW / 2 - 110, 380, 220, 50}, "CUSTOM"};
+    Button blackStartBtn{{110, 560, 200, 50}, "BLACK START"};
+    Button whiteStartBtn{{330, 560, 200, 50}, "WHITE START"};
+    Button backBtn{{240, 670, 160, 40}, "BACK TO MENU"};
+    SDL_Rect setupBoardRect{kSetupBoardX, kSetupBoardY, kSetupBoardPx, kSetupBoardPx};
+    SDL_Rect blackPalette[6];
+    SDL_Rect whitePalette[6];
+    for (int i = 0; i < 6; i++) {
+        blackPalette[i] = SDL_Rect{0, kSetupBoardY + i * kPaletteSlot, kPaletteSlot, kPaletteSlot};
+        whitePalette[i] = SDL_Rect{kWindowW - kPaletteSlot, kSetupBoardY + i * kPaletteSlot, kPaletteSlot, kPaletteSlot};
+    }
 
     while (app.running) {
         SDL_Event e;
@@ -615,14 +825,27 @@ int runGui() {
             } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                 app.dragState = DragState::None;
                 app.promotionPending = false;
+                if (app.customDragActive && app.customDragFromBoard) {
+                    app.customGrid[app.customDragFromX][app.customDragFromY] = Piece{app.customDragType, app.customDragColor};
+                }
+                app.customDragActive = false;
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT) {
                 app.dragState = DragState::None;
                 app.promotionPending = false;
+                if (app.customDragActive && app.customDragFromBoard) {
+                    app.customGrid[app.customDragFromX][app.customDragFromY] = Piece{app.customDragType, app.customDragColor};
+                }
+                app.customDragActive = false;
             } else if (app.screen == Screen::MenuMain && e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
                 if (pointInRect(e.button.x, e.button.y, twoPlayersBtn.rect)) {
                     app.vsAi = false;
+                    app.customMode = false;
                     startGame(app);
                 } else if (pointInRect(e.button.x, e.button.y, vsComputerBtn.rect)) {
+                    app.customMode = false;
+                    app.screen = Screen::MenuColor;
+                } else if (pointInRect(e.button.x, e.button.y, customBtn.rect)) {
+                    app.customMode = true;
                     app.screen = Screen::MenuColor;
                 }
             } else if (app.screen == Screen::MenuColor && e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
@@ -640,9 +863,63 @@ int runGui() {
                     if (pointInRect(e.button.x, e.button.y, difficultyBtns[i].rect)) {
                         app.aiDepthCap = kDifficultyPresets[i].depthCap;
                         app.aiTimeBudgetMs = kDifficultyPresets[i].timeBudgetMs;
-                        startGame(app);
+                        if (app.customMode) {
+                            resetCustomSetup(app);
+                            app.screen = Screen::CustomSetup;
+                        } else {
+                            startGame(app);
+                        }
                         break;
                     }
+                }
+            } else if (app.screen == Screen::CustomSetup) {
+                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                    PieceType paletteType;
+                    Color paletteColor;
+                    if (pointInRect(e.button.x, e.button.y, backBtn.rect)) {
+                        app.customMode = false;
+                        app.screen = Screen::MenuMain;
+                    } else if (pointInRect(e.button.x, e.button.y, blackStartBtn.rect)) {
+                        finishCustomSetup(app, Color::Black);
+                    } else if (pointInRect(e.button.x, e.button.y, whiteStartBtn.rect)) {
+                        finishCustomSetup(app, Color::White);
+                    } else if (paletteSlotAt(e.button.x, e.button.y, blackPalette, whitePalette, paletteType, paletteColor)) {
+                        app.customDragActive = true;
+                        app.customDragFromBoard = false;
+                        app.customDragType = paletteType;
+                        app.customDragColor = paletteColor;
+                        app.customMouseX = e.button.x;
+                        app.customMouseY = e.button.y;
+                    } else if (pointInRect(e.button.x, e.button.y, setupBoardRect)) {
+                        int bx = setupToBoardX(e.button.x, app.flipped);
+                        int by = setupToBoardY(e.button.y, app.flipped);
+                        Piece p = app.customGrid[bx][by];
+                        if (!p.isEmpty()) {
+                            app.customDragActive = true;
+                            app.customDragFromBoard = true;
+                            app.customDragType = p.type;
+                            app.customDragColor = p.color;
+                            app.customDragFromX = bx;
+                            app.customDragFromY = by;
+                            app.customGrid[bx][by] = Piece{};
+                            app.customErrorMsg.clear();
+                            app.customMouseX = e.button.x;
+                            app.customMouseY = e.button.y;
+                        }
+                    }
+                } else if (e.type == SDL_MOUSEMOTION && app.customDragActive) {
+                    app.customMouseX = e.motion.x;
+                    app.customMouseY = e.motion.y;
+                } else if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT && app.customDragActive) {
+                    if (pointInRect(e.button.x, e.button.y, setupBoardRect)) {
+                        int bx = setupToBoardX(e.button.x, app.flipped);
+                        int by = setupToBoardY(e.button.y, app.flipped);
+                        app.customGrid[bx][by] = Piece{app.customDragType, app.customDragColor};
+                        app.customErrorMsg.clear();
+                    }
+                    app.customDragActive = false;
+                    app.customDragFromX = -1;
+                    app.customDragFromY = -1;
                 }
             } else if (app.screen == Screen::Game) {
                 GameStatus status = app.board.status();
@@ -721,9 +998,10 @@ int runGui() {
         }
 
         switch (app.screen) {
-            case Screen::MenuMain: renderMenuMain(app, twoPlayersBtn, vsComputerBtn); break;
+            case Screen::MenuMain: renderMenuMain(app, twoPlayersBtn, vsComputerBtn, customBtn); break;
             case Screen::MenuColor: renderMenuColor(app, playWhiteBtn, playBlackBtn); break;
             case Screen::MenuDifficulty: renderMenuDifficulty(app, difficultyBtns); break;
+            case Screen::CustomSetup: renderCustomSetup(app, blackPalette, whitePalette, blackStartBtn, whiteStartBtn, backBtn); break;
             case Screen::Game: renderGame(app, quitBtn, newGameBtn); break;
         }
         SDL_RenderPresent(renderer);

@@ -30,7 +30,7 @@ Added before touching any optimization code:
 ```
 startpos   perft(1..5) = 20, 400, 8902, 197281, 4865609        — ALL OK
 kiwipete   perft(1..4) = 48, 2039, 97862, 4085603              — ALL OK
-endgame    perft(1..5) = 14, 191, 2812, 43238, 674624           — ALL OK
+endgame    perft(1..5) = 14, 191, 2812, 43238, 674624          — ALL OK
 PERFT SUITE: ALL PASS
 ```
 
@@ -150,7 +150,7 @@ one-time, non-per-candidate copies, out of scope:
 ## Perft suite (safety net)
 
 ```
-startpos   perft(1..4) = 20, 400, 8902, 197281       — ALL OK (unmake cross-check also OK)
+startpos   perft(1..4) = 20, 400, 8902, 197281        — ALL OK (unmake cross-check also OK)
 kiwipete   perft(1..4) = 48, 2039, 97862, 4085603     — ALL OK
 endgame    perft(1..4) = 14, 191, 2812, 43238         — ALL OK
 PERFT SUITE: ALL PASS
