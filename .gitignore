@@ -45,3 +45,12 @@ Makefile
 
 # Mac OS metadata
 .DS_Store
+
+# ====================================================================
+# Testing harness (tools/sprt.sh, tools/smoke_test.sh)
+# ====================================================================
+# fastchess built from source by tools/setup_fastchess.sh -- a build
+# artifact, not part of this repo.
+tools/fastchess-src/
+# SPRT/smoke-test scratch: built comparison binaries, game logs, PGN output.
+.sprt-work/
