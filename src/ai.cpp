@@ -506,7 +506,7 @@ BenchResult benchSearch(const Board& board, Color color, int depth) {
 }
 
 Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudgetMs, TranspositionTable& tt) {
-    std::vector<Move> book = lookupBook(board);
+    std::vector<BookEntry> book = lookupBook(board);
     static std::mt19937 rng(std::random_device{}());
     if (!book.empty()) {
         // Cheap, unconditional safety net: even though hashKey() is a
@@ -516,19 +516,33 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         // through to normal search instead of returning a stale/bogus move
         // on any hash collision or book/board mismatch.
         MoveList legal = board.legalMoves(aiColor);
-        std::vector<Move> legalBookMoves;
-        for (const Move& bm : book) {
+        std::vector<BookEntry> legalBookMoves;
+        for (const BookEntry& be : book) {
             for (const Move& lm : legal) {
-                if (bm.fromX == lm.fromX && bm.fromY == lm.fromY && bm.toX == lm.toX && bm.toY == lm.toY &&
-                    bm.promotion == lm.promotion) {
-                    legalBookMoves.push_back(lm);
+                if (be.move.fromX == lm.fromX && be.move.fromY == lm.fromY && be.move.toX == lm.toX &&
+                    be.move.toY == lm.toY && be.move.promotion == lm.promotion) {
+                    legalBookMoves.push_back({lm, be.weight});
                     break;
                 }
             }
         }
         if (!legalBookMoves.empty()) {
+            if (aiColor == Color::Black) {
+                // Rather than picking any known reply at random, play the
+                // most theoretically established counter to whatever White
+                // just did -- only tying among equally-weighted options
+                // falls back to randomness, for some variety.
+                int bestWeight = legalBookMoves.front().weight;
+                for (const BookEntry& be : legalBookMoves) bestWeight = std::max(bestWeight, be.weight);
+                std::vector<Move> bestReplies;
+                for (const BookEntry& be : legalBookMoves) {
+                    if (be.weight == bestWeight) bestReplies.push_back(be.move);
+                }
+                std::uniform_int_distribution<size_t> dist(0, bestReplies.size() - 1);
+                return bestReplies[dist(rng)];
+            }
             std::uniform_int_distribution<size_t> dist(0, legalBookMoves.size() - 1);
-            return legalBookMoves[dist(rng)];
+            return legalBookMoves[dist(rng)].move;
         }
     }
 
@@ -565,7 +579,8 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     // reason to cap thread count by the number of root moves anymore — that
     // cap only made sense when each thread owned a disjoint, non-empty
     // bucket to search.
-    size_t numThreads = std::max(1u, std::thread::hardware_concurrency() - 2);
+    int hwThreads = static_cast<int>(std::thread::hardware_concurrency());
+    size_t numThreads = static_cast<size_t>(std::max(1, hwThreads - 2));
 
     if (g_aiDebugLog) {
         std::fprintf(stderr, "[ai] numThreads=%zu rootMoves: %s\n", numThreads, movesStr(rootMoves).c_str());

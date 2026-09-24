@@ -10,6 +10,7 @@
 #include "ai.hpp"
 #include "board.hpp"
 #include "gui.hpp"
+#include "opening_book.hpp"
 #include "pgn.hpp"
 
 namespace {
@@ -174,6 +175,22 @@ int runBench(int depth) {
     return 0;
 }
 
+// Forces the opening book's lazily-built index to construct (it logs a
+// warning to stderr for any line with an illegal move) and reports what the
+// starting position's book looks like, as a lightweight sanity check when
+// editing opening_book.cpp.
+int runVerifyBook() {
+    Board board;
+    std::vector<BookEntry> replies = lookupBook(board);
+    std::printf("Book has %zu known first move(s) for White.\n", replies.size());
+    for (const BookEntry& be : replies) {
+        std::string mv = squareStr(be.move.fromX, be.move.fromY) + squareStr(be.move.toX, be.move.toY);
+        std::printf("  %s (weight=%d)\n", mv.c_str(), be.weight);
+    }
+    std::printf("BOOK VERIFICATION: see warnings above (none printed = every line is fully legal)\n");
+    return 0;
+}
+
 // Replays a PGN's mainline move-by-move. At every White-to-move position
 // (White is this engine's suggestions, relayed by hand in the source games)
 // it calls findBestMove with debug logging enabled and reports whether the
@@ -245,6 +262,9 @@ int main(int argc, char** argv) {
     if (argc >= 2 && std::strcmp(argv[1], "--bench") == 0) {
         int depth = argc >= 3 ? std::atoi(argv[2]) : 6;
         return runBench(depth);
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--verify-book") == 0) {
+        return runVerifyBook();
     }
     if (argc >= 3 && std::strcmp(argv[1], "--replay") == 0) {
         return runReplay(argv[2]);

@@ -540,3 +540,16 @@ didn't find one here.
   entirely within `src/ai.cpp`, the search layer)
 - `src/ai.cpp` — quiescence TT, PVS, aspiration windows, null-move pruning
   integration, LMR
+
+# Tier 3 Strength Pass: Threading Fix, Draw Detection, Eval, SEE, Delta Pruning, Adaptive Reductions
+
+Six items, each its own commit, verified with `--perft-suite 5`,
+`--verify-eval 4`, and `--bench 6` before moving to the next. Starting state:
+the repo's committed HEAD before this pass (`02265e5`, "added custom start
+placement").
+
+## Items implemented, each its own commit
+
+| # | Item | Perft/eval-verify | Bench (depth 6) nodes: startpos / middlegame / endgame / tactical | Move/score |
+|---|---|---|---|---|
+| 1 | Fix `hardware_concurrency()` unsigned-underflow in `findBestMove` (thread count now computed in signed `int`, clamped to >= 1 before converting to `size_t`) | ALL PASS / ALL PASS | 28,057 / 398,352 / 19,474 / 39 (unchanged from pre-pass baseline — expected, single-threaded `--bench` never exercises the thread-count path) | Identical (startpos `g1f3`/0, middlegame `e2a6`/19, endgame `b4f4`/15, tactical `d1d8`/999999) |
