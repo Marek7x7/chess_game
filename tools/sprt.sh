@@ -67,5 +67,6 @@ echo "Running SPRT: tc=$TC elo0=$ELO0 elo1=$ELO1 openings=$OPENINGS concurrency=
     -openings file="$OPENINGS" format=pgn order=random \
     -sprt elo0="$ELO0" elo1="$ELO1" alpha=0.05 beta=0.05 \
     -rounds 20000 -repeat -concurrency "$CONCURRENCY" -recover \
+    -config outname="$WORK/config.json" \
     -log file="$WORK/sprt.log" level=info \
     -pgnout file="$WORK/games.pgn"

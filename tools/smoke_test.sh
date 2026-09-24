@@ -36,6 +36,7 @@ echo "Running 200-game self-play smoke test (tc=8+0.08, concurrency=$CONCURRENCY
     -each tc=8+0.08 \
     -openings file="$REPO/tools/openings/mini_suite.pgn" format=pgn order=random \
     -rounds 100 -repeat -concurrency "$CONCURRENCY" -recover \
+    -config outname="$WORK/config.json" \
     -pgnout file="$WORK/smoke.pgn"
 
 echo "Smoke test finished. Pass bar: 200 games, zero crashes/time-losses/illegal-moves"
