@@ -162,6 +162,7 @@ const std::vector<BenchPosition>& benchPositions() {
 }
 
 int runBench(int depth) {
+    long long totalNodes = 0;
     for (const BenchPosition& bp : benchPositions()) {
         Board board = bp.fen ? Board::fromFEN(bp.fen) : Board();
         auto start = std::chrono::steady_clock::now();
@@ -171,7 +172,13 @@ int runBench(int depth) {
         std::string mv = squareStr(r.move.fromX, r.move.fromY) + squareStr(r.move.toX, r.move.toY);
         std::printf("%-22s depth=%d nodes=%-10lld time=%.3fs nps=%.0f score=%d move=%s\n", bp.name, depth, r.nodes,
                      secs, nps, r.score, mv.c_str());
+        totalNodes += r.nodes;
     }
+    // Stable, single-line summary for scripted regression checks: a pure
+    // speedup commit must reproduce this line byte-for-byte across builds
+    // (same tree, same node count); anything else means search behavior
+    // changed, not just speed.
+    std::printf("BENCH SIGNATURE: nodes=%lld depth=%d positions=%zu\n", totalNodes, depth, benchPositions().size());
     return 0;
 }
 
