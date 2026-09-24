@@ -237,17 +237,23 @@ int runReplay(const std::string& path, const std::string& side) {
             g_aiDebugLog = true;
             std::fprintf(stderr, "=== move %d, %s to play (actual: %s) ===\n", moveNumber, sideLabel, san.c_str());
             SearchProgress lastProgress{};
+            bool searched = false; // onDepthComplete only fires if findBestMove actually searched
+                                    // (an opening-book hit returns instantly with no search at all)
             SearchOptions opts;
-            opts.onDepthComplete = [&lastProgress](const SearchProgress& p) { lastProgress = p; };
+            opts.onDepthComplete = [&lastProgress, &searched](const SearchProgress& p) {
+                lastProgress = p;
+                searched = true;
+            };
             Move suggested = findBestMove(board, toMove, 20, 6000, tt, opts);
             g_aiDebugLog = false;
             bool match = suggested.fromX == actual.fromX && suggested.fromY == actual.fromY &&
                          suggested.toX == actual.toX && suggested.toY == actual.toY &&
                          suggested.promotion == actual.promotion;
-            std::vector<Move> pv = extractPV(board, tt, 12); // board is still pre-move here: correct PV root
+            std::string scoreStr = searched ? formatUciScore(lastProgress.score) : "book";
+            std::string pvStr = searched ? formatUciMoveList(extractPV(board, tt, 12)) : "-";
             std::fprintf(stderr, "=== move %d: engine suggests %s (score %s, pv %s), actual played %s -> %s\n",
-                         moveNumber, formatUciMove(suggested).c_str(), formatUciScore(lastProgress.score).c_str(),
-                         formatUciMoveList(pv).c_str(), san.c_str(), match ? "MATCH" : "MISMATCH");
+                         moveNumber, formatUciMove(suggested).c_str(), scoreStr.c_str(), pvStr.c_str(), san.c_str(),
+                         match ? "MATCH" : "MISMATCH");
         }
 
         board.makeMove(actual);
