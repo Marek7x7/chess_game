@@ -524,6 +524,43 @@ std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt
     return pv;
 }
 
+std::string formatUciMove(const Move& m) {
+    std::string s;
+    s += static_cast<char>('a' + m.fromX);
+    s += static_cast<char>('1' + m.fromY);
+    s += static_cast<char>('a' + m.toX);
+    s += static_cast<char>('1' + m.toY);
+    switch (m.promotion) {
+        case PieceType::Queen: s += 'q'; break;
+        case PieceType::Rook: s += 'r'; break;
+        case PieceType::Bishop: s += 'b'; break;
+        case PieceType::Knight: s += 'n'; break;
+        default: break;
+    }
+    return s;
+}
+
+std::string formatUciMoveList(const std::vector<Move>& moves) {
+    std::string s;
+    for (size_t i = 0; i < moves.size(); i++) {
+        if (i) s += ' ';
+        s += formatUciMove(moves[i]);
+    }
+    return s;
+}
+
+std::string formatUciScore(int score) {
+    if (score > kMateThreshold) {
+        int pliesToMate = kMateScore - score;
+        return "mate " + std::to_string((pliesToMate + 1) / 2);
+    }
+    if (score < -kMateThreshold) {
+        int pliesToMate = kMateScore + score;
+        return "mate -" + std::to_string((pliesToMate + 1) / 2);
+    }
+    return "cp " + std::to_string(score);
+}
+
 BenchResult benchSearch(const Board& board, Color color, int depth) {
     // searchRootFull() (below) is outside Step 3's scope and still takes a
     // std::vector<Move>&, so convert once here at the root (not a hot path).

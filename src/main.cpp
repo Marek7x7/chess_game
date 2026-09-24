@@ -12,6 +12,7 @@
 #include "gui.hpp"
 #include "opening_book.hpp"
 #include "pgn.hpp"
+#include "uci.hpp"
 
 namespace {
 
@@ -272,6 +273,9 @@ int main(int argc, char** argv) {
     }
     if (argc >= 2 && std::strcmp(argv[1], "--verify-book") == 0) {
         return runVerifyBook();
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--uci") == 0) {
+        return runUci();
     }
     if (argc >= 3 && std::strcmp(argv[1], "--replay") == 0) {
         return runReplay(argv[2]);

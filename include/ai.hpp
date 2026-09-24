@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "board.hpp"
@@ -86,6 +87,13 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
 // bug. Read-only against `tt` (probes only, never stores); touches nothing
 // in the negamax/quiescence hot path.
 std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen = 32);
+
+// UCI-format move/score/PV text ("e7e8q" not "e7e8=Q", "cp <n>"/"mate <n>"
+// not a bare centipawn integer). Shared by uci.cpp and --replay's
+// score/PV reporting (main.cpp) so both produce identical formatting.
+std::string formatUciMove(const Move& m);
+std::string formatUciMoveList(const std::vector<Move>& moves);
+std::string formatUciScore(int score);
 
 struct BenchResult {
     Move move{};
