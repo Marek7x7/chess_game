@@ -227,7 +227,18 @@ int runUci() {
                 // (that's later-phase scope).
                 timeBudgetMs = std::min<long long>(timeBudgetMs, myTime / 2);
             }
-            if (timeBudgetMs < 0) timeBudgetMs = 24LL * 60 * 60 * 1000; // bare go / depth-only / infinite
+            if (timeBudgetMs < 0) {
+                // Only fall back to "search until depth/mate/stop" when no
+                // time control was given at all (bare go / depth-only /
+                // infinite -- timeBudgetMs is still its initial -1). If
+                // movetime or wtime/btime WAS given but the computed budget
+                // went negative (very little time left, or Move Overhead
+                // larger than what's left), that's a real "must move
+                // immediately" signal, not an absence of time control --
+                // conflating the two is exactly how an engine loses on
+                // time under real clock pressure.
+                timeBudgetMs = (movetime >= 0 || haveMyTime) ? 1 : (24LL * 60 * 60 * 1000);
+            }
             timeBudgetMs = std::max<long long>(timeBudgetMs, 1);
 
             Board searchBoard = board;
