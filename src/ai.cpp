@@ -73,8 +73,9 @@ int evaluate(const Board& board, Color color) {
 // ---------------------------------------------------------------------
 
 constexpr int kMaxPly = 64;
-constexpr int kMateScore = 1'000'000;
-constexpr int kMateThreshold = kMateScore - 1000;
+// kMateScore/kMateThreshold are declared in ai.hpp (needed there so external
+// callers formatting scores, e.g. UCI's "score mate <n>", don't duplicate
+// these magic numbers).
 constexpr int kMaxCheckExtensions = 16;
 
 // kTTSize is declared in ai.hpp (needed there so callers can construct the
@@ -88,6 +89,7 @@ struct SearchContext {
     int history[2][8][8][8][8]{};
     long long nodes = 0;
     std::chrono::steady_clock::time_point deadline;
+    const std::atomic<bool>* stopFlag = nullptr;
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
@@ -121,7 +123,9 @@ void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const S
 }
 
 void checkTime(SearchContext& ctx) {
-    if ((ctx.nodes & 0xFFF) == 0 && std::chrono::steady_clock::now() >= ctx.deadline) throw TimeUp{};
+    if ((ctx.nodes & 0xFFF) != 0) return;
+    if (std::chrono::steady_clock::now() >= ctx.deadline) throw TimeUp{};
+    if (ctx.stopFlag && ctx.stopFlag->load(std::memory_order_relaxed)) throw TimeUp{};
 }
 
 // Converts a score found `ply` levels below the search root into one
@@ -393,11 +397,12 @@ bool isBetterAtSameDepth(const RootSearchResult& a, const RootSearchResult& b) {
 // at any depth — so every thread's search remains fully sound.
 RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<Move>& rootMoves, int maxDepth,
                                  std::chrono::steady_clock::time_point deadline, TranspositionTable& tt,
-                                 size_t threadIndex) {
+                                 size_t threadIndex, const std::atomic<bool>* stopFlag = nullptr,
+                                 const std::function<void(const SearchProgress&)>& onDepthComplete = {}) {
     RootSearchResult result;
     result.move = rootMoves.front();
 
-    SearchContext ctx{tt, {}, {}, 0, deadline};
+    SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag};
     std::mt19937 jitterRng(0x9E3779B9u + static_cast<unsigned>(threadIndex));
     std::uniform_int_distribution<int> jitterDist(0, 24);
 
@@ -478,6 +483,10 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
         result.depthReached = depth;
         tt.store(board.hashKey(), depth, depthBest, TTFlag::Exact, depthBestMove, true);
 
+        // Fired after the store above, so extractPV()'s first hop (this
+        // root move) is guaranteed present in tt at this instant.
+        if (onDepthComplete) onDepthComplete(SearchProgress{depth, depthBest, ctx.nodes, depthBestMove});
+
         if (depthBest > kMateThreshold) break; // forced mate found, no need to search deeper
     }
 
@@ -486,6 +495,34 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 }
 
 } // namespace
+
+std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen) {
+    std::vector<Move> pv;
+    std::vector<uint64_t> seen;
+    Board board = rootBoard;
+    for (int i = 0; i < maxLen; i++) {
+        uint64_t key = board.hashKey();
+        if (std::find(seen.begin(), seen.end(), key) != seen.end()) break; // cycle guard
+        seen.push_back(key);
+
+        TTEntry entry;
+        if (!tt.probe(key, entry) || !entry.hasMove) break;
+
+        MoveList legal = board.legalMoves(board.sideToMove());
+        bool found = false;
+        for (const Move& m : legal) {
+            if (sameMove(m, entry.best)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) break; // hash collision or stale entry -- don't trust it
+
+        pv.push_back(entry.best);
+        board.makeMove(entry.best);
+    }
+    return pv;
+}
 
 BenchResult benchSearch(const Board& board, Color color, int depth) {
     // searchRootFull() (below) is outside Step 3's scope and still takes a
@@ -505,44 +542,47 @@ BenchResult benchSearch(const Board& board, Color color, int depth) {
     return result;
 }
 
-Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudgetMs, TranspositionTable& tt) {
-    std::vector<BookEntry> book = lookupBook(board);
-    static std::mt19937 rng(std::random_device{}());
-    if (!book.empty()) {
-        // Cheap, unconditional safety net: even though hashKey() is a
-        // complete encoding of position state (verified: pieces, side to
-        // move, all four castling rights, en passant target), a book move
-        // is only ever trustworthy if it's actually legal right now. Falls
-        // through to normal search instead of returning a stale/bogus move
-        // on any hash collision or book/board mismatch.
-        MoveList legal = board.legalMoves(aiColor);
-        std::vector<BookEntry> legalBookMoves;
-        for (const BookEntry& be : book) {
-            for (const Move& lm : legal) {
-                if (be.move.fromX == lm.fromX && be.move.fromY == lm.fromY && be.move.toX == lm.toX &&
-                    be.move.toY == lm.toY && be.move.promotion == lm.promotion) {
-                    legalBookMoves.push_back({lm, be.weight});
-                    break;
+Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudgetMs, TranspositionTable& tt,
+                   const SearchOptions& options) {
+    if (options.useOpeningBook) {
+        std::vector<BookEntry> book = lookupBook(board);
+        static std::mt19937 rng(std::random_device{}());
+        if (!book.empty()) {
+            // Cheap, unconditional safety net: even though hashKey() is a
+            // complete encoding of position state (verified: pieces, side to
+            // move, all four castling rights, en passant target), a book move
+            // is only ever trustworthy if it's actually legal right now. Falls
+            // through to normal search instead of returning a stale/bogus move
+            // on any hash collision or book/board mismatch.
+            MoveList legal = board.legalMoves(aiColor);
+            std::vector<BookEntry> legalBookMoves;
+            for (const BookEntry& be : book) {
+                for (const Move& lm : legal) {
+                    if (be.move.fromX == lm.fromX && be.move.fromY == lm.fromY && be.move.toX == lm.toX &&
+                        be.move.toY == lm.toY && be.move.promotion == lm.promotion) {
+                        legalBookMoves.push_back({lm, be.weight});
+                        break;
+                    }
                 }
             }
-        }
-        if (!legalBookMoves.empty()) {
-            if (aiColor == Color::Black) {
-                // Rather than picking any known reply at random, play the
-                // most theoretically established counter to whatever White
-                // just did -- only tying among equally-weighted options
-                // falls back to randomness, for some variety.
-                int bestWeight = legalBookMoves.front().weight;
-                for (const BookEntry& be : legalBookMoves) bestWeight = std::max(bestWeight, be.weight);
-                std::vector<Move> bestReplies;
-                for (const BookEntry& be : legalBookMoves) {
-                    if (be.weight == bestWeight) bestReplies.push_back(be.move);
+            if (!legalBookMoves.empty()) {
+                if (aiColor == Color::Black) {
+                    // Rather than picking any known reply at random, play the
+                    // most theoretically established counter to whatever White
+                    // just did -- only tying among equally-weighted options
+                    // falls back to randomness, for some variety.
+                    int bestWeight = legalBookMoves.front().weight;
+                    for (const BookEntry& be : legalBookMoves) bestWeight = std::max(bestWeight, be.weight);
+                    std::vector<Move> bestReplies;
+                    for (const BookEntry& be : legalBookMoves) {
+                        if (be.weight == bestWeight) bestReplies.push_back(be.move);
+                    }
+                    std::uniform_int_distribution<size_t> dist(0, bestReplies.size() - 1);
+                    return bestReplies[dist(rng)];
                 }
-                std::uniform_int_distribution<size_t> dist(0, bestReplies.size() - 1);
-                return bestReplies[dist(rng)];
+                std::uniform_int_distribution<size_t> dist(0, legalBookMoves.size() - 1);
+                return legalBookMoves[dist(rng)].move;
             }
-            std::uniform_int_distribution<size_t> dist(0, legalBookMoves.size() - 1);
-            return legalBookMoves[dist(rng)].move;
         }
     }
 
@@ -578,9 +618,15 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     // move list (Lazy-SMP), sharing one transposition table, so there's no
     // reason to cap thread count by the number of root moves anymore — that
     // cap only made sense when each thread owned a disjoint, non-empty
-    // bucket to search.
-    int hwThreads = static_cast<int>(std::thread::hardware_concurrency());
-    size_t numThreads = static_cast<size_t>(std::max(1, hwThreads - 2));
+    // bucket to search. options.threadOverride > 0 (UCI's Threads option,
+    // or a test harness pinning Threads=1) takes this over completely.
+    size_t numThreads;
+    if (options.threadOverride > 0) {
+        numThreads = static_cast<size_t>(options.threadOverride);
+    } else {
+        int hwThreads = static_cast<int>(std::thread::hardware_concurrency());
+        numThreads = static_cast<size_t>(std::max(1, hwThreads - 2));
+    }
 
     if (g_aiDebugLog) {
         std::fprintf(stderr, "[ai] numThreads=%zu rootMoves: %s\n", numThreads, movesStr(rootMoves).c_str());
@@ -594,10 +640,18 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         // outer `const Board&` (capturing that by value would still carry
         // the const through into the closure, `mutable` notwithstanding).
         Board threadBoard = board;
+        const std::atomic<bool>* stopFlag = options.stopFlag;
+        // Progress callback only from thread 0 -- the deterministic,
+        // unperturbed-ordering thread (see searchRootFull's jitter comment)
+        // -- so a caller reporting "the" search's progress gets one
+        // consistent stream instead of interleaved reports from N threads.
+        std::function<void(const SearchProgress&)> progressCb = (t == 0) ? options.onDepthComplete
+                                                                           : std::function<void(const SearchProgress&)>{};
         futures.push_back(std::async(
             std::launch::async,
-            [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, &tt, t]() mutable {
-                return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t);
+            [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, &tt, t, stopFlag, progressCb]() mutable {
+                return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t, stopFlag,
+                                       progressCb);
             }));
     }
 
