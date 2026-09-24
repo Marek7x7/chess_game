@@ -199,13 +199,13 @@ int runVerifyBook() {
     return 0;
 }
 
-// Replays a PGN's mainline move-by-move. At every White-to-move position
-// (White is this engine's suggestions, relayed by hand in the source games)
-// it calls findBestMove with debug logging enabled and reports whether the
-// engine's choice matches what was actually played, then applies the
-// *actual historical* move so later positions stay in sync with the real
-// game regardless of what the engine suggests.
-int runReplay(const std::string& path) {
+// Replays a PGN's mainline move-by-move. At every position matching `side`
+// ("white", "black", or "both") it calls findBestMove with debug logging
+// enabled and reports whether the engine's choice, score, and PV match what
+// was actually played, then applies the *actual historical* move so later
+// positions stay in sync with the real game regardless of what the engine
+// suggests.
+int runReplay(const std::string& path, const std::string& side) {
     std::ifstream file(path);
     if (!file) {
         std::fprintf(stderr, "replay: could not open %s\n", path.c_str());
@@ -218,6 +218,7 @@ int runReplay(const std::string& path) {
     Board board;
     TranspositionTable tt(kTTSize); // persists across the whole replayed game, not rebuilt per move
     int ply = 0;
+    int analyzed = 0;
     for (const std::string& san : sanMoves) {
         int moveNumber = ply / 2 + 1;
         Color toMove = board.sideToMove();
@@ -230,25 +231,30 @@ int runReplay(const std::string& path) {
             return 1;
         }
 
-        if (toMove == Color::White) {
+        bool shouldAnalyze = (toMove == Color::White) ? (side != "black") : (side != "white");
+        if (shouldAnalyze) {
+            analyzed++;
             g_aiDebugLog = true;
-            std::fprintf(stderr, "=== move %d, White to play (actual: %s) ===\n", moveNumber, san.c_str());
-            Move suggested = findBestMove(board, Color::White, 20, 6000, tt);
+            std::fprintf(stderr, "=== move %d, %s to play (actual: %s) ===\n", moveNumber, sideLabel, san.c_str());
+            SearchProgress lastProgress{};
+            SearchOptions opts;
+            opts.onDepthComplete = [&lastProgress](const SearchProgress& p) { lastProgress = p; };
+            Move suggested = findBestMove(board, toMove, 20, 6000, tt, opts);
             g_aiDebugLog = false;
             bool match = suggested.fromX == actual.fromX && suggested.fromY == actual.fromY &&
                          suggested.toX == actual.toX && suggested.toY == actual.toY &&
                          suggested.promotion == actual.promotion;
-            std::string suggestedStr =
-                squareStr(suggested.fromX, suggested.fromY) + squareStr(suggested.toX, suggested.toY);
-            std::fprintf(stderr, "=== move %d: engine suggests %s, actual played %s -> %s\n", moveNumber,
-                         suggestedStr.c_str(), san.c_str(), match ? "MATCH" : "MISMATCH");
+            std::vector<Move> pv = extractPV(board, tt, 12); // board is still pre-move here: correct PV root
+            std::fprintf(stderr, "=== move %d: engine suggests %s (score %s, pv %s), actual played %s -> %s\n",
+                         moveNumber, formatUciMove(suggested).c_str(), formatUciScore(lastProgress.score).c_str(),
+                         formatUciMoveList(pv).c_str(), san.c_str(), match ? "MATCH" : "MISMATCH");
         }
 
         board.makeMove(actual);
         ply++;
     }
 
-    std::printf("replay: finished %s, %d plies\n", path.c_str(), ply);
+    std::printf("replay: finished %s, %d plies, %d analyzed (side=%s)\n", path.c_str(), ply, analyzed, side.c_str());
     return 0;
 }
 
@@ -278,7 +284,12 @@ int main(int argc, char** argv) {
         return runUci();
     }
     if (argc >= 3 && std::strcmp(argv[1], "--replay") == 0) {
-        return runReplay(argv[2]);
+        std::string side = argc >= 4 ? argv[3] : "both";
+        if (side != "white" && side != "black" && side != "both") {
+            std::fprintf(stderr, "replay: unknown side '%s' (expected white|black|both)\n", side.c_str());
+            return 1;
+        }
+        return runReplay(argv[2], side);
     }
     return runGui();
 }
