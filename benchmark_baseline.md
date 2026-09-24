@@ -1,5 +1,15 @@
 # Benchmark Baseline (Step 0)
 
+> **Debug-build disclaimer (added during the Phase 0 measurement-harness
+> pass):** `CMakeLists.txt` set no `CMAKE_BUILD_TYPE`, and every build
+> directory used to produce the numbers in this file was configured
+> `CMAKE_BUILD_TYPE=Debug` (`-g` only -- no `-O3`, `-DNDEBUG`, or
+> `-march=native`). **Every node-count/timing/NPS number below this point
+> was measured on an unoptimized Debug build.** `CMakeLists.txt` now
+> defaults a fresh, never-configured build directory to Release
+> (`-O3 -DNDEBUG -march=native`); real performance numbers start from that
+> commit onward, not from anything recorded here.
+
 Recorded before any optimization work (Steps 1+). Build: `cmake --build build`
 (ninja, GCC 15.2.0, `-Wall -Wextra -Werror`, C++17). Build produced **zero warnings**.
 
