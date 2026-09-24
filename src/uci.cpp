@@ -248,7 +248,26 @@ int runUci() {
             opts.stopFlag = &stopFlag;
             auto start = std::chrono::steady_clock::now();
             opts.onDepthComplete = [&tt, searchBoard, start](const SearchProgress& p) {
-                std::vector<Move> pv = extractPV(searchBoard, *tt, 32);
+                // p.bestMove is the authoritative move for this depth --
+                // exactly what becomes `bestmove` if this is the last
+                // completed depth. extractPV()'s own TT root-probe is NOT
+                // guaranteed to agree with it: the TT persists across the
+                // whole game, and TranspositionTable::store() skips
+                // overwriting a same-key slot whose existing entry has
+                // depth >= the new depth (see its own doc comment), so a
+                // deeper, older entry for this exact position (or one
+                // written by a transposition within this same depth's
+                // search, via a check-extension line looping back to the
+                // root) can outlive this depth's own root store. Walking
+                // the TT for ply 0 can then report a different first move
+                // than bestmove -- so ply 0 always comes from p.bestMove
+                // (guaranteed correct by construction), and extractPV only
+                // supplies the continuation from ply 1 onward.
+                Board afterBest = searchBoard;
+                afterBest.makeMove(p.bestMove);
+                std::vector<Move> pv = {p.bestMove};
+                std::vector<Move> rest = extractPV(afterBest, *tt, 31);
+                pv.insert(pv.end(), rest.begin(), rest.end());
                 double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
                 long long nps = secs > 0 ? static_cast<long long>(p.nodes / secs) : 0;
                 std::printf("info depth %d score %s nodes %lld nps %lld pv %s\n", p.depth,

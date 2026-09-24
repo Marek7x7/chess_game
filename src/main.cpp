@@ -250,7 +250,21 @@ int runReplay(const std::string& path, const std::string& side) {
                          suggested.toX == actual.toX && suggested.toY == actual.toY &&
                          suggested.promotion == actual.promotion;
             std::string scoreStr = searched ? formatUciScore(lastProgress.score) : "book";
-            std::string pvStr = searched ? formatUciMoveList(extractPV(board, tt, 12)) : "-";
+            std::string pvStr = "-";
+            if (searched) {
+                // `suggested` is the authoritative move for the search that
+                // just ran; extractPV()'s own TT root-probe for `board` can
+                // disagree with it for the same reason documented in
+                // uci.cpp's onDepthComplete (persistent-across-the-game TT,
+                // depth-gated replacement) -- so ply 0 always comes from
+                // `suggested`, extractPV only supplies the continuation.
+                Board afterSuggested = board;
+                afterSuggested.makeMove(suggested);
+                std::vector<Move> pv = {suggested};
+                std::vector<Move> rest = extractPV(afterSuggested, tt, 11);
+                pv.insert(pv.end(), rest.begin(), rest.end());
+                pvStr = formatUciMoveList(pv);
+            }
             std::fprintf(stderr, "=== move %d: engine suggests %s (score %s, pv %s), actual played %s -> %s\n",
                          moveNumber, formatUciMove(suggested).c_str(), scoreStr.c_str(), pvStr.c_str(), san.c_str(),
                          match ? "MATCH" : "MISMATCH");
