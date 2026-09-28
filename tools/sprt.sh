@@ -6,6 +6,8 @@
 #     screening.
 #   [elo0]/[elo1] default "0 5" (standard "is this better" bounds). Pass
 #     "-3 1" for pure simplifications/speedups expected to be ~neutral.
+#   Environment overrides: CONCURRENCY (games in parallel, default
+#     nproc/2 - 1) and THREADS (each engine's Threads option, default 1).
 #
 # Requires tools/setup_fastchess.sh and tools/fetch_openings.sh to have
 # been run first.
@@ -56,13 +58,14 @@ fi
 
 # Each concurrent game pair spawns two Threads=1 engine processes, so halve
 # nproc (minus 1 headroom) rather than using it directly.
-CONCURRENCY=$(( $(nproc) / 2 - 1 ))
+CONCURRENCY="${CONCURRENCY:-$(( $(nproc) / 2 - 1 ))}"
 [ "$CONCURRENCY" -lt 1 ] && CONCURRENCY=1
+THREADS="${THREADS:-1}"
 
-echo "Running SPRT: tc=$TC elo0=$ELO0 elo1=$ELO1 openings=$OPENINGS concurrency=$CONCURRENCY"
+echo "Running SPRT: tc=$TC elo0=$ELO0 elo1=$ELO1 openings=$OPENINGS concurrency=$CONCURRENCY threads=$THREADS"
 "$FASTCHESS" \
-    -engine cmd="$WORK/new.bin"  args="--uci" name=new  option.Threads=1 option.Hash=64 option.OwnBook=false \
-    -engine cmd="$WORK/base.bin" args="--uci" name=base option.Threads=1 option.Hash=64 option.OwnBook=false \
+    -engine cmd="$WORK/new.bin"  args="--uci" name=new  option.Threads="$THREADS" option.Hash=64 option.OwnBook=false \
+    -engine cmd="$WORK/base.bin" args="--uci" name=base option.Threads="$THREADS" option.Hash=64 option.OwnBook=false \
     -each tc="$TC" \
     -openings file="$OPENINGS" format=pgn order=random \
     -sprt elo0="$ELO0" elo1="$ELO1" alpha=0.05 beta=0.05 \

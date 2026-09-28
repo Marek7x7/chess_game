@@ -23,15 +23,20 @@ proven by a match test before it is kept.**
 
 ## Hard rules
 
-1. **No change is kept without a passing SPRT.** Run
-   `tools/sprt.sh <new-ref|WORKTREE> <base-ref>` (defaults: 10+0.1,
-   Threads=1, Hash=64, OwnBook=false, elo0=0/elo1=5, `8moves_v3.pgn`).
-   Keep a change only when fastchess reports "H1 was accepted". Use bounds
-   `-3 1` for speedups and simplifications expected to be neutral.
-   `tools/openings/mini_suite.pgn` is for smoke tests only and never counts.
-2. **One change per commit.** Every commit builds and passes the gates. If
-   two terms interact and are tested together (e.g. doubled/isolated pawns +
-   bishop pair), commit them together and say why in the message.
+1. **No change is kept without a passing SPRT.** Related changes are tested
+   together as a bundle (e.g. all new search pruning, or all king-safety
+   terms), one fast match per bundle:
+   `CONCURRENCY=20 tools/sprt.sh <new-ref|WORKTREE> <base-ref> 5+0.05 0 10`
+   (Threads=1, Hash=64, OwnBook=false, `8moves_v3.pgn`). Keep a bundle only
+   when fastchess reports "H1 was accepted"; if it fails, split it and test
+   the parts to find the culprit. Use bounds `-3 1` for speedups and
+   simplifications expected to be neutral. Changes that only matter with
+   several threads (hash table, thread handling) run with
+   `THREADS=2 CONCURRENCY=10`. `tools/openings/mini_suite.pgn` is for smoke
+   tests only and never counts. (Until 2026-09-28 every change had its own
+   match at 10+0.1, bounds 0/5; the user switched to bundles to save time.)
+2. **One change per commit**, also inside a bundle: every commit builds and
+   passes the gates, and its message cites its bundle's match result.
 3. **Gates after every change:** `--perft-suite 5` and `--verify-eval 4`
    print ALL PASS, and the build has zero warnings. Pure speedups/refactors
    must leave `--bench 6`'s `BENCH SIGNATURE` line byte-identical.
@@ -39,8 +44,8 @@ proven by a match test before it is kept.**
    mirror must score exactly opposite. Anything tracked incrementally in
    `Board` must also be recomputed in `rawEvalFromScratch()`, so
    `--verify-eval` checks it.
-5. **Log every match in `STRENGTH_LOG.md`**, including REVERTED and
-   INCONCLUSIVE ones, with the exact numbers fastchess prints, in a separate
+5. **Log every match (one row per bundle) in `STRENGTH_LOG.md`**, including
+   REVERTED and INCONCLUSIVE ones, with the exact numbers fastchess prints, in a separate
    commit after the change (the row cites the change's hash). Keep
    `benchmark_baseline.md` separate: it's a historical log that never
    claims Elo.
@@ -60,16 +65,18 @@ proven by a match test before it is kept.**
 2. **Did its decisions change:** replay the same fixed positions with the
    old and the new build. Use FEN via UCI `position fen` after
    `ucinewgame`, at a fixed `go depth 10` with Threads=1, so reruns are
-   identical. This is the scripted equivalent of the GUI's custom placement.
+   identical (for search changes, where a fixed depth means different
+   things in the two builds, a fixed `go movetime 1000` instead). This is
+   the scripted equivalent of the GUI's custom placement.
    Use every engine-to-move position from move 13 on in the Komodo games
    (where Stockfish's eval is within ±5 pawns), plus a few hand-made test
    positions. Grade every move where the builds disagree with Stockfish
    (depth 18, `searchmoves` restricted). Report: moves changed, better vs
    worse, average centipawn loss, big mistakes (≥ 80 cp).
-3. **Is it stronger:** the SPRT (rule 1). It takes 1-2 hours at about 23
-   games/min. Run it in the background, **give the user a status update
-   every 20 minutes** (games, Elo ± error, LLR, ETA), and never run two
-   matches at once, since they compete for CPU and distort time-based games.
+3. **Is it stronger:** the bundle's SPRT (rule 1). Run it in the
+   background, **give the user a status update every 20 minutes** (games,
+   Elo ± error, LLR, ETA), and never run two matches at once, since they
+   compete for CPU and distort time-based games.
 4. To test uncommitted work against an uncommitted baseline, snapshot the
    baseline tree as a dangling commit through a temporary index
    (`GIT_INDEX_FILE=... git read-tree HEAD; git add -A; git write-tree;
