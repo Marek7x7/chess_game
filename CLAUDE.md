@@ -87,32 +87,30 @@ proven by a match test before it is kept.**
 
 ## Roadmap (update this list as items are done)
 
-(TT replacement done: two-slot buckets with aging, bundle 4.)
+Everything on the original list is done, all SPRT-accepted -- exact numbers
+per change in `STRENGTH_LOG.md`:
+- **Eval:** passed pawns; doubled/isolated pawns + bishop pair; mobility;
+  king safety (shelter, king-zone attacks); rooks on open files and the
+  7th rank; outposts; backward pawns; endgame pawn values; pawn cache.
+- **Search:** captures-only quiescence moves; log-based late-move
+  reductions; SEE + delta pruning in quiescence; root PVS; futility +
+  reverse futility pruning; mate distance pruning; fifty-move rule;
+  soft/hard time limits in clock games; thread 0's result; lock-free
+  hash table with two-slot buckets and aging.
+- **Other:** the GUI's human-vs-computer mode passes the game history
+  (repetition detection, validated at +55); reported PVs end at a
+  threefold.
+- Checked and left as is: the GUI keeps a fixed time per move -- with no
+  clock known to the engine, using the whole budget is strongest; the
+  endgame depth bonus in `findBestMove()` only matters when the depth cap
+  binds (EASY/MEDIUM/HARD), which is where it's meant to.
 
-Done, all SPRT-accepted: passed pawns (+34), doubled/isolated pawns +
-bishop pair (+27), mobility (+54). The engine still rates its middlegame
-positions about a pawn better than Stockfish does.
-
-Also done: the GUI's human-vs-computer mode now passes the game history to
-the search, so repetition detection works there too.
-
-Next, in suggested order:
-2. **Search (Phase 3):** done -- captures-only move generation in
-   quiescence (+29), log-based late-move reductions (+17), and bundle 1:
-   SEE + delta pruning in quiescence, PVS at the root, futility + reverse
-   futility pruning (+223 at 5+0.05).
-3. **King safety:** done -- bundle 2, king shelter (pawn shield, open files
-   near the king) and king-zone attacks (+28 at 5+0.05).
-4. **More eval:** done -- bundle 3, rooks on open/semi-open files and the
-   7th rank, outposts, backward pawns, endgame pawn values (+27 at
-   5+0.05).
-5. **Speed (Phase 4):** the from-scratch eval terms cost about 24% NPS. Do
-   one board scan instead of several, and cache pawn-structure results.
-   (Done: lock-free packed transposition table, bundle 4.)
-6. **Phase 1 leftovers:** Lazy SMP result selection never tested against
-   alternatives, repetition detection never SPRT-tested on its own, no
-   50-move-rule awareness or mate distance pruning in search, PVs that
-   continue past a threefold (fastchess warnings).
-7. **Time management (Phase 5):** the GUI spends a fixed time per move, and
-   the endgame depth bonus in `findBestMove()` does nothing at Expert
-   (time runs out first).
+Ideas for next time, not started:
+1. Tune the eval weights -- all hand-picked or Fruit 2.1's (e.g. Texel
+   tuning on positions from self-play games).
+2. Pin-aware mobility: pinned or tied-up pieces are still the engine's
+   biggest misjudgement against Stockfish.
+3. More search refinements: history-based reduction adjustments,
+   counter-move heuristic, an "improving" flag for the pruning margins.
+4. Re-check the big fast-TC gains at a longer time control (e.g. 10+0.1):
+   pruning gains in particular shrink as the time control grows.
