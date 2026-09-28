@@ -81,8 +81,14 @@ constexpr int kPassedEg[8] = {0, 10, 15, 25, 45, 75, 120, 0};
 constexpr int kDoubledMg = 10, kDoubledEg = 25;
 constexpr int kIsolatedMg = 10, kIsolatedEg = 15;
 
-// Positive = good for White: passed-pawn bonuses minus doubled/isolated
-// penalties. A passed pawn has no enemy pawn in front of it on its own or an
+// Backward pawn: every friendly pawn on the adjacent files has already
+// advanced past it, so no pawn can ever defend it, and an enemy pawn
+// controls the square in front of it, so it can't safely advance to catch
+// up either (Fruit 2.1's values).
+constexpr int kBackwardMg = 8, kBackwardEg = 10;
+
+// Positive = good for White: passed-pawn bonuses minus doubled/isolated/
+// backward penalties. A passed pawn has no enemy pawn in front of it on its own or an
 // adjacent file.
 int pawnStructure(const Board& board) {
     // Per file, the rank of the rearmost pawn of each color: the only one
@@ -102,11 +108,33 @@ int pawnStructure(const Board& board) {
     }
 
     int mg = 0, eg = 0;
+    auto pawnAt = [&](int px, int py, Color c) {
+        return Board::inBounds(px, py) && board.at(px, py).type == PieceType::Pawn && board.at(px, py).color == c;
+    };
     for (int x = 0; x < 8; x++) {
         int lo = std::max(0, x - 1), hi = std::min(7, x + 1);
         for (int y = 1; y < 7; y++) {
             Piece p = board.at(x, y);
             if (p.type != PieceType::Pawn) continue;
+
+            // Backward: friendly pawns on the adjacent files exist (so it's not
+            // isolated) but all stand further up the board than this one --
+            // whiteLowest/blackHighest hold each file's rearmost pawn.
+            bool white = p.color == Color::White;
+            int side = white ? 0 : 1;
+            bool hasNeighbour = false, neighbourLevelOrBehind = false;
+            for (int f : {x - 1, x + 1}) {
+                if (f < 0 || f > 7 || count[side][f] == 0) continue;
+                hasNeighbour = true;
+                if (white ? whiteLowest[f] <= y : blackHighest[f] >= y) neighbourLevelOrBehind = true;
+            }
+            int dir = white ? 1 : -1;
+            bool stopControlled = pawnAt(x - 1, y + 2 * dir, opponent(p.color)) || pawnAt(x + 1, y + 2 * dir, opponent(p.color));
+            if (hasNeighbour && !neighbourLevelOrBehind && stopControlled) {
+                mg -= (white ? 1 : -1) * kBackwardMg;
+                eg -= (white ? 1 : -1) * kBackwardEg;
+            }
+
             bool passed = true;
             for (int f = lo; f <= hi; f++) {
                 if (p.color == Color::White ? blackHighest[f] > y : whiteLowest[f] < y) passed = false;
