@@ -147,7 +147,7 @@ constexpr int kKnightJumps[8][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, 
 // Rooks slide along the first four, bishops the last four, queens all eight.
 constexpr int kSlideDirs[8][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
 
-// Pieces bearing on the squares around one king, gathered by mobility()
+// Pieces bearing on the squares around one king, gathered by pieceTerms()
 // (which already walks every square each piece can reach) for kingSafety().
 struct KingAttack {
     int attackers = 0; // knights/bishops/rooks/queens reaching a square next to the king
@@ -157,10 +157,16 @@ struct KingAttack {
 // How dangerous each piece type is as a king attacker, indexed by PieceType.
 constexpr int kKingAttackWeight[7] = {0, 0, 20, 20, 40, 80, 0};
 
-// Positive = good for White. Counts every square that's empty or holds an
-// enemy piece, pins and checks aside. Also fills attacks[c] with the pieces
-// attacking color c's king zone (the squares next to that king).
-int mobility(const Board& board, KingAttack (&attacks)[2]) {
+// A rook on a file with no pawns at all, or with only enemy pawns, has a
+// lane into the enemy position (Fruit 2.1's values; same in both phases).
+constexpr int kRookOpenFile = 20;
+constexpr int kRookSemiOpenFile = 10;
+
+// Positive = good for White. Terms for each knight, bishop, rook and queen:
+// mobility -- every square that's empty or holds an enemy piece, pins and
+// checks aside -- and rooks on open files. Also fills attacks[c] with the
+// pieces attacking color c's king zone (the squares next to that king).
+int pieceTerms(const Board& board, KingAttack (&attacks)[2]) {
     int mg = 0, eg = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
@@ -198,6 +204,16 @@ int mobility(const Board& board, KingAttack (&attacks)[2]) {
             int sign = p.color == Color::White ? 1 : -1;
             mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
             eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
+            if (p.type == PieceType::Rook) {
+                bool ownPawn = false, enemyPawn = false;
+                for (int fy = 1; fy < 7; fy++) {
+                    Piece q = board.at(x, fy);
+                    if (q.type == PieceType::Pawn) (q.color == p.color ? ownPawn : enemyPawn) = true;
+                }
+                int bonus = ownPawn ? 0 : enemyPawn ? kRookSemiOpenFile : kRookOpenFile;
+                mg += sign * bonus;
+                eg += sign * bonus;
+            }
             if (hitsKingZone) {
                 KingAttack& a = attacks[enemy == Color::White ? 0 : 1];
                 a.attackers++;
@@ -251,7 +267,7 @@ int kingAttackPenalty(const KingAttack& a) {
     return a.weight * kAttackerScalePercent[std::min(a.attackers, 7)] / 100;
 }
 
-// Positive = good for White. `attacks` comes from mobility().
+// Positive = good for White. `attacks` comes from pieceTerms().
 int kingSafety(const Board& board, const KingAttack (&attacks)[2]) {
     int mg = kingShelterPenalty(board, Color::Black) + kingAttackPenalty(attacks[1]) -
              kingShelterPenalty(board, Color::White) - kingAttackPenalty(attacks[0]);
@@ -261,7 +277,7 @@ int kingSafety(const Board& board, const KingAttack (&attacks)[2]) {
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
     KingAttack attacks[2]; // on White's king, on Black's king
-    int score = board.rawEval() + pawnStructure(board) + mobility(board, attacks) + kingSafety(board, attacks);
+    int score = board.rawEval() + pawnStructure(board) + pieceTerms(board, attacks) + kingSafety(board, attacks);
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
