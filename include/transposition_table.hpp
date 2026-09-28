@@ -27,12 +27,22 @@ struct TTEntry {
 // XORed with it. A probe that reads a slot while another thread is half way
 // through rewriting it sees a key that doesn't match and treats it as a
 // miss, so a torn entry is never used (the classic lockless-hashing scheme).
+//
+// Slots come in buckets of two, and a position can live in either slot of
+// its bucket: a new result evicts whichever of the two is worth less -- one
+// left over from an earlier search before one from this search, then the
+// shallower one -- so a deep result isn't lost to an unrelated shallow
+// store landing on the same slot.
 class TranspositionTable {
 public:
-    explicit TranspositionTable(size_t sizePowerOfTwo);
+    explicit TranspositionTable(size_t sizePowerOfTwo); // total slots (two per bucket), at least 2
 
     bool probe(uint64_t key, TTEntry& out) const;
     void store(uint64_t key, int depth, int score, TTFlag flag, const Move& best, bool hasMove);
+
+    // Marks the start of a new search (call before its threads start):
+    // entries stored before it become the first to be replaced.
+    void newSearch() { generation = (generation + 1) & 63; }
 
     // Bytes per entry, for sizing a table to a memory budget.
     static constexpr size_t kEntryBytes = 16;
@@ -45,5 +55,6 @@ private:
     static_assert(sizeof(Slot) == kEntryBytes, "kEntryBytes must match the slot layout");
 
     std::vector<Slot> table;
-    size_t mask;
+    size_t bucketMask; // slot index of a key's bucket = key & bucketMask (always even)
+    uint64_t generation = 0;
 };

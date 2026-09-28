@@ -1123,6 +1123,7 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         std::fprintf(stderr, "[ai] gamePhase=%.3f effectiveMaxDepth=%d\n", phase, effectiveMaxDepth);
     }
 
+    tt.newSearch();
     auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeBudgetMs);
 
     // Use about half the machine's hardware threads (e.g. 12 of 24), leaving
