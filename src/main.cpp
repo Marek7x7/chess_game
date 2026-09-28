@@ -10,6 +10,7 @@
 #include "ai.hpp"
 #include "board.hpp"
 #include "gui.hpp"
+#include "match.hpp"
 #include "opening_book.hpp"
 #include "pgn.hpp"
 #include "uci.hpp"
@@ -310,6 +311,19 @@ int main(int argc, char** argv) {
             return 1;
         }
         return runReplay(argv[2], side);
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--selfplay") == 0) {
+        int games = argc >= 3 ? std::atoi(argv[2]) : 0;
+        int levelA = presetIndexByName(argc >= 4 ? argv[3] : "medium");
+        int levelB = presetIndexByName(argc >= 5 ? argv[4] : "medium");
+        if (games < 1 || levelA < 0 || levelB < 0) {
+            std::fprintf(stderr,
+                         "usage: %s --selfplay <games> [botA level] [botB level]\n"
+                         "  levels: easy|medium|hard|expert (default medium); Bot A is White in game 1\n",
+                         argv[0]);
+            return 1;
+        }
+        return runSelfplay(games, levelA, levelB);
     }
     return runGui();
 }

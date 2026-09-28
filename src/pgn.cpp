@@ -37,6 +37,20 @@ bool squareFromString(const std::string& s, int& x, int& y) {
     return x >= 0 && x < 8 && y >= 0 && y < 8;
 }
 
+char pieceLetter(PieceType t) {
+    switch (t) {
+        case PieceType::King: return 'K';
+        case PieceType::Queen: return 'Q';
+        case PieceType::Rook: return 'R';
+        case PieceType::Bishop: return 'B';
+        case PieceType::Knight: return 'N';
+        default: return '?';
+    }
+}
+
+char fileChar(int x) { return static_cast<char>('a' + x); }
+char rankChar(int y) { return static_cast<char>('1' + y); }
+
 } // namespace
 
 std::vector<std::string> parsePgnMainline(const std::string& pgnText) {
@@ -181,4 +195,83 @@ bool resolveSanMove(const Board& board, const std::string& sanIn, Move& out) {
         return true;
     }
     return false;
+}
+
+std::string moveToSan(const Board& before, const Move& m) {
+    std::string san;
+    PieceType moved = before.at(m.fromX, m.fromY).type;
+    bool capture = m.captured != PieceType::None; // en passant sets captured = Pawn too
+
+    if (m.isCastle) {
+        san = m.toX == 6 ? "O-O" : "O-O-O";
+    } else if (moved == PieceType::Pawn) {
+        if (capture) {
+            san += fileChar(m.fromX);
+            san += 'x';
+        }
+        san += fileChar(m.toX);
+        san += rankChar(m.toY);
+        if (m.promotion != PieceType::None) {
+            san += '=';
+            san += pieceLetter(m.promotion);
+        }
+    } else {
+        san += pieceLetter(moved);
+        // Disambiguate only against other pieces of the same type that can
+        // legally reach the same square: file if that's unique among them,
+        // else rank, else both.
+        bool ambiguous = false, sameFile = false, sameRank = false;
+        for (const Move& other : before.legalMoves(before.sideToMove())) {
+            if (other.toX != m.toX || other.toY != m.toY || other.isCastle) continue;
+            if (other.fromX == m.fromX && other.fromY == m.fromY) continue;
+            if (before.at(other.fromX, other.fromY).type != moved) continue;
+            ambiguous = true;
+            sameFile |= other.fromX == m.fromX;
+            sameRank |= other.fromY == m.fromY;
+        }
+        if (ambiguous) {
+            if (!sameFile) {
+                san += fileChar(m.fromX);
+            } else if (!sameRank) {
+                san += rankChar(m.fromY);
+            } else {
+                san += fileChar(m.fromX);
+                san += rankChar(m.fromY);
+            }
+        }
+        if (capture) san += 'x';
+        san += fileChar(m.toX);
+        san += rankChar(m.toY);
+    }
+
+    Board after = before;
+    after.makeMove(m);
+    GameStatus status = after.status();
+    if (status == GameStatus::Checkmate) san += '#';
+    else if (status == GameStatus::Check) san += '+';
+    return san;
+}
+
+std::string formatPgn(const std::vector<std::pair<std::string, std::string>>& tags,
+                      const std::vector<std::string>& sanMoves, const std::string& result) {
+    std::string pgn;
+    for (const auto& [name, value] : tags) pgn += "[" + name + " \"" + value + "\"]\n";
+    pgn += '\n';
+
+    std::string line;
+    auto append = [&](const std::string& token) {
+        if (!line.empty() && line.size() + 1 + token.size() > 80) {
+            pgn += line + '\n';
+            line.clear();
+        }
+        if (!line.empty()) line += ' ';
+        line += token;
+    };
+    for (size_t i = 0; i < sanMoves.size(); i++) {
+        // "12. Nf3" as one unit, so a move number never ends a line alone.
+        append(i % 2 == 0 ? std::to_string(i / 2 + 1) + ". " + sanMoves[i] : sanMoves[i]);
+    }
+    append(result);
+    pgn += line + "\n\n";
+    return pgn;
 }

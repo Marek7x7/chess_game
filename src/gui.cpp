@@ -3,9 +3,11 @@
 #include <SDL2/SDL.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <future>
 #include <optional>
 #include <string>
@@ -13,6 +15,7 @@
 
 #include "ai.hpp"
 #include "board.hpp"
+#include "match.hpp"
 #include "move.hpp"
 #include "piece.hpp"
 
@@ -24,18 +27,9 @@ constexpr int kStatusH = 110;
 constexpr int kWindowW = kBoardPx;
 constexpr int kWindowH = kBoardPx + kStatusH;
 
-struct DifficultyPreset {
-    const char* label;
-    int depthCap;
-    int timeBudgetMs;
-};
-
-constexpr DifficultyPreset kDifficultyPresets[4] = {
-    {"EASY", 3, 300},
-    {"MEDIUM", 6, 1200},
-    {"HARD", 10, 3000},
-    {"EXPERT", 20, 6000},
-};
+// Bot-vs-bot match setup: how the game-count buttons step, and the range.
+constexpr int kGameCountSteps[4] = {-10, -1, 1, 10};
+constexpr int kMaxMatchGames = 99;
 
 // Layout for Screen::CustomSetup: a shrunk, editable board flanked by two
 // piece palettes (one per side, same width), all inside the normal
@@ -180,15 +174,25 @@ Glyph glyphFor(char c) {
                             {0.8f, 0.35f}, {0.65f, 0.5f}, {0.3f, 0.5f}},
                            {{0.3f, 0.5f}, {0.1f, 0.65f}, {0.1f, 0.85f}, {0.3f, 1}, {0.65f, 1}, {0.85f, 0.85f},
                             {0.85f, 0.65f}, {0.65f, 0.5f}, {0.3f, 0.5f}}};
+        case '9': return {{{0.1f, 0.95f}, {0.4f, 1}, {0.65f, 0.85f}, {0.8f, 0.5f}, {0.8f, 0.2f}, {0.6f, 0},
+                            {0.25f, 0}, {0, 0.2f}, {0, 0.35f}, {0.25f, 0.5f}, {0.6f, 0.5f}, {0.8f, 0.35f}}};
+        case '0': return {{{0.45f, 0}, {0.15f, 0.12f}, {0.05f, 0.5f}, {0.15f, 0.88f}, {0.45f, 1}, {0.75f, 0.88f},
+                            {0.85f, 0.5f}, {0.75f, 0.12f}, {0.45f, 0}}};
         case '-': return {{{0.15f, 0.5f}, {0.85f, 0.5f}}};
+        case '+': return {{{0.5f, 0.2f}, {0.5f, 0.8f}}, {{0.2f, 0.5f}, {0.8f, 0.5f}}};
+        case '/': return {{{0.8f, 0}, {0.1f, 1}}};
+        case '_': return {{{0, 1}, {0.85f, 1}}};
+        case '(': return {{{0.6f, 0}, {0.35f, 0.25f}, {0.3f, 0.5f}, {0.35f, 0.75f}, {0.6f, 1}}};
+        case ')': return {{{0.25f, 0}, {0.5f, 0.25f}, {0.55f, 0.5f}, {0.5f, 0.75f}, {0.25f, 1}}};
         default: return {};
     }
 }
 
 void drawChar(SDL_Renderer* r, float x, float y, float size, SDL_Color color, char c) {
     char uc = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-    if (uc == '.') {
+    if (uc == '.' || uc == ':') {
         filledCircle(r, x + size * 0.5f, y + size * 0.85f, size * 0.08f, color);
+        if (uc == ':') filledCircle(r, x + size * 0.5f, y + size * 0.35f, size * 0.08f, color);
         return;
     }
     SDL_SetRenderDrawColor(r, color.r, color.g, color.b, color.a);
@@ -340,7 +344,7 @@ std::string colorName(Color c) { return c == Color::White ? "WHITE" : "BLACK"; }
 // Application state
 // ---------------------------------------------------------------------
 
-enum class Screen { MenuMain, MenuColor, MenuDifficulty, CustomSetup, Game };
+enum class Screen { MenuMain, MenuColor, MenuDifficulty, CustomSetup, BotSetup, Game };
 enum class DragState { None, Selected, Dragging };
 
 struct App {
@@ -354,6 +358,7 @@ struct App {
     int aiDepthCap = kDifficultyPresets[1].depthCap;
     int aiTimeBudgetMs = kDifficultyPresets[1].timeBudgetMs;
     std::optional<std::future<Move>> aiFuture;
+    std::atomic<bool> aiStop{false}; // aborts the search behind aiFuture (quitting, leaving a bot match)
 
     // Persists across the whole session (and across games, and across the
     // opponent's moves), rather than being rebuilt per move: a search often
@@ -381,6 +386,18 @@ struct App {
     int customDragFromX = -1, customDragFromY = -1; // valid only when customDragFromBoard
     int customMouseX = 0, customMouseY = 0;
     std::string customErrorMsg; // empty = no error shown
+
+    // Bot-vs-bot match: picked on Screen::BotSetup, then played on
+    // Screen::Game while `match` is set. `board` mirrors botGame.board() so
+    // the normal board rendering needs no bot-specific code.
+    int setupBotLevel[2] = {1, 1}; // kDifficultyPresets index for Bot A, Bot B
+    int setupGames = 1;
+    std::optional<BotMatch> match;
+    int botRound = 0; // 1-based number of the game on the board
+    GameRecord botGame;
+    std::optional<TranspositionTable> botTT[2]; // one per bot, rebuilt every game
+    std::chrono::steady_clock::time_point nextGameAt; // end of the pause after a finished game
+    std::string lastSavedPgn;                         // empty if the last save failed
 
     bool running = true;
 };
@@ -519,6 +536,72 @@ void resolvePromotion(App& app, PieceType chosen) {
     app.promotionPending = false;
 }
 
+// Puts game `round` of app.match on the board, with a fresh transposition
+// table for each bot (see runSelfplay for why they're per bot, per game).
+void startBotGame(App& app, int round) {
+    app.aiFuture.reset(); // never searching here, but the tables must not be replaced under a search
+    app.botRound = round;
+    app.botGame = GameRecord();
+    app.board = app.botGame.board();
+    for (auto& tt : app.botTT) tt.emplace(kTTSize);
+    app.flipped = false;
+    app.dragState = DragState::None;
+    app.hasLastMove = false;
+    app.promotionPending = false;
+    app.screen = Screen::Game;
+}
+
+// Back to the main menu from a bot match, finished or not: a search still
+// running is aborted rather than waited out, and an unfinished game is
+// discarded (only finished games are saved).
+void leaveBotMatch(App& app) {
+    app.aiStop = true;
+    app.aiFuture.reset();
+    app.aiStop = false;
+    app.match.reset();
+    for (auto& tt : app.botTT) tt.reset();
+    app.screen = Screen::MenuMain;
+}
+
+// Advances a bot match by at most one step per frame: starts or collects
+// the side to move's search, saves the game once it's over, and starts the
+// next one after a short pause so the final position stays readable.
+void driveBotMatch(App& app) {
+    BotMatch& match = *app.match;
+    if (match.gamesPlayed == app.botRound) { // this game is over and already saved
+        if (!match.finished() && std::chrono::steady_clock::now() >= app.nextGameAt) {
+            startBotGame(app, app.botRound + 1);
+        }
+        return;
+    }
+    if (app.botGame.outcome().over) {
+        app.lastSavedPgn = match.recordFinishedGame(app.botGame);
+        if (!app.lastSavedPgn.empty()) std::printf("saved %s\n", app.lastSavedPgn.c_str());
+        app.nextGameAt = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        return;
+    }
+    if (!app.aiFuture) {
+        Color side = app.botGame.board().sideToMove();
+        int bot = match.botToMove(app.botRound, side);
+        const DifficultyPreset& preset = kDifficultyPresets[match.level[bot]];
+        SearchOptions options;
+        options.stopFlag = &app.aiStop;
+        options.gameHistory = app.botGame.positionHashes();
+        app.aiFuture = std::async(std::launch::async,
+                                  [board = app.botGame.board(), side, preset, options, &tt = *app.botTT[bot]] {
+                                      return findBestMove(board, side, preset.depthCap, preset.timeBudgetMs, tt,
+                                                          options);
+                                  });
+    } else if (app.aiFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        Move m = app.aiFuture->get();
+        app.aiFuture.reset();
+        app.botGame.play(m);
+        app.board = app.botGame.board();
+        app.hasLastMove = true;
+        app.lastMove = m;
+    }
+}
+
 // ---------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------
@@ -534,8 +617,10 @@ const SDL_Color kMoveHighlight{60, 160, 60, 130};
 const SDL_Color kLastMoveHighlight{80, 130, 220, 90};
 const SDL_Color kCheckHighlight{220, 40, 40, 140};
 const SDL_Color kErrorColor{235, 90, 90, 255};
+const SDL_Color kButtonSelectedBg{70, 110, 170, 255};
+const SDL_Color kHintColor{160, 160, 170, 255};
 
-void renderMenuMain(App& app, Button& twoPlayers, Button& vsComputer, Button& custom) {
+void renderMenuMain(App& app, Button& twoPlayers, Button& vsComputer, Button& custom, Button& botVsBot) {
     SDL_Renderer* r = app.renderer;
     SDL_SetRenderDrawColor(r, kBg.r, kBg.g, kBg.b, kBg.a);
     SDL_RenderClear(r);
@@ -543,6 +628,73 @@ void renderMenuMain(App& app, Button& twoPlayers, Button& vsComputer, Button& cu
     drawButton(r, twoPlayers, kButtonBg, kButtonFg, 20);
     drawButton(r, vsComputer, kButtonBg, kButtonFg, 20);
     drawButton(r, custom, kButtonBg, kButtonFg, 20);
+    drawButton(r, botVsBot, kButtonBg, kButtonFg, 20);
+}
+
+void renderBotSetup(App& app, Button (&levelBtns)[2][4], Button (&gameCountBtns)[4], Button& startBtn,
+                    Button& backBtn) {
+    SDL_Renderer* r = app.renderer;
+    SDL_SetRenderDrawColor(r, kBg.r, kBg.g, kBg.b, kBg.a);
+    SDL_RenderClear(r);
+    drawTextCentered(r, kWindowW / 2.0f, 40, 32, kTitleColor, "BOT VS BOT");
+    drawTextCentered(r, kWindowW / 2.0f, 115, 16, kTitleColor, "BOT A (WHITE IN GAME 1)");
+    drawTextCentered(r, kWindowW / 2.0f, 225, 16, kTitleColor, "BOT B");
+    for (int bot = 0; bot < 2; bot++) {
+        for (int i = 0; i < 4; i++) {
+            drawButton(r, levelBtns[bot][i], i == app.setupBotLevel[bot] ? kButtonSelectedBg : kButtonBg, kButtonFg,
+                       16);
+        }
+    }
+    drawTextCentered(r, kWindowW / 2.0f, 335, 16, kTitleColor, "NUMBER OF GAMES");
+    for (const Button& b : gameCountBtns) drawButton(r, b, kButtonBg, kButtonFg, 16);
+    drawTextCentered(r, kWindowW / 2.0f, 376, 28, kTitleColor, std::to_string(app.setupGames));
+    drawTextCentered(r, kWindowW / 2.0f, 440, 14, kHintColor, "COLORS SWAP EVERY GAME");
+    drawButton(r, startBtn, kButtonBg, kButtonFg, 20);
+    drawButton(r, backBtn, kButtonBg, kButtonFg, 14);
+}
+
+// "2.5" / "3" from a count of half points.
+std::string pointsText(int halfPoints) { return std::to_string(halfPoints / 2) + (halfPoints % 2 ? ".5" : ""); }
+
+// Bot-match status bar: what's happening on the board, the game number and
+// running score, and the last saved PGN. Sized to stay left of the MENU and
+// QUIT buttons in the right-hand column.
+void drawBotMatchStatus(App& app) {
+    SDL_Renderer* r = app.renderer;
+    const BotMatch& match = *app.match;
+    int half[2] = {2 * match.wins[0] + match.draws, 2 * match.wins[1] + match.draws};
+
+    std::string headline;
+    GameOutcome outcome = app.botGame.outcome();
+    if (match.finished()) {
+        int leader = half[0] >= half[1] ? 0 : 1;
+        headline = "MATCH OVER - " +
+                   (half[0] == half[1] ? std::string("TIED ")
+                                       : std::string(leader == 0 ? "BOT A" : "BOT B") + " WINS ") +
+                   pointsText(half[leader]) + "-" + pointsText(half[1 - leader]);
+    } else if (outcome.over && outcome.reason == "checkmate") {
+        Color winner = opponent(app.board.sideToMove());
+        headline = "CHECKMATE - " + match.botName(match.botToMove(app.botRound, winner)) + " WINS";
+    } else if (outcome.over) {
+        headline = "DRAW - " + outcome.reason;
+    } else {
+        Color turn = app.board.sideToMove();
+        headline = colorName(turn) + " - " + match.botName(match.botToMove(app.botRound, turn)) + " THINKING";
+    }
+    drawText(r, 16, static_cast<float>(kBoardPx + 14), 16, kTitleColor, headline);
+
+    std::string score = "GAME " + std::to_string(app.botRound) + "/" + std::to_string(match.totalGames) +
+                        " - BOT A " + pointsText(half[0]) + "  BOT B " + pointsText(half[1]);
+    drawText(r, 16, static_cast<float>(kBoardPx + 42), 14, kTitleColor, score);
+
+    if (match.gamesPlayed > 0) {
+        std::filesystem::path saved(app.lastSavedPgn);
+        std::string savedText = app.lastSavedPgn.empty()
+                                    ? "COULD NOT SAVE THE PGN - SEE TERMINAL"
+                                    : "SAVED " + (saved.parent_path().filename() / saved.filename()).generic_string();
+        drawText(r, 16, static_cast<float>(kBoardPx + 70), 11,
+                 app.lastSavedPgn.empty() ? kErrorColor : kHintColor, savedText);
+    }
 }
 
 void renderMenuColor(App& app, Button& white, Button& black) {
@@ -622,7 +774,7 @@ void renderCustomSetup(App& app, const SDL_Rect (&blackPalette)[6], const SDL_Re
     }
 }
 
-void renderGame(App& app, Button& quitBtn, Button& newGameBtn) {
+void renderGame(App& app, Button& quitBtn, Button& newGameBtn, Button& botMenuBtn) {
     SDL_Renderer* r = app.renderer;
     SDL_SetRenderDrawColor(r, kBg.r, kBg.g, kBg.b, kBg.a);
     SDL_RenderClear(r);
@@ -723,22 +875,26 @@ void renderGame(App& app, Button& quitBtn, Button& newGameBtn) {
     SDL_SetRenderDrawColor(r, kBg.r, kBg.g, kBg.b, kBg.a);
     SDL_RenderFillRect(r, &statusRect);
 
-    std::string statusText;
-    if (status == GameStatus::Checkmate) {
-        statusText = "CHECKMATE - " + colorName(opponent(turn)) + " WINS";
-    } else if (status == GameStatus::Stalemate) {
-        statusText = "STALEMATE - DRAW";
-    } else if (app.vsAi && turn != app.humanColor) {
-        statusText = colorName(turn) + " (AI) IS THINKING...";
-    } else if (status == GameStatus::Check) {
-        statusText = colorName(turn) + " IS IN CHECK";
+    if (app.match) {
+        drawBotMatchStatus(app);
+        drawButton(r, botMenuBtn, kButtonBg, kButtonFg, 16);
     } else {
-        statusText = colorName(turn) + " TO MOVE";
+        std::string statusText;
+        if (status == GameStatus::Checkmate) {
+            statusText = "CHECKMATE - " + colorName(opponent(turn)) + " WINS";
+        } else if (status == GameStatus::Stalemate) {
+            statusText = "STALEMATE - DRAW";
+        } else if (app.vsAi && turn != app.humanColor) {
+            statusText = colorName(turn) + " (AI) IS THINKING...";
+        } else if (status == GameStatus::Check) {
+            statusText = colorName(turn) + " IS IN CHECK";
+        } else {
+            statusText = colorName(turn) + " TO MOVE";
+        }
+        drawText(r, 16, static_cast<float>(kBoardPx + 18), 22, kTitleColor, statusText);
+        if (gameOver) drawButton(r, newGameBtn, kButtonBg, kButtonFg, 16);
     }
-    drawText(r, 16, static_cast<float>(kBoardPx + 18), 22, kTitleColor, statusText);
-
     drawButton(r, quitBtn, kButtonBg, kButtonFg, 16);
-    if (gameOver) drawButton(r, newGameBtn, kButtonBg, kButtonFg, 16);
 
     // Promotion picker modal.
     if (app.promotionPending) {
@@ -809,6 +965,22 @@ int runGui() {
     Button blackStartBtn{{110, 560, 200, 50}, "BLACK START"};
     Button whiteStartBtn{{330, 560, 200, 50}, "WHITE START"};
     Button backBtn{{240, 670, 160, 40}, "BACK TO MENU"};
+    Button botVsBotBtn{{kWindowW / 2 - 110, 460, 220, 50}, "BOT VS BOT"};
+    Button botLevelBtns[2][4];
+    for (int bot = 0; bot < 2; bot++) {
+        for (int i = 0; i < 4; i++) {
+            botLevelBtns[bot][i] = {{36 + i * 146, bot == 0 ? 145 : 255, 130, 44}, kDifficultyPresets[i].label};
+        }
+    }
+    Button gameCountBtns[4] = {
+        {{150, 365, 70, 50}, "-10"},
+        {{226, 365, 60, 50}, "-1"},
+        {{354, 365, 60, 50}, "+1"},
+        {{420, 365, 70, 50}, "+10"},
+    };
+    Button startMatchBtn{{kWindowW / 2 - 110, 490, 220, 50}, "START"};
+    Button botBackBtn{{240, 580, 160, 40}, "BACK TO MENU"};
+    Button botMenuBtn{{kWindowW - 116, kBoardPx + 12, 100, 34}, "MENU"};
     SDL_Rect setupBoardRect{kSetupBoardX, kSetupBoardY, kSetupBoardPx, kSetupBoardPx};
     SDL_Rect blackPalette[6];
     SDL_Rect whitePalette[6];
@@ -847,6 +1019,26 @@ int runGui() {
                 } else if (pointInRect(e.button.x, e.button.y, customBtn.rect)) {
                     app.customMode = true;
                     app.screen = Screen::MenuColor;
+                } else if (pointInRect(e.button.x, e.button.y, botVsBotBtn.rect)) {
+                    app.screen = Screen::BotSetup;
+                }
+            } else if (app.screen == Screen::BotSetup && e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                for (int bot = 0; bot < 2; bot++) {
+                    for (int i = 0; i < 4; i++) {
+                        if (pointInRect(e.button.x, e.button.y, botLevelBtns[bot][i].rect)) app.setupBotLevel[bot] = i;
+                    }
+                }
+                for (int i = 0; i < 4; i++) {
+                    if (pointInRect(e.button.x, e.button.y, gameCountBtns[i].rect)) {
+                        app.setupGames = std::clamp(app.setupGames + kGameCountSteps[i], 1, kMaxMatchGames);
+                    }
+                }
+                if (pointInRect(e.button.x, e.button.y, startMatchBtn.rect)) {
+                    app.match.emplace(app.setupBotLevel[0], app.setupBotLevel[1], app.setupGames);
+                    app.lastSavedPgn.clear();
+                    startBotGame(app, 1);
+                } else if (pointInRect(e.button.x, e.button.y, botBackBtn.rect)) {
+                    app.screen = Screen::MenuMain;
                 }
             } else if (app.screen == Screen::MenuColor && e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
                 if (pointInRect(e.button.x, e.button.y, playWhiteBtn.rect)) {
@@ -929,6 +1121,8 @@ int runGui() {
                 if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
                     if (pointInRect(e.button.x, e.button.y, quitBtn.rect)) {
                         app.running = false;
+                    } else if (app.match) { // bots play both sides: the board takes no input
+                        if (pointInRect(e.button.x, e.button.y, botMenuBtn.rect)) leaveBotMatch(app);
                     } else if (gameOver && pointInRect(e.button.x, e.button.y, newGameBtn.rect)) {
                         app.screen = Screen::MenuMain;
                     } else if (app.promotionPending) {
@@ -976,7 +1170,9 @@ int runGui() {
             }
         }
 
-        if (app.screen == Screen::Game && !app.promotionPending) {
+        if (app.screen == Screen::Game && app.match) {
+            driveBotMatch(app);
+        } else if (app.screen == Screen::Game && !app.promotionPending) {
             GameStatus status = app.board.status();
             bool gameOver = status == GameStatus::Checkmate || status == GameStatus::Stalemate;
             if (!gameOver && app.vsAi && app.board.sideToMove() != app.humanColor) {
@@ -984,9 +1180,12 @@ int runGui() {
                     Board snapshot = app.board;
                     Color aiColor = app.board.sideToMove();
                     int depth = app.aiDepthCap, budget = app.aiTimeBudgetMs;
-                    app.aiFuture = std::async(std::launch::async, [snapshot, aiColor, depth, budget, &tt = app.tt] {
-                        return findBestMove(snapshot, aiColor, depth, budget, tt);
-                    });
+                    SearchOptions options;
+                    options.stopFlag = &app.aiStop;
+                    app.aiFuture = std::async(std::launch::async,
+                                              [snapshot, aiColor, depth, budget, options, &tt = app.tt] {
+                                                  return findBestMove(snapshot, aiColor, depth, budget, tt, options);
+                                              });
                 } else if (app.aiFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
                     Move m = app.aiFuture->get();
                     app.aiFuture.reset();
@@ -998,15 +1197,22 @@ int runGui() {
         }
 
         switch (app.screen) {
-            case Screen::MenuMain: renderMenuMain(app, twoPlayersBtn, vsComputerBtn, customBtn); break;
+            case Screen::MenuMain: renderMenuMain(app, twoPlayersBtn, vsComputerBtn, customBtn, botVsBotBtn); break;
             case Screen::MenuColor: renderMenuColor(app, playWhiteBtn, playBlackBtn); break;
             case Screen::MenuDifficulty: renderMenuDifficulty(app, difficultyBtns); break;
             case Screen::CustomSetup: renderCustomSetup(app, blackPalette, whitePalette, blackStartBtn, whiteStartBtn, backBtn); break;
-            case Screen::Game: renderGame(app, quitBtn, newGameBtn); break;
+            case Screen::BotSetup: renderBotSetup(app, botLevelBtns, gameCountBtns, startMatchBtn, botBackBtn); break;
+            case Screen::Game: renderGame(app, quitBtn, newGameBtn, botMenuBtn); break;
         }
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
+
+    // Stop any in-flight search and wait for it here: `app`'s members are
+    // destroyed in reverse order, so its transposition tables would
+    // otherwise be freed while that search thread is still using them.
+    app.aiStop = true;
+    app.aiFuture.reset();
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

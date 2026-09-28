@@ -90,6 +90,9 @@ struct SearchContext {
     long long nodes = 0;
     std::chrono::steady_clock::time_point deadline;
     const std::atomic<bool>* stopFlag = nullptr;
+    // Game history followed by every position on the current search line
+    // (root included), for repetition detection.
+    std::vector<uint64_t> path;
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
@@ -234,10 +237,15 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         extensionsLeft--;
     }
 
+    // Any repetition of an earlier position (in the game or on this line)
+    // is scored as a draw: repeating once more is always available to the
+    // side it suits, so the true value is at best a draw either way.
+    uint64_t key = board.hashKey();
+    if (std::find(ctx.path.begin(), ctx.path.end(), key) != ctx.path.end()) return 0;
+
     if (depth <= 0) return quiescence(board, alpha, beta, color, ply, ctx);
 
     int origAlpha = alpha;
-    uint64_t key = board.hashKey();
     Move ttMove{};
     TTEntry ttEntry;
     if (ctx.tt.probe(key, ttEntry)) {
@@ -298,6 +306,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     Move bestMove = moves.front();
     int best = INT_MIN;
     int moveIndex = 0;
+    ctx.path.push_back(key); // popped below; a TimeUp unwind leaves it, see searchWindow
     for (const Move& m : moves) {
         Board::UndoState undo;
         board.makeMove(m, undo);
@@ -358,6 +367,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             break;
         }
     }
+    ctx.path.pop_back();
 
     TTFlag flag = best <= origAlpha ? TTFlag::UpperBound : (best >= beta ? TTFlag::LowerBound : TTFlag::Exact);
     ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true);
@@ -398,11 +408,14 @@ bool isBetterAtSameDepth(const RootSearchResult& a, const RootSearchResult& b) {
 RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<Move>& rootMoves, int maxDepth,
                                  std::chrono::steady_clock::time_point deadline, TranspositionTable& tt,
                                  size_t threadIndex, const std::atomic<bool>* stopFlag = nullptr,
-                                 const std::function<void(const SearchProgress&)>& onDepthComplete = {}) {
+                                 const std::function<void(const SearchProgress&)>& onDepthComplete = {},
+                                 const std::vector<uint64_t>& gameHistory = {}) {
     RootSearchResult result;
     result.move = rootMoves.front();
 
-    SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag};
+    SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory};
+    ctx.path.push_back(board.hashKey());
+    const size_t rootPathSize = ctx.path.size();
     std::mt19937 jitterRng(0x9E3779B9u + static_cast<unsigned>(threadIndex));
     std::uniform_int_distribution<int> jitterDist(0, 24);
 
@@ -433,6 +446,7 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
             Move bestMoveLocal = moves.front();
             int bestLocal = INT_MIN;
             bool completedLocal = true;
+            ctx.path.resize(rootPathSize); // drop anything a previous TimeUp unwind left behind
             try {
                 for (const Move& m : moves) {
                     Board::UndoState undo;
@@ -686,9 +700,10 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
                                                                            : std::function<void(const SearchProgress&)>{};
         futures.push_back(std::async(
             std::launch::async,
-            [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, &tt, t, stopFlag, progressCb]() mutable {
+            [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, &tt, t, stopFlag, progressCb,
+             &gameHistory = options.gameHistory]() mutable {
                 return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t, stopFlag,
-                                       progressCb);
+                                       progressCb, gameHistory);
             }));
     }
 

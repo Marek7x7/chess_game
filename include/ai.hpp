@@ -58,6 +58,11 @@ struct SearchOptions {
     // internal search threads -- they're all joined before it returns).
     const std::atomic<bool>* stopFlag = nullptr;
     std::function<void(const SearchProgress&)> onDepthComplete;
+    // hashKey() of every position earlier in the game (including the one
+    // being searched is harmless). The search scores reaching any of them again as a draw, so
+    // a side that's ahead steers away from repeating instead of drifting
+    // into a threefold. Empty = no game history known.
+    std::vector<uint64_t> gameHistory;
 };
 
 // Picks a move for `aiColor`: an opening-book move if the position is a

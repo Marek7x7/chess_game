@@ -81,6 +81,7 @@ int runUci() {
     std::setvbuf(stdout, nullptr, _IOLBF, 0);
 
     Board board;
+    std::vector<uint64_t> gameHistory; // hashKey() of every position from "position", for repetition detection
     int hashMB = 224; // matches kTTSize's ~224 MiB (ai.hpp)
     auto tt = std::make_unique<TranspositionTable>(hashMBToEntries(hashMB));
     bool ownBook = false; // UCI default is OFF, unlike every other caller of findBestMove
@@ -171,12 +172,14 @@ int runUci() {
                 }
                 board = Board::fromFEN(fen);
             }
+            gameHistory.assign(1, board.hashKey());
             if (i < tok.size() && tok[i] == "moves") {
                 i++;
                 for (; i < tok.size(); i++) {
                     Move m;
                     if (!parseUciMove(board, tok[i], m)) break; // malformed input: stop applying
                     board.makeMove(m);
+                    gameHistory.push_back(board.hashKey());
                 }
             }
         } else if (cmd == "go") {
@@ -246,6 +249,7 @@ int runUci() {
             opts.useOpeningBook = ownBook;
             opts.threadOverride = threadsOption;
             opts.stopFlag = &stopFlag;
+            opts.gameHistory = gameHistory;
             auto start = std::chrono::steady_clock::now();
             opts.onDepthComplete = [&tt, searchBoard, start](const SearchProgress& p) {
                 // p.bestMove is the authoritative move for this depth --
