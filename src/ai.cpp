@@ -978,13 +978,15 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 
 } // namespace
 
-std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen) {
+std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen,
+                            const std::vector<uint64_t>& history) {
     std::vector<Move> pv;
     std::vector<uint64_t> seen;
     Board board = rootBoard;
     for (int i = 0; i < maxLen; i++) {
         uint64_t key = board.hashKey();
         if (std::find(seen.begin(), seen.end(), key) != seen.end()) break; // cycle guard
+        if (std::count(history.begin(), history.end(), key) >= 2) break;   // third occurrence: a draw
         seen.push_back(key);
 
         TTEntry entry;

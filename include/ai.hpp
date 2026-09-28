@@ -83,14 +83,17 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
 // the stored best move (re-checked for legality -- a hash collision could
 // otherwise hand back a move that isn't legal here), apply it to a scratch
 // copy, and stop at a TT miss, a stored-but-illegal/absent move, a repeated
-// position (cycle guard), or `maxLen` moves.
+// position (cycle guard), or `maxLen` moves. `history` holds the hashes of
+// the game's earlier positions: the line also ends at a position that
+// completes a threefold repetition with them, since the game would be over.
 //
 // Best-effort, not guaranteed-complete: tt entries can be overwritten
 // between "search finished" and "this walk," which can truncate the PV
 // early -- an accepted trade-off (the standard technique for this), not a
 // bug. Read-only against `tt` (probes only, never stores); touches nothing
 // in the negamax/quiescence hot path.
-std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen = 32);
+std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen = 32,
+                            const std::vector<uint64_t>& history = {});
 
 // UCI-format move/score/PV text ("e7e8q" not "e7e8=Q", "cp <n>"/"mate <n>"
 // not a bare centipawn integer). Shared by uci.cpp and --replay's

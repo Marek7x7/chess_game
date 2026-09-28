@@ -251,7 +251,7 @@ int runUci() {
             opts.stopFlag = &stopFlag;
             opts.gameHistory = gameHistory;
             auto start = std::chrono::steady_clock::now();
-            opts.onDepthComplete = [&tt, searchBoard, start](const SearchProgress& p) {
+            opts.onDepthComplete = [&tt, searchBoard, start, history = gameHistory](const SearchProgress& p) {
                 // p.bestMove is the authoritative move for this depth --
                 // exactly what becomes `bestmove` if this is the last
                 // completed depth. extractPV()'s own TT root-probe is NOT
@@ -270,7 +270,7 @@ int runUci() {
                 Board afterBest = searchBoard;
                 afterBest.makeMove(p.bestMove);
                 std::vector<Move> pv = {p.bestMove};
-                std::vector<Move> rest = extractPV(afterBest, *tt, 31);
+                std::vector<Move> rest = extractPV(afterBest, *tt, 31, history);
                 pv.insert(pv.end(), rest.begin(), rest.end());
                 double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
                 long long nps = secs > 0 ? static_cast<long long>(p.nodes / secs) : 0;
