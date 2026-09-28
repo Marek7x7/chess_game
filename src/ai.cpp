@@ -168,9 +168,32 @@ constexpr int kRookSemiOpenFile = 10;
 constexpr int kRookOn7thMg = 20, kRookOn7thEg = 40;
 constexpr int kQueenOn7thMg = 10, kQueenOn7thEg = 20;
 
+// Outpost: a knight or bishop on the 4th-6th rank (counted from its own
+// side), defended by an own pawn, on a square no enemy pawn can ever attack
+// -- it can only be driven off by trading a piece for it. Middlegame /
+// endgame; a knight gains more, having no long-range alternative.
+constexpr int kKnightOutpostMg = 20, kKnightOutpostEg = 10;
+constexpr int kBishopOutpostMg = 10, kBishopOutpostEg = 5;
+
+bool isOutpost(const Board& board, int x, int y, Color color) {
+    int rank = color == Color::White ? y : 7 - y;
+    if (rank < 3 || rank > 5) return false;
+    int dir = color == Color::White ? 1 : -1;
+    auto pawnOf = [&](int px, int py, Color c) {
+        return Board::inBounds(px, py) && board.at(px, py).type == PieceType::Pawn && board.at(px, py).color == c;
+    };
+    if (!pawnOf(x - 1, y - dir, color) && !pawnOf(x + 1, y - dir, color)) return false;
+    // An enemy pawn on an adjacent file anywhere ahead could still advance to attack it.
+    for (int py = y + dir; py >= 1 && py <= 6; py += dir) {
+        if (pawnOf(x - 1, py, opponent(color)) || pawnOf(x + 1, py, opponent(color))) return false;
+    }
+    return true;
+}
+
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece, pins and
-// checks aside -- rooks on open files, and rooks/queens on the 7th rank.
+// checks aside -- rooks on open files, rooks/queens on the 7th rank, and
+// outposts.
 // Also fills attacks[c] with the
 // pieces attacking color c's king zone (the squares next to that king).
 int pieceTerms(const Board& board, KingAttack (&attacks)[2]) {
@@ -220,6 +243,11 @@ int pieceTerms(const Board& board, KingAttack (&attacks)[2]) {
                 int bonus = ownPawn ? 0 : enemyPawn ? kRookSemiOpenFile : kRookOpenFile;
                 mg += sign * bonus;
                 eg += sign * bonus;
+            }
+            if ((p.type == PieceType::Knight || p.type == PieceType::Bishop) && isOutpost(board, x, y, p.color)) {
+                bool knight = p.type == PieceType::Knight;
+                mg += sign * (knight ? kKnightOutpostMg : kBishopOutpostMg);
+                eg += sign * (knight ? kKnightOutpostEg : kBishopOutpostEg);
             }
             int seventh = p.color == Color::White ? 6 : 1;
             if ((p.type == PieceType::Rook || p.type == PieceType::Queen) && y == seventh) {
