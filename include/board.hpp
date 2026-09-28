@@ -31,7 +31,8 @@ public:
     // live-tracked king squares and phase (it can't be summed incrementally
     // like the other pieces, since its value changes with the game phase
     // even when the king itself doesn't move). Same for the bishop-pair
-    // bonus, from the live-tracked bishop count of each side.
+    // bonus, from the live-tracked bishop count of each side, and for the
+    // endgame pawn values, from a live-tracked sum.
     int rawEval() const;
 
     // 0 (endgame) .. 1 (opening/middlegame), from incrementally-tracked
@@ -74,6 +75,7 @@ public:
         int prevPhaseUnits;
         int prevKingX[2], prevKingY[2];
         int prevBishopCount[2];
+        int prevPawnEgShift;
     };
 
     // Same as makeMove(const Move&), but also records enough state in `undo`
@@ -127,6 +129,7 @@ private:
     int phaseUnits;
     int kingX[2], kingY[2]; // [White, Black]
     int bishopCount[2];     // [White, Black], for the bishop-pair bonus
+    int pawnEgShift;        // sum of pawnEgShift() over all pawns, blended in by phase
 
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 

@@ -144,6 +144,20 @@ int bishopPairTerm(const int (&bishops)[2], double phase) {
     return (bishops[0] >= 2 ? bonus : 0) - (bishops[1] >= 2 ? bonus : 0);
 }
 
+// Endgame pawn values by rank counted from the pawn's own side. With few
+// pieces left, what a pawn is worth is how close it is to promoting, not
+// whether it controls the center, which is what kPawnTable (used, halved,
+// in the middlegame) rewards.
+constexpr int kPawnEgByRank[8] = {0, 0, 5, 10, 15, 25, 35, 0};
+
+// How much a pawn's endgame square value differs from its halved
+// middlegame one, positive = good for White.
+int pawnEgShiftFor(Color color, int x, int y) {
+    int rank = color == Color::White ? y : 7 - y;
+    int shift = kPawnEgByRank[rank] - pst(kPawnTable, color, x, y) / 2;
+    return color == Color::White ? shift : -shift;
+}
+
 // Positive = good for White. Positional bonuses are scaled down relative to
 // material so a few plies of accumulated piece-square swings can't outweigh
 // a clean material gain.
@@ -211,6 +225,7 @@ void Board::recomputeEval() {
     nonKingScore = 0;
     phaseUnits = 0;
     bishopCount[0] = bishopCount[1] = 0;
+    pawnEgShift = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
@@ -223,6 +238,7 @@ void Board::recomputeEval() {
             nonKingScore += pieceContribution(p.type, p.color, x, y);
             phaseUnits += phaseValue(p.type);
             if (p.type == PieceType::Bishop) bishopCount[colorIndex(p.color)]++;
+            if (p.type == PieceType::Pawn) pawnEgShift += pawnEgShiftFor(p.color, x, y);
         }
     }
 }
@@ -234,7 +250,11 @@ int Board::kingTerm() const {
     return white / 2 - black / 2;
 }
 
-int Board::rawEval() const { return nonKingScore + kingTerm() + bishopPairTerm(bishopCount, gamePhase()); }
+int Board::rawEval() const {
+    double phase = gamePhase();
+    return nonKingScore + kingTerm() + bishopPairTerm(bishopCount, phase) +
+           static_cast<int>(pawnEgShift * (1.0 - phase));
+}
 
 double Board::gamePhase() const { return std::min(1.0, phaseUnits / static_cast<double>(kMaxPhase)); }
 
@@ -250,6 +270,7 @@ int Board::rawEvalFromScratch() const {
     }
     double phaseFrac = std::min(1.0, phase / static_cast<double>(kMaxPhase));
     int bishops[2] = {0, 0};
+    int pawnShift = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
@@ -261,9 +282,10 @@ int Board::rawEvalFromScratch() const {
                 score += pieceContribution(p.type, p.color, x, y);
             }
             if (p.type == PieceType::Bishop) bishops[colorIndex(p.color)]++;
+            if (p.type == PieceType::Pawn) pawnShift += pawnEgShiftFor(p.color, x, y);
         }
     }
-    return score + bishopPairTerm(bishops, phaseFrac);
+    return score + bishopPairTerm(bishops, phaseFrac) + static_cast<int>(pawnShift * (1.0 - phaseFrac));
 }
 
 void Board::recomputeHash() {
@@ -602,9 +624,11 @@ void Board::makeMove(const Move& m) {
     // are summed incrementally at exactly the points their placement changes.
     auto addEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore += pieceContribution(t, c, x, y);
+        if (t == PieceType::Pawn) pawnEgShift += pawnEgShiftFor(c, x, y);
     };
     auto removeEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore -= pieceContribution(t, c, x, y);
+        if (t == PieceType::Pawn) pawnEgShift -= pawnEgShiftFor(c, x, y);
     };
 
     Piece moving = squares[m.fromX][m.fromY];
@@ -703,6 +727,7 @@ void Board::makeMove(const Move& m, UndoState& undo) {
     undo.prevKingY[1] = kingY[1];
     undo.prevBishopCount[0] = bishopCount[0];
     undo.prevBishopCount[1] = bishopCount[1];
+    undo.prevPawnEgShift = pawnEgShift;
     const Piece& moving = squares[m.fromX][m.fromY];
     undo.movedType = moving.type;
     undo.movedColor = moving.color;
@@ -751,6 +776,7 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     kingY[1] = undo.prevKingY[1];
     bishopCount[0] = undo.prevBishopCount[0];
     bishopCount[1] = undo.prevBishopCount[1];
+    pawnEgShift = undo.prevPawnEgShift;
     turn = color;
 }
 
