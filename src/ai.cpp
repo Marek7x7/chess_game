@@ -58,13 +58,58 @@ std::string movesStr(const std::vector<Move>& moves) {
 
 // ---------------------------------------------------------------------
 // Evaluation. Material + piece-square-table score is maintained
-// incrementally by Board itself (see Board::rawEval()); this just applies
-// the side-to-move sign flip.
+// incrementally by Board itself (see Board::rawEval()); pawn structure
+// depends on where the other pawns are, so it's computed here from scratch.
 // ---------------------------------------------------------------------
+
+// Passed-pawn bonus by rank counted from the pawn's own side (1 = its
+// starting rank, 6 = one step from promoting), middlegame and endgame. A
+// passer is worth far more once pieces come off: fewer pieces are left to
+// blockade it or to stop it while also doing everything else.
+constexpr int kPassedMg[8] = {0, 5, 10, 15, 25, 45, 70, 0};
+constexpr int kPassedEg[8] = {0, 10, 15, 25, 45, 75, 120, 0};
+
+// Positive = good for White. A passed pawn has no enemy pawn in front of it
+// on its own or an adjacent file.
+int pawnStructure(const Board& board) {
+    // Per file, the rank of the rearmost pawn of each color: the only one
+    // that decides whether an enemy pawn on that file is passed.
+    int whiteLowest[8], blackHighest[8];
+    std::fill(std::begin(whiteLowest), std::end(whiteLowest), 8);
+    std::fill(std::begin(blackHighest), std::end(blackHighest), -1);
+    for (int x = 0; x < 8; x++) {
+        for (int y = 1; y < 7; y++) {
+            Piece p = board.at(x, y);
+            if (p.type != PieceType::Pawn) continue;
+            if (p.color == Color::White) whiteLowest[x] = std::min(whiteLowest[x], y);
+            else blackHighest[x] = std::max(blackHighest[x], y);
+        }
+    }
+
+    int mg = 0, eg = 0;
+    for (int x = 0; x < 8; x++) {
+        int lo = std::max(0, x - 1), hi = std::min(7, x + 1);
+        for (int y = 1; y < 7; y++) {
+            Piece p = board.at(x, y);
+            if (p.type != PieceType::Pawn) continue;
+            bool passed = true;
+            for (int f = lo; f <= hi; f++) {
+                if (p.color == Color::White ? blackHighest[f] > y : whiteLowest[f] < y) passed = false;
+            }
+            if (!passed) continue;
+            int rank = p.color == Color::White ? y : 7 - y;
+            int sign = p.color == Color::White ? 1 : -1;
+            mg += sign * kPassedMg[rank];
+            eg += sign * kPassedEg[rank];
+        }
+    }
+    double phase = board.gamePhase();
+    return static_cast<int>(mg * phase + eg * (1.0 - phase));
+}
 
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
-    int score = board.rawEval(); // positive = good for White
+    int score = board.rawEval() + pawnStructure(board); // positive = good for White
     return (color == Color::White) ? score : -score;
 }
 
