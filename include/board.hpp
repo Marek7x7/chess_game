@@ -46,6 +46,12 @@ public:
     // All moves for `color` that don't leave that color's own king in check.
     MoveList legalMoves(Color color) const;
 
+    // The subset of legalMoves() that quiescence search looks at -- every
+    // capture (en passant and capture-promotions included) plus non-capture
+    // queen promotions -- in the same relative order legalMoves() lists
+    // them, without paying the legality check for every quiet move.
+    MoveList legalNoisyMoves(Color color) const;
+
     bool isSquareAttacked(int x, int y, Color byColor) const;
     bool isInCheck(Color color) const;
 
@@ -142,9 +148,11 @@ private:
     void makeMoveLight(const Move& m, LightUndo& undo);
     void unmakeMoveLight(const Move& m, const LightUndo& undo);
 
-    MoveList pseudoLegalMoves(Color color) const;
+    // noisyOnly: generate only what legalNoisyMoves() returns.
+    MoveList pseudoLegalMoves(Color color, bool noisyOnly) const;
+    MoveList filterLegal(const MoveList& pseudo, Color color) const;
     void addSlidingMoves(MoveList& moves, int x, int y, Color color,
-                         const int dirs[][2], int numDirs) const;
-    void addPawnMoves(MoveList& moves, int x, int y, Color color) const;
-    void addKingMoves(MoveList& moves, int x, int y, Color color) const;
+                         const int dirs[][2], int numDirs, bool noisyOnly) const;
+    void addPawnMoves(MoveList& moves, int x, int y, Color color, bool noisyOnly) const;
+    void addKingMoves(MoveList& moves, int x, int y, Color color, bool noisyOnly) const;
 };

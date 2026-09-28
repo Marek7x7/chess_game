@@ -312,9 +312,7 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
         candidates = board.legalMoves(color);
         if (candidates.empty()) return -(kMateScore - ply);
     } else {
-        for (const Move& m : board.legalMoves(color)) {
-            if (m.captured != PieceType::None || m.promotion == PieceType::Queen) candidates.push_back(m);
-        }
+        candidates = board.legalNoisyMoves(color);
     }
     orderMoves(board, candidates, ttMove, ctx, ply, color);
 

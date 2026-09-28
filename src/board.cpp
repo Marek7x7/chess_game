@@ -352,14 +352,14 @@ Board Board::fromFEN(const std::string& fen) {
 }
 
 void Board::addSlidingMoves(MoveList& moves, int x, int y, Color color,
-                             const int dirs[][2], int numDirs) const {
+                             const int dirs[][2], int numDirs, bool noisyOnly) const {
     for (int d = 0; d < numDirs; d++) {
         int nx = x + dirs[d][0];
         int ny = y + dirs[d][1];
         while (inBounds(nx, ny)) {
             const Piece& target = squares[nx][ny];
             if (target.isEmpty()) {
-                moves.push_back({x, y, nx, ny});
+                if (!noisyOnly) moves.push_back({x, y, nx, ny});
             } else {
                 if (target.color != color) moves.push_back({x, y, nx, ny, PieceType::None, false, false, target.type});
                 break;
@@ -370,7 +370,7 @@ void Board::addSlidingMoves(MoveList& moves, int x, int y, Color color,
     }
 }
 
-void Board::addPawnMoves(MoveList& moves, int x, int y, Color color) const {
+void Board::addPawnMoves(MoveList& moves, int x, int y, Color color, bool noisyOnly) const {
     int dir = (color == Color::White) ? 1 : -1;
     int startRank = (color == Color::White) ? 1 : 6;
     int promotionRank = (color == Color::White) ? 7 : 0;
@@ -387,10 +387,14 @@ void Board::addPawnMoves(MoveList& moves, int x, int y, Color color) const {
 
     int ny = y + dir;
     if (inBounds(x, ny) && squares[x][ny].isEmpty()) {
-        addForwardOrPromotion(x, ny, PieceType::None);
-        int ny2 = y + 2 * dir;
-        if (y == startRank && squares[x][ny2].isEmpty()) {
-            moves.push_back({x, y, x, ny2});
+        if (!noisyOnly) {
+            addForwardOrPromotion(x, ny, PieceType::None);
+            int ny2 = y + 2 * dir;
+            if (y == startRank && squares[x][ny2].isEmpty()) {
+                moves.push_back({x, y, x, ny2});
+            }
+        } else if (ny == promotionRank) {
+            moves.push_back({x, y, x, ny, PieceType::Queen});
         }
     }
 
@@ -409,19 +413,19 @@ void Board::addPawnMoves(MoveList& moves, int x, int y, Color color) const {
     }
 }
 
-void Board::addKingMoves(MoveList& moves, int x, int y, Color color) const {
+void Board::addKingMoves(MoveList& moves, int x, int y, Color color, bool noisyOnly) const {
     for (int dx = -1; dx <= 1; dx++) {
         for (int dy = -1; dy <= 1; dy++) {
             if (dx == 0 && dy == 0) continue;
             int nx = x + dx, ny = y + dy;
             if (!inBounds(nx, ny)) continue;
             const Piece& target = squares[nx][ny];
-            if (target.isEmpty() || target.color != color)
+            if (noisyOnly ? !target.isEmpty() && target.color != color : target.isEmpty() || target.color != color)
                 moves.push_back({x, y, nx, ny, PieceType::None, false, false, target.type});
         }
     }
 
-    if (isInCheck(color)) return;
+    if (noisyOnly || isInCheck(color)) return;
     int homeY = (color == Color::White) ? 0 : 7;
     if (x != 4 || y != homeY) return;
     Color enemy = opponent(color);
@@ -444,7 +448,7 @@ void Board::addKingMoves(MoveList& moves, int x, int y, Color color) const {
     }
 }
 
-MoveList Board::pseudoLegalMoves(Color color) const {
+MoveList Board::pseudoLegalMoves(Color color, bool noisyOnly) const {
     MoveList moves;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
@@ -452,28 +456,29 @@ MoveList Board::pseudoLegalMoves(Color color) const {
             if (p.color != color) continue;
             switch (p.type) {
                 case PieceType::Pawn:
-                    addPawnMoves(moves, x, y, color);
+                    addPawnMoves(moves, x, y, color, noisyOnly);
                     break;
                 case PieceType::Knight:
                     for (auto& off : kKnightOffsets) {
                         int nx = x + off[0], ny = y + off[1];
                         if (!inBounds(nx, ny)) continue;
                         const Piece& target = squares[nx][ny];
-                        if (target.isEmpty() || target.color != color)
+                        if (noisyOnly ? !target.isEmpty() && target.color != color
+                                      : target.isEmpty() || target.color != color)
                             moves.push_back({x, y, nx, ny, PieceType::None, false, false, target.type});
                     }
                     break;
                 case PieceType::Bishop:
-                    addSlidingMoves(moves, x, y, color, kBishopDirs, 4);
+                    addSlidingMoves(moves, x, y, color, kBishopDirs, 4, noisyOnly);
                     break;
                 case PieceType::Rook:
-                    addSlidingMoves(moves, x, y, color, kRookDirs, 4);
+                    addSlidingMoves(moves, x, y, color, kRookDirs, 4, noisyOnly);
                     break;
                 case PieceType::Queen:
-                    addSlidingMoves(moves, x, y, color, kQueenDirs, 8);
+                    addSlidingMoves(moves, x, y, color, kQueenDirs, 8, noisyOnly);
                     break;
                 case PieceType::King:
-                    addKingMoves(moves, x, y, color);
+                    addKingMoves(moves, x, y, color, noisyOnly);
                     break;
                 default:
                     break;
@@ -549,7 +554,11 @@ bool Board::isInCheck(Color color) const {
     return isSquareAttacked(kingX[ci], kingY[ci], opponent(color));
 }
 
-MoveList Board::legalMoves(Color color) const {
+MoveList Board::legalMoves(Color color) const { return filterLegal(pseudoLegalMoves(color, false), color); }
+
+MoveList Board::legalNoisyMoves(Color color) const { return filterLegal(pseudoLegalMoves(color, true), color); }
+
+MoveList Board::filterLegal(const MoveList& pseudo, Color color) const {
     // Logically const (this queries, never mutates, the position from the
     // caller's perspective), but avoiding a per-candidate Board copy means
     // using make/unmake in place instead: each candidate is applied,
@@ -569,7 +578,7 @@ MoveList Board::legalMoves(Color color) const {
     // only cost.
     Board& self = const_cast<Board&>(*this);
     MoveList result;
-    for (const Move& m : pseudoLegalMoves(color)) {
+    for (const Move& m : pseudo) {
         LightUndo undo;
         self.makeMoveLight(m, undo);
         // isInCheck(color): check the side that just moved (the candidate
