@@ -162,9 +162,16 @@ constexpr int kKingAttackWeight[7] = {0, 0, 20, 20, 40, 80, 0};
 constexpr int kRookOpenFile = 20;
 constexpr int kRookSemiOpenFile = 10;
 
+// A rook or queen on the 7th rank (counted from its own side), when there
+// are still enemy pawns there to attack or the enemy king is cut off on the
+// back rank, middlegame / endgame (Fruit 2.1's values).
+constexpr int kRookOn7thMg = 20, kRookOn7thEg = 40;
+constexpr int kQueenOn7thMg = 10, kQueenOn7thEg = 20;
+
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece, pins and
-// checks aside -- and rooks on open files. Also fills attacks[c] with the
+// checks aside -- rooks on open files, and rooks/queens on the 7th rank.
+// Also fills attacks[c] with the
 // pieces attacking color c's king zone (the squares next to that king).
 int pieceTerms(const Board& board, KingAttack (&attacks)[2]) {
     int mg = 0, eg = 0;
@@ -213,6 +220,18 @@ int pieceTerms(const Board& board, KingAttack (&attacks)[2]) {
                 int bonus = ownPawn ? 0 : enemyPawn ? kRookSemiOpenFile : kRookOpenFile;
                 mg += sign * bonus;
                 eg += sign * bonus;
+            }
+            int seventh = p.color == Color::White ? 6 : 1;
+            if ((p.type == PieceType::Rook || p.type == PieceType::Queen) && y == seventh) {
+                bool targets = eky == (p.color == Color::White ? 7 : 0);
+                for (int fx = 0; fx < 8 && !targets; fx++) {
+                    targets = board.at(fx, y).type == PieceType::Pawn && board.at(fx, y).color == enemy;
+                }
+                if (targets) {
+                    bool rook = p.type == PieceType::Rook;
+                    mg += sign * (rook ? kRookOn7thMg : kQueenOn7thMg);
+                    eg += sign * (rook ? kRookOn7thEg : kQueenOn7thEg);
+                }
             }
             if (hitsKingZone) {
                 KingAttack& a = attacks[enemy == Color::White ? 0 : 1];
