@@ -505,6 +505,19 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         }
     }
 
+    // The static eval, for the pruning decisions near the leaves below --
+    // only computed where one of them can apply, since it isn't free.
+    bool haveStaticEval = !pvNode && !inCheck && depth <= 3;
+    int staticEval = haveStaticEval ? evaluate(board, color) : 0;
+
+    // Reverse futility pruning: if the static eval beats beta by more than
+    // the opponent could plausibly win back in the remaining plies, assume
+    // the position holds and cut without searching it.
+    constexpr int kReverseFutilityMargin = 120; // per remaining ply
+    if (haveStaticEval && beta < kMateThreshold && beta > -kMateThreshold &&
+        staticEval - kReverseFutilityMargin * depth >= beta)
+        return staticEval;
+
     // Null-move pruning: "pass" (give the opponent a free move) and search
     // at a reduced depth with a minimal window around beta. If the
     // position is still so good after passing that it fails high, a real
@@ -554,8 +567,8 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // lift the static eval to alpha, every quiet, non-checking move after
     // the first is skipped. Not at PV nodes, in check, or near mate scores.
     constexpr int kFutilityMargin[3] = {0, 150, 300};
-    bool futile = !pvNode && !inCheck && depth <= 2 && alpha > -kMateThreshold && alpha < kMateThreshold &&
-                  evaluate(board, color) + kFutilityMargin[depth] <= alpha;
+    bool futile = haveStaticEval && depth <= 2 && alpha > -kMateThreshold && alpha < kMateThreshold &&
+                  staticEval + kFutilityMargin[depth] <= alpha;
 
     Move bestMove = moves.front();
     int best = INT_MIN;
