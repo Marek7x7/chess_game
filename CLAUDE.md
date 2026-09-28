@@ -95,9 +95,10 @@ Also done: the GUI's human-vs-computer mode now passes the game history to
 the search, so repetition detection works there too.
 
 Next, in suggested order:
-2. **Search (Phase 3):** SEE + delta pruning in `quiescence()`, PVS at the
-   root, futility pruning. (Done: captures-only move generation in
-   quiescence, +29; log-based late-move reductions, +17.)
+2. **Search (Phase 3):** done -- captures-only move generation in
+   quiescence (+29), log-based late-move reductions (+17), and bundle 1:
+   SEE + delta pruning in quiescence, PVS at the root, futility + reverse
+   futility pruning (+223 at 5+0.05).
 3. **King safety:** pawn shield, attackers near the king, open files toward
    the king.
 4. **More eval:** rooks on open/semi-open files and the 7th rank, outposts,
