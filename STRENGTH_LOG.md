@@ -33,6 +33,25 @@ cite `tools/openings/8moves_v3.pgn` (fetch with `tools/fetch_openings.sh`).
 | 2026-09-28 | Speed bundle: pawn-only hash key, pawn cache in the evaluation (identical evaluation, pure speedup) | `55eb793`..`ba4462d` vs `ca2052d` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=-3/elo1=1, suite=8moves_v3 | Elo +24.81 ± 10.33 (2806 games, LLR 2.95) | KEPT |
 | 2026-09-28 | Repetition detection in search (from `8ec47f2`, never tested on its own): with it vs the same code without it | `ba4462d` vs test-only build `3ccb4b6` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=-3/elo1=1, suite=8moves_v3 | Elo +55.29 ± 14.00 (1166 games, LLR 2.95) | KEPT (validated) |
 
+## Absolute strength estimates
+
+Not SPRT rows: fixed-length matches against Stockfish 17.1 with
+`UCI_LimitStrength` at a given `UCI_Elo` (calibrated by Stockfish at 120+1
+and anchored to CCRL 40/4), both engines on 1 thread, Hash=64MB, book off,
+`8moves_v3.pgn` with each opening played from both sides. Performance =
+the Stockfish level + the Elo difference fastchess reports. These are on
+a CCRL-like scale, not chess.com's. Played at 60+0.6 -- half the
+calibration time control -- which likely understates this engine a
+little (it gains more from time than depth-limited Stockfish does).
+
+| Date | Engine | Opponent | TC | Result | Performance |
+|---|---|---|---|---|---|
+| 2026-09-28 | Original: the tree before this session's work (`8ec47f2`) | Stockfish, UCI_Elo 2050 | 60+0.6 | 110W 36L 4D, 74.7% of 150: Elo +187.77 ± 58.16 | ≈ 2240 (2180-2295) |
+| 2026-09-28 | All of the above changes (`ba4462d`) | Stockfish, UCI_Elo 2500 | 60+0.6 | 101W 41L 8D, 70.0% of 150: Elo +147.19 ± 55.82 | ≈ 2650 (2590-2705) |
+
+Head to head at 10+0.1 over 200 games, the same two builds: +463.16 ±
+86.13 Elo for the new one (181W 7L 12D, 93.5%).
+
 ## How to add a row
 
 1. `tools/sprt.sh <new-ref> <base-ref> [tc] [elo0] [elo1]` (requires
