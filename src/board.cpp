@@ -131,6 +131,19 @@ int kingPst(Color color, int x, int y, double phase) {
     return static_cast<int>(mid * phase + end * (1.0 - phase) + 0.5);
 }
 
+// Two bishops cover both square colors between them, which no other pair of
+// minor pieces can, so the pair is worth more than two single bishops --
+// most of all in open endgames. Middlegame / endgame values, interpolated by
+// phase like the king's table.
+constexpr int kBishopPairMg = 30;
+constexpr int kBishopPairEg = 50;
+
+// Positive = good for White.
+int bishopPairTerm(const int (&bishops)[2], double phase) {
+    int bonus = static_cast<int>(kBishopPairMg * phase + kBishopPairEg * (1.0 - phase) + 0.5);
+    return (bishops[0] >= 2 ? bonus : 0) - (bishops[1] >= 2 ? bonus : 0);
+}
+
 // Positive = good for White. Positional bonuses are scaled down relative to
 // material so a few plies of accumulated piece-square swings can't outweigh
 // a clean material gain.
@@ -197,6 +210,7 @@ Board::Board() {
 void Board::recomputeEval() {
     nonKingScore = 0;
     phaseUnits = 0;
+    bishopCount[0] = bishopCount[1] = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
@@ -208,6 +222,7 @@ void Board::recomputeEval() {
             }
             nonKingScore += pieceContribution(p.type, p.color, x, y);
             phaseUnits += phaseValue(p.type);
+            if (p.type == PieceType::Bishop) bishopCount[colorIndex(p.color)]++;
         }
     }
 }
@@ -219,7 +234,7 @@ int Board::kingTerm() const {
     return white / 2 - black / 2;
 }
 
-int Board::rawEval() const { return nonKingScore + kingTerm(); }
+int Board::rawEval() const { return nonKingScore + kingTerm() + bishopPairTerm(bishopCount, gamePhase()); }
 
 double Board::gamePhase() const { return std::min(1.0, phaseUnits / static_cast<double>(kMaxPhase)); }
 
@@ -234,6 +249,7 @@ int Board::rawEvalFromScratch() const {
         }
     }
     double phaseFrac = std::min(1.0, phase / static_cast<double>(kMaxPhase));
+    int bishops[2] = {0, 0};
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
@@ -244,9 +260,10 @@ int Board::rawEvalFromScratch() const {
             } else {
                 score += pieceContribution(p.type, p.color, x, y);
             }
+            if (p.type == PieceType::Bishop) bishops[colorIndex(p.color)]++;
         }
     }
-    return score;
+    return score + bishopPairTerm(bishops, phaseFrac);
 }
 
 void Board::recomputeHash() {
@@ -598,6 +615,7 @@ void Board::makeMove(const Move& m) {
         togglePiece(captured.color, captured.type, m.toX, m.toY);
         removeEval(captured.color, captured.type, m.toX, m.toY);
         phaseUnits -= phaseValue(captured.type);
+        if (captured.type == PieceType::Bishop) bishopCount[colorIndex(captured.color)]--;
     }
     if (m.isCastle) {
         int homeY = m.fromY;
@@ -624,6 +642,7 @@ void Board::makeMove(const Move& m) {
     togglePiece(color, squares[m.toX][m.toY].type, m.toX, m.toY);
     addEval(color, squares[m.toX][m.toY].type, m.toX, m.toY);
     if (m.promotion != PieceType::None) phaseUnits += phaseValue(m.promotion);
+    if (m.promotion == PieceType::Bishop) bishopCount[colorIndex(color)]++;
 
     if (moving.type == PieceType::King) {
         kingX[colorIndex(color)] = m.toX;
@@ -673,6 +692,8 @@ void Board::makeMove(const Move& m, UndoState& undo) {
     undo.prevKingX[1] = kingX[1];
     undo.prevKingY[0] = kingY[0];
     undo.prevKingY[1] = kingY[1];
+    undo.prevBishopCount[0] = bishopCount[0];
+    undo.prevBishopCount[1] = bishopCount[1];
     const Piece& moving = squares[m.fromX][m.fromY];
     undo.movedType = moving.type;
     undo.movedColor = moving.color;
@@ -719,6 +740,8 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     kingX[1] = undo.prevKingX[1];
     kingY[0] = undo.prevKingY[0];
     kingY[1] = undo.prevKingY[1];
+    bishopCount[0] = undo.prevBishopCount[0];
+    bishopCount[1] = undo.prevBishopCount[1];
     turn = color;
 }
 

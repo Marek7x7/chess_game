@@ -69,20 +69,31 @@ std::string movesStr(const std::vector<Move>& moves) {
 constexpr int kPassedMg[8] = {0, 5, 10, 15, 25, 45, 70, 0};
 constexpr int kPassedEg[8] = {0, 10, 15, 25, 45, 75, 120, 0};
 
-// Positive = good for White. A passed pawn has no enemy pawn in front of it
-// on its own or an adjacent file.
+// Penalties per pawn, middlegame and endgame. Doubled: every pawn beyond the
+// first on a file (the rear one blocks the front one and no pawn can defend
+// either). Isolated: no friendly pawn on either adjacent file, so only
+// pieces can ever defend it. Both weigh more in the endgame, where a weak
+// pawn is a long-term target the defender runs out of pieces to protect.
+constexpr int kDoubledMg = 10, kDoubledEg = 25;
+constexpr int kIsolatedMg = 10, kIsolatedEg = 15;
+
+// Positive = good for White: passed-pawn bonuses minus doubled/isolated
+// penalties. A passed pawn has no enemy pawn in front of it on its own or an
+// adjacent file.
 int pawnStructure(const Board& board) {
     // Per file, the rank of the rearmost pawn of each color: the only one
     // that decides whether an enemy pawn on that file is passed.
     int whiteLowest[8], blackHighest[8];
     std::fill(std::begin(whiteLowest), std::end(whiteLowest), 8);
     std::fill(std::begin(blackHighest), std::end(blackHighest), -1);
+    int count[2][8] = {}; // [White, Black] pawns per file
     for (int x = 0; x < 8; x++) {
         for (int y = 1; y < 7; y++) {
             Piece p = board.at(x, y);
             if (p.type != PieceType::Pawn) continue;
             if (p.color == Color::White) whiteLowest[x] = std::min(whiteLowest[x], y);
             else blackHighest[x] = std::max(blackHighest[x], y);
+            count[p.color == Color::White ? 0 : 1][x]++;
         }
     }
 
@@ -101,6 +112,17 @@ int pawnStructure(const Board& board) {
             int sign = p.color == Color::White ? 1 : -1;
             mg += sign * kPassedMg[rank];
             eg += sign * kPassedEg[rank];
+        }
+    }
+
+    for (int side = 0; side < 2; side++) {
+        int sign = side == 0 ? 1 : -1;
+        for (int x = 0; x < 8; x++) {
+            int n = count[side][x];
+            if (n == 0) continue;
+            bool isolated = (x == 0 || count[side][x - 1] == 0) && (x == 7 || count[side][x + 1] == 0);
+            mg -= sign * ((n - 1) * kDoubledMg + (isolated ? n * kIsolatedMg : 0));
+            eg -= sign * ((n - 1) * kDoubledEg + (isolated ? n * kIsolatedEg : 0));
         }
     }
     double phase = board.gamePhase();

@@ -28,7 +28,8 @@ public:
     // king's term is phase-interpolated and recomputed in O(1) from the
     // live-tracked king squares and phase (it can't be summed incrementally
     // like the other pieces, since its value changes with the game phase
-    // even when the king itself doesn't move).
+    // even when the king itself doesn't move). Same for the bishop-pair
+    // bonus, from the live-tracked bishop count of each side.
     int rawEval() const;
 
     // 0 (endgame) .. 1 (opening/middlegame), from incrementally-tracked
@@ -64,6 +65,7 @@ public:
         int prevNonKingScore;
         int prevPhaseUnits;
         int prevKingX[2], prevKingY[2];
+        int prevBishopCount[2];
     };
 
     // Same as makeMove(const Move&), but also records enough state in `undo`
@@ -116,6 +118,7 @@ private:
     int nonKingScore;
     int phaseUnits;
     int kingX[2], kingY[2]; // [White, Black]
+    int bishopCount[2];     // [White, Black], for the bishop-pair bonus
 
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 
