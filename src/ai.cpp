@@ -436,7 +436,14 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
     Move bestMove{};
     bool haveBestMove = false;
     int best = inCheck ? INT_MIN : standPat;
+    // Delta pruning margin: the most a capture is assumed to swing the
+    // positional part of the eval, on top of the captured piece's value.
+    constexpr int kDeltaMargin = 200;
     for (const Move& m : candidates) {
+        // Delta pruning: even winning the captured piece for free can't lift
+        // the score to alpha, so this capture can't matter.
+        if (!inCheck && m.promotion == PieceType::None && standPat + pieceValue(m.captured) + kDeltaMargin <= alpha)
+            continue;
         // A capture that loses material once the exchange plays out can't
         // raise the stand-pat score, so it isn't worth searching.
         if (!inCheck && !seeNonNegative(board, m)) continue;
