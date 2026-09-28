@@ -981,18 +981,20 @@ std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt
         TTEntry entry;
         if (!tt.probe(key, entry) || !entry.hasMove) break;
 
+        // The table keeps only the move's squares: play the matching legal
+        // move, which also rejects a hash collision or a stale entry.
         MoveList legal = board.legalMoves(board.sideToMove());
-        bool found = false;
+        const Move* found = nullptr;
         for (const Move& m : legal) {
             if (sameMove(m, entry.best)) {
-                found = true;
+                found = &m;
                 break;
             }
         }
-        if (!found) break; // hash collision or stale entry -- don't trust it
+        if (!found) break;
 
-        pv.push_back(entry.best);
-        board.makeMove(entry.best);
+        pv.push_back(*found);
+        board.makeMove(*found);
     }
     return pv;
 }

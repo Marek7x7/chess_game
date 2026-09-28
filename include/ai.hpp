@@ -22,13 +22,12 @@ extern bool g_aiDebugLog;
 constexpr int kMateScore = 1'000'000;
 constexpr int kMateThreshold = kMateScore - 1000;
 
-// sizeof(TTEntry) is 56 bytes (measured). This table is shared by every
-// search thread within one findBestMove call (see below), so it must absorb
-// the *combined* node volume of every thread searching the full root
-// position, not one thread's slice of it. Diagnosis against real games
-// showed ~90-100M total nodes visited per move at EXPERT settings (12
-// threads x ~7-9M nodes each); 1<<22 (4,194,304) entries x 56 bytes ~= 224
-// MiB comfortably covers that per-move working set. The table is meant to
+// Entries are TranspositionTable::kEntryBytes (16) each, so 1<<22
+// (4,194,304) entries is 64 MiB. This table is shared by every search
+// thread within one findBestMove call (see below), so it must absorb the
+// *combined* node volume of every thread searching the full root position,
+// not one thread's slice of it (~90-100M nodes per move at EXPERT settings
+// with 12 threads, measured before the search got its pruning). The table is meant to
 // be constructed once per game/session and passed into findBestMove by
 // reference (not rebuilt per move), so this size also has to be reasonable
 // to hold for a whole game rather than just disposable per-call scratch.

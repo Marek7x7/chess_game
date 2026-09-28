@@ -51,13 +51,13 @@ bool parseUciMove(const Board& board, const std::string& token, Move& out) {
     return false;
 }
 
-// entries*sizeof(TTEntry) <= mb MiB, rounded down to a power of two
+// entries*kEntryBytes <= mb MiB, rounded down to a power of two
 // (TranspositionTable's constructor requires one) and floored so a tiny or
 // garbage Hash value can't produce a degenerate table.
 size_t hashMBToEntries(int mb) {
     if (mb < 1) mb = 1;
     size_t bytes = static_cast<size_t>(mb) * 1024 * 1024;
-    size_t entries = bytes / sizeof(TTEntry);
+    size_t entries = bytes / TranspositionTable::kEntryBytes;
     size_t p = size_t(1) << 16;
     while (p * 2 <= entries) p *= 2;
     return p;
@@ -82,7 +82,7 @@ int runUci() {
 
     Board board;
     std::vector<uint64_t> gameHistory; // hashKey() of every position from "position", for repetition detection
-    int hashMB = 224; // matches kTTSize's ~224 MiB (ai.hpp)
+    int hashMB = 224; // UCI "Hash" default; the GUI and --selfplay use kTTSize (ai.hpp) instead
     auto tt = std::make_unique<TranspositionTable>(hashMBToEntries(hashMB));
     bool ownBook = false; // UCI default is OFF, unlike every other caller of findBestMove
     int hwThreads = std::max(1, static_cast<int>(std::thread::hardware_concurrency()) - 2);
