@@ -87,6 +87,8 @@ proven by a match test before it is kept.**
 
 ## Roadmap (update this list as items are done)
 
+(TT replacement done: two-slot buckets with aging, bundle 4.)
+
 Done, all SPRT-accepted: passed pawns (+34), doubled/isolated pawns +
 bishop pair (+27), mobility (+54). The engine still rates its middlegame
 positions about a pawn better than Stockfish does.
@@ -106,9 +108,8 @@ Next, in suggested order:
    5+0.05).
 5. **Speed (Phase 4):** the from-scratch eval terms cost about 24% NPS. Do
    one board scan instead of several, and cache pawn-structure results.
-   Every TT access takes a mutex, so threads scale poorly.
-6. **Phase 1 leftovers:** TT replacement (a collision always overwrites,
-   even a deeper entry), Lazy SMP result selection never tested against
+   (Done: lock-free packed transposition table, bundle 4.)
+6. **Phase 1 leftovers:** Lazy SMP result selection never tested against
    alternatives, repetition detection never SPRT-tested on its own, no
    50-move-rule awareness or mate distance pruning in search, PVs that
    continue past a threefold (fastchess warnings).

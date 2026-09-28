@@ -28,6 +28,7 @@ cite `tools/openings/8moves_v3.pgn` (fetch with `tools/fetch_openings.sh`).
 | 2026-09-28 | Bundle 1, search pruning: SEE + delta pruning in quiescence, root PVS, futility + reverse futility pruning | `74e0805`..`3bb8fb0` vs `02668cd` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo +222.75 ± 40.59 (198 games, LLR 2.95) | KEPT |
 | 2026-09-28 | Bundle 2, king safety: king shelter + king-zone attacks | `a453582`..`b934e6c` vs `3474021` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo +27.99 ± 16.54 (1356 games, LLR 2.95) | KEPT |
 | 2026-09-28 | Bundle 3, more eval: rooks on open files and the 7th rank, outposts, backward pawns, endgame pawn values | `c68852a`..`c660b5c` vs `782c26d` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo +27.08 ± 16.00 (1414 games, LLR 2.99) | KEPT |
+| 2026-09-28 | Bundle 4, hash table: lock-free packed entries, two-slot buckets with aging | `35b8de0`..`c4ea07d` vs `c0d7477` | TC=5+0.05, Hash=64MB, Threads=2, book=off, concurrency=10, elo0=-3/elo1=1, suite=8moves_v3 | Elo +4.74 ± 4.88 (13194 games, LLR 2.95) | KEPT |
 
 ## How to add a row
 
