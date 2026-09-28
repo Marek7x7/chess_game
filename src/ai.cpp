@@ -653,6 +653,13 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     uint64_t key = board.hashKey();
     if (std::find(ctx.path.begin(), ctx.path.end(), key) != ctx.path.end()) return 0;
 
+    // Mate distance pruning: nothing from here can beat mating right at
+    // this ply or be worse than being mated at the next, so a window
+    // outside those bounds can't hold a better result.
+    alpha = std::max(alpha, -(kMateScore - ply));
+    beta = std::min(beta, kMateScore - ply - 1);
+    if (alpha >= beta) return alpha;
+
     if (depth <= 0) return quiescence(board, alpha, beta, color, ply, ctx);
 
     int origAlpha = alpha;
