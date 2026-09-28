@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <ostream>
 #include <random>
 
@@ -368,6 +369,11 @@ Board Board::fromFEN(const std::string& fen) {
         board.enPassantY = epField[1] - '1';
     }
 
+    // The halfmove clock is optional (the GUI's custom setup leaves it out).
+    if (pos != std::string::npos && fen.find_first_not_of(' ', pos) != std::string::npos) {
+        board.halfmoveCount = std::atoi(nextField().c_str());
+    }
+
     board.recomputeHash();
     board.recomputeEval();
     return board;
@@ -634,6 +640,7 @@ void Board::makeMove(const Move& m) {
     Piece moving = squares[m.fromX][m.fromY];
     Color color = moving.color;
     Piece captured = squares[m.toX][m.toY];
+    halfmoveCount = (moving.type == PieceType::Pawn || !captured.isEmpty()) ? 0 : halfmoveCount + 1;
 
     togglePiece(moving.color, moving.type, m.fromX, m.fromY);
     removeEval(moving.color, moving.type, m.fromX, m.fromY);
@@ -728,6 +735,7 @@ void Board::makeMove(const Move& m, UndoState& undo) {
     undo.prevBishopCount[0] = bishopCount[0];
     undo.prevBishopCount[1] = bishopCount[1];
     undo.prevPawnEgShift = pawnEgShift;
+    undo.prevHalfmoveCount = halfmoveCount;
     const Piece& moving = squares[m.fromX][m.fromY];
     undo.movedType = moving.type;
     undo.movedColor = moving.color;
@@ -777,6 +785,7 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     bishopCount[0] = undo.prevBishopCount[0];
     bishopCount[1] = undo.prevBishopCount[1];
     pawnEgShift = undo.prevPawnEgShift;
+    halfmoveCount = undo.prevHalfmoveCount;
     turn = color;
 }
 

@@ -23,6 +23,8 @@ public:
     Color sideToMove() const { return turn; }
     int kingFile(Color c) const { return kingX[colorIndex(c)]; }
     int kingRank(Color c) const { return kingY[colorIndex(c)]; }
+    // Plies since the last capture or pawn move (the fifty-move-rule count).
+    int halfmoveClock() const { return halfmoveCount; }
     uint64_t hashKey() const { return hash; }
 
     // Material + piece-square-table evaluation, positive = good for White.
@@ -76,6 +78,7 @@ public:
         int prevKingX[2], prevKingY[2];
         int prevBishopCount[2];
         int prevPawnEgShift;
+        int prevHalfmoveCount;
     };
 
     // Same as makeMove(const Move&), but also records enough state in `undo`
@@ -120,6 +123,7 @@ private:
     bool castleQueenside[2];
     int enPassantX, enPassantY; // target square a capturing pawn would move to; (-1,-1) if none
     uint64_t hash;
+    int halfmoveCount = 0;
 
     // Running material+PST sum over every piece except kings, positive =
     // good for White; and running count of phase units (knight/bishop=1,
