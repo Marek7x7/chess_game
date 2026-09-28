@@ -101,8 +101,9 @@ Next, in suggested order:
    futility pruning (+223 at 5+0.05).
 3. **King safety:** done -- bundle 2, king shelter (pawn shield, open files
    near the king) and king-zone attacks (+28 at 5+0.05).
-4. **More eval:** rooks on open/semi-open files and the 7th rank, outposts,
-   backward pawns, middlegame/endgame pawn piece-square values.
+4. **More eval:** done -- bundle 3, rooks on open/semi-open files and the
+   7th rank, outposts, backward pawns, endgame pawn values (+27 at
+   5+0.05).
 5. **Speed (Phase 4):** the from-scratch eval terms cost about 24% NPS. Do
    one board scan instead of several, and cache pawn-structure results.
    Every TT access takes a mutex, so threads scale poorly.
