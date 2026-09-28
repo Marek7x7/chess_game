@@ -23,6 +23,7 @@ cite `tools/openings/8moves_v3.pgn` (fetch with `tools/fetch_openings.sh`).
 | 2026-09-28 | Doubled/isolated pawn penalties + bishop-pair bonus | `5d881f6` vs `b548941` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +26.61 ± 11.72 (2564 games, LLR 2.97) | KEPT |
 | 2026-09-28 | Piece mobility (knight/bishop/rook/queen, Fruit 2.1 weights) | `882eed1` vs `5d881f6` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +54.18 ± 16.90 (1196 games, LLR 2.95) | KEPT |
 | 2026-09-28 | Noisy-only move generation in quiescence (pure speedup, identical tree) | `df54360` vs `5fcd1af` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=-3/elo1=1, suite=8moves_v3 | Elo +28.90 ± 11.21 (2470 games, LLR 2.96) | KEPT |
+| 2026-09-28 | Log-based late-move reductions | `77f6f5e` vs `8ef8449` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +16.76 ± 8.78 (3922 games, LLR 2.95) | KEPT |
 
 ## How to add a row
 
