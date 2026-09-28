@@ -5,6 +5,7 @@
 #include <chrono>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <cstdio>
 #include <future>
@@ -146,19 +147,37 @@ constexpr int kKnightJumps[8][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, 
 // Rooks slide along the first four, bishops the last four, queens all eight.
 constexpr int kSlideDirs[8][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
 
+// Pieces bearing on the squares around one king, gathered by mobility()
+// (which already walks every square each piece can reach) for kingSafety().
+struct KingAttack {
+    int attackers = 0; // knights/bishops/rooks/queens reaching a square next to the king
+    int weight = 0;    // sum of their kKingAttackWeight
+};
+
+// How dangerous each piece type is as a king attacker, indexed by PieceType.
+constexpr int kKingAttackWeight[7] = {0, 0, 20, 20, 40, 80, 0};
+
 // Positive = good for White. Counts every square that's empty or holds an
-// enemy piece, pins and checks aside.
-int mobility(const Board& board) {
+// enemy piece, pins and checks aside. Also fills attacks[c] with the pieces
+// attacking color c's king zone (the squares next to that king).
+int mobility(const Board& board, KingAttack (&attacks)[2]) {
     int mg = 0, eg = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             Piece p = board.at(x, y);
             if (p.type < PieceType::Knight || p.type > PieceType::Queen) continue;
+            Color enemy = opponent(p.color);
+            int ekx = board.kingFile(enemy), eky = board.kingRank(enemy);
+            bool hitsKingZone = false;
             int moves = 0;
+            auto reach = [&](int tx, int ty) {
+                moves++;
+                if (std::abs(tx - ekx) <= 1 && std::abs(ty - eky) <= 1) hitsKingZone = true;
+            };
             if (p.type == PieceType::Knight) {
                 for (const auto& jump : kKnightJumps) {
                     int tx = x + jump[0], ty = y + jump[1];
-                    if (Board::inBounds(tx, ty) && board.at(tx, ty).color != p.color) moves++;
+                    if (Board::inBounds(tx, ty) && board.at(tx, ty).color != p.color) reach(tx, ty);
                 }
             } else {
                 int first = p.type == PieceType::Bishop ? 4 : 0;
@@ -168,7 +187,7 @@ int mobility(const Board& board) {
                     while (Board::inBounds(tx, ty)) {
                         Piece target = board.at(tx, ty);
                         if (target.color == p.color) break;
-                        moves++;
+                        reach(tx, ty);
                         if (!target.isEmpty()) break;
                         tx += kSlideDirs[d][0];
                         ty += kSlideDirs[d][1];
@@ -179,6 +198,11 @@ int mobility(const Board& board) {
             int sign = p.color == Color::White ? 1 : -1;
             mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
             eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
+            if (hitsKingZone) {
+                KingAttack& a = attacks[enemy == Color::White ? 0 : 1];
+                a.attackers++;
+                a.weight += kKingAttackWeight[t];
+            }
         }
     }
     double phase = board.gamePhase();
@@ -217,17 +241,28 @@ int kingShelterPenalty(const Board& board, Color color) {
     return penalty;
 }
 
-// Positive = good for White.
-int kingSafety(const Board& board) {
-    int mg = kingShelterPenalty(board, Color::Black) - kingShelterPenalty(board, Color::White);
+// King attack penalty, in percent of the attackers' summed weight, by how
+// many pieces take part: one piece alone rarely mates, so it counts for
+// nothing, and each extra attacker makes the attack disproportionately more
+// dangerous.
+constexpr int kAttackerScalePercent[8] = {0, 0, 50, 75, 88, 94, 97, 99};
+
+int kingAttackPenalty(const KingAttack& a) {
+    return a.weight * kAttackerScalePercent[std::min(a.attackers, 7)] / 100;
+}
+
+// Positive = good for White. `attacks` comes from mobility().
+int kingSafety(const Board& board, const KingAttack (&attacks)[2]) {
+    int mg = kingShelterPenalty(board, Color::Black) + kingAttackPenalty(attacks[1]) -
+             kingShelterPenalty(board, Color::White) - kingAttackPenalty(attacks[0]);
     return static_cast<int>(mg * board.gamePhase());
 }
 
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
-    // positive = good for White
-    int score = board.rawEval() + pawnStructure(board) + mobility(board) + kingSafety(board);
-    return (color == Color::White) ? score : -score;
+    KingAttack attacks[2]; // on White's king, on Black's king
+    int score = board.rawEval() + pawnStructure(board) + mobility(board, attacks) + kingSafety(board, attacks);
+    return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
 // ---------------------------------------------------------------------
