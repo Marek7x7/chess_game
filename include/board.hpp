@@ -21,6 +21,8 @@ public:
 
     Piece at(int x, int y) const { return squares[x][y]; }
     Color sideToMove() const { return turn; }
+    int kingFile(Color c) const { return kingX[colorIndex(c)]; }
+    int kingRank(Color c) const { return kingY[colorIndex(c)]; }
     uint64_t hashKey() const { return hash; }
 
     // Material + piece-square-table evaluation, positive = good for White.

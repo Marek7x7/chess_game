@@ -185,9 +185,48 @@ int mobility(const Board& board) {
     return static_cast<int>(mg * phase + eg * (1.0 - phase));
 }
 
+// King shelter, per file on and next to the king's: a pawn still right in
+// front of the king is ideal; one pushed a square further guards less; none
+// at all leaves a hole. A file with none of the king's own pawns is a lane
+// for enemy rooks and queens, worse still with no enemy pawn in the way
+// either. Middlegame only: with the queens and most pieces gone there's no
+// attack left to shelter from.
+constexpr int kShelterPushedOnce = 10;
+constexpr int kShelterMissing = 25;
+constexpr int kKingFileSemiOpen = 15;
+constexpr int kKingFileOpen = 10; // on top of kKingFileSemiOpen
+
+// Shelter penalty for `color`'s king, as a positive number.
+int kingShelterPenalty(const Board& board, Color color) {
+    int kx = board.kingFile(color), ky = board.kingRank(color);
+    int dir = color == Color::White ? 1 : -1;
+    auto ownPawn = [&](int x, int y) {
+        return Board::inBounds(x, y) && board.at(x, y).type == PieceType::Pawn && board.at(x, y).color == color;
+    };
+    int penalty = 0;
+    for (int x = std::max(0, kx - 1); x <= std::min(7, kx + 1); x++) {
+        if (!ownPawn(x, ky + dir)) penalty += ownPawn(x, ky + 2 * dir) ? kShelterPushedOnce : kShelterMissing;
+        bool ownOnFile = false, enemyOnFile = false;
+        for (int y = 1; y < 7; y++) {
+            Piece p = board.at(x, y);
+            if (p.type != PieceType::Pawn) continue;
+            (p.color == color ? ownOnFile : enemyOnFile) = true;
+        }
+        if (!ownOnFile) penalty += kKingFileSemiOpen + (enemyOnFile ? 0 : kKingFileOpen);
+    }
+    return penalty;
+}
+
+// Positive = good for White.
+int kingSafety(const Board& board) {
+    int mg = kingShelterPenalty(board, Color::Black) - kingShelterPenalty(board, Color::White);
+    return static_cast<int>(mg * board.gamePhase());
+}
+
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
-    int score = board.rawEval() + pawnStructure(board) + mobility(board); // positive = good for White
+    // positive = good for White
+    int score = board.rawEval() + pawnStructure(board) + mobility(board) + kingSafety(board);
     return (color == Color::White) ? score : -score;
 }
 
