@@ -30,6 +30,7 @@ cite `tools/openings/8moves_v3.pgn` (fetch with `tools/fetch_openings.sh`).
 | 2026-09-28 | Bundle 3, more eval: rooks on open files and the 7th rank, outposts, backward pawns, endgame pawn values | `c68852a`..`c660b5c` vs `782c26d` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo +27.08 ± 16.00 (1414 games, LLR 2.99) | KEPT |
 | 2026-09-28 | Bundle 4, hash table: lock-free packed entries, two-slot buckets with aging | `35b8de0`..`c4ea07d` vs `c0d7477` | TC=5+0.05, Hash=64MB, Threads=2, book=off, concurrency=10, elo0=-3/elo1=1, suite=8moves_v3 | Elo +4.74 ± 4.88 (13194 games, LLR 2.95) | KEPT |
 | 2026-09-28 | Bundle 5, time and misc: mate distance pruning, fifty-move rule in search, PVs ending at a threefold, soft/hard time limits, thread 0's result | `27bc5db`..`d122759` vs `3973251` | TC=5+0.05, Hash=64MB, Threads=2, book=off, concurrency=10, elo0=-3/elo1=1, suite=8moves_v3 | Elo +75.31 ± 17.36 (984 games, LLR 2.96) | KEPT |
+| 2026-09-28 | Speed bundle: pawn-only hash key, pawn cache in the evaluation (identical evaluation, pure speedup) | `55eb793`..`ba4462d` vs `ca2052d` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=-3/elo1=1, suite=8moves_v3 | Elo +24.81 ± 10.33 (2806 games, LLR 2.95) | KEPT |
 
 ## How to add a row
 
