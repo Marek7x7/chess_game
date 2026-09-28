@@ -26,6 +26,7 @@ cite `tools/openings/8moves_v3.pgn` (fetch with `tools/fetch_openings.sh`).
 | 2026-09-28 | Log-based late-move reductions | `77f6f5e` vs `8ef8449` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +16.76 ± 8.78 (3922 games, LLR 2.95) | KEPT |
 | 2026-09-28 | SEE pruning in quiescence alone | never committed (`7cf714c`) vs `fdd9fb6` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +17.62 ± 14.70 (1460 games, LLR 1.14) | INCONCLUSIVE (stopped: switched to bundles; retested in bundle 1, next row) |
 | 2026-09-28 | Bundle 1, search pruning: SEE + delta pruning in quiescence, root PVS, futility + reverse futility pruning | `74e0805`..`3bb8fb0` vs `02668cd` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo +222.75 ± 40.59 (198 games, LLR 2.95) | KEPT |
+| 2026-09-28 | Bundle 2, king safety: king shelter + king-zone attacks | `a453582`..`b934e6c` vs `3474021` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo +27.99 ± 16.54 (1356 games, LLR 2.95) | KEPT |
 
 ## How to add a row
 

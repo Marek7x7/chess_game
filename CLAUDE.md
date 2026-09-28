@@ -99,8 +99,8 @@ Next, in suggested order:
    quiescence (+29), log-based late-move reductions (+17), and bundle 1:
    SEE + delta pruning in quiescence, PVS at the root, futility + reverse
    futility pruning (+223 at 5+0.05).
-3. **King safety:** pawn shield, attackers near the king, open files toward
-   the king.
+3. **King safety:** done -- bundle 2, king shelter (pawn shield, open files
+   near the king) and king-zone attacks (+28 at 5+0.05).
 4. **More eval:** rooks on open/semi-open files and the 7th rank, outposts,
    backward pawns, middlegame/endgame pawn piece-square values.
 5. **Speed (Phase 4):** the from-scratch eval terms cost about 24% NPS. Do
