@@ -89,9 +89,8 @@ the search, so repetition detection works there too.
 
 Next, in suggested order:
 2. **Search (Phase 3):** log-based late-move reductions (currently a flat 1
-   ply), SEE + delta pruning in `quiescence()`, captures-only move
-   generation in quiescence (it currently generates all legal moves and
-   filters), PVS at the root, futility pruning.
+   ply), SEE + delta pruning in `quiescence()`, PVS at the root, futility
+   pruning. (Done: captures-only move generation in quiescence, +29.)
 3. **King safety:** pawn shield, attackers near the king, open files toward
    the king.
 4. **More eval:** rooks on open/semi-open files and the 7th rank, outposts,
