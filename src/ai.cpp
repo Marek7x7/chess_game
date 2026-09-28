@@ -58,8 +58,9 @@ std::string movesStr(const std::vector<Move>& moves) {
 
 // ---------------------------------------------------------------------
 // Evaluation. Material + piece-square-table score is maintained
-// incrementally by Board itself (see Board::rawEval()); pawn structure
-// depends on where the other pawns are, so it's computed here from scratch.
+// incrementally by Board itself (see Board::rawEval()); pawn structure and
+// mobility depend on where the other pieces are, so they're computed here
+// from scratch.
 // ---------------------------------------------------------------------
 
 // Passed-pawn bonus by rank counted from the pawn's own side (1 = its
@@ -129,9 +130,62 @@ int pawnStructure(const Board& board) {
     return static_cast<int>(mg * phase + eg * (1.0 - phase));
 }
 
+// Mobility, per square a knight/bishop/rook/queen can move to above or below
+// a typical count for that piece, middlegame and endgame, indexed by
+// PieceType (Fruit 2.1's weights and offsets). A piece with few moves is
+// boxed in, tied to defending, or blocked by its own pawns -- invisible to
+// material and piece-square tables, which score a passive piece exactly
+// like an active one on the same square.
+constexpr int kMobilityMg[7] = {0, 0, 4, 5, 2, 1, 0};
+constexpr int kMobilityEg[7] = {0, 0, 4, 5, 4, 2, 0};
+constexpr int kMobilityTypical[7] = {0, 0, 4, 6, 7, 13, 0};
+
+constexpr int kKnightJumps[8][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}};
+// Rooks slide along the first four, bishops the last four, queens all eight.
+constexpr int kSlideDirs[8][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
+
+// Positive = good for White. Counts every square that's empty or holds an
+// enemy piece, pins and checks aside.
+int mobility(const Board& board) {
+    int mg = 0, eg = 0;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            Piece p = board.at(x, y);
+            if (p.type < PieceType::Knight || p.type > PieceType::Queen) continue;
+            int moves = 0;
+            if (p.type == PieceType::Knight) {
+                for (const auto& jump : kKnightJumps) {
+                    int tx = x + jump[0], ty = y + jump[1];
+                    if (Board::inBounds(tx, ty) && board.at(tx, ty).color != p.color) moves++;
+                }
+            } else {
+                int first = p.type == PieceType::Bishop ? 4 : 0;
+                int last = p.type == PieceType::Rook ? 4 : 8;
+                for (int d = first; d < last; d++) {
+                    int tx = x + kSlideDirs[d][0], ty = y + kSlideDirs[d][1];
+                    while (Board::inBounds(tx, ty)) {
+                        Piece target = board.at(tx, ty);
+                        if (target.color == p.color) break;
+                        moves++;
+                        if (!target.isEmpty()) break;
+                        tx += kSlideDirs[d][0];
+                        ty += kSlideDirs[d][1];
+                    }
+                }
+            }
+            int t = static_cast<int>(p.type);
+            int sign = p.color == Color::White ? 1 : -1;
+            mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
+            eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
+        }
+    }
+    double phase = board.gamePhase();
+    return static_cast<int>(mg * phase + eg * (1.0 - phase));
+}
+
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
-    int score = board.rawEval() + pawnStructure(board); // positive = good for White
+    int score = board.rawEval() + pawnStructure(board) + mobility(board); // positive = good for White
     return (color == Color::White) ? score : -score;
 }
 
