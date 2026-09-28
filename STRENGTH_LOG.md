@@ -18,6 +18,9 @@ cite `tools/openings/8moves_v3.pgn` (fetch with `tools/fetch_openings.sh`).
 | Date | Change | Commit | Test settings | Result | Verdict |
 |---|---|---|---|---|---|
 | YYYY-MM-DD | one-line description | `newhash` vs `basehash` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +X.X ± Y.Y (N games, LLR Z.ZZ) | KEPT / REVERTED / INCONCLUSIVE |
+| 2026-09-27 | Passed-pawn bonus, tapered by rank | `b548941` vs `8ec47f2` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +34.05 ± 13.20 (1904 games, LLR 2.96) | KEPT |
+| 2026-09-27 | Doubled/isolated pawn penalties alone | never committed vs `b548941` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +12.96 ± 16.83 (1180 games, LLR 0.62) | INCONCLUSIVE (stopped early; retested with the bishop pair, next row) |
+| 2026-09-28 | Doubled/isolated pawn penalties + bishop-pair bonus | `5d881f6` vs `b548941` | TC=10+0.1, Hash=64MB, Threads=1, book=off, elo0=0/elo1=5, suite=8moves_v3 | Elo +26.61 ± 11.72 (2564 games, LLR 2.97) | KEPT |
 
 ## How to add a row
 
