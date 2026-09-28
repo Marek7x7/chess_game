@@ -62,6 +62,10 @@ struct SearchOptions {
     // a side that's ahead steers away from repeating instead of drifting
     // into a threefold. Empty = no game history known.
     std::vector<uint64_t> gameHistory;
+    // > 0: once this many ms have passed, don't start another iterative-
+    // deepening depth (timeBudgetMs stays the hard limit that aborts one
+    // in progress). 0 = keep deepening until the hard limit.
+    int softTimeMs = 0;
 };
 
 // Picks a move for `aiColor`: an opening-book move if the position is a

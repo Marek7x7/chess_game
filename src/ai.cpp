@@ -862,7 +862,9 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
                                  std::chrono::steady_clock::time_point deadline, TranspositionTable& tt,
                                  size_t threadIndex, const std::atomic<bool>* stopFlag = nullptr,
                                  const std::function<void(const SearchProgress&)>& onDepthComplete = {},
-                                 const std::vector<uint64_t>& gameHistory = {}) {
+                                 const std::vector<uint64_t>& gameHistory = {},
+                                 std::chrono::steady_clock::time_point softDeadline =
+                                     std::chrono::steady_clock::time_point::max()) {
     RootSearchResult result;
     result.move = rootMoves.front();
 
@@ -970,6 +972,10 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
         if (onDepthComplete) onDepthComplete(SearchProgress{depth, depthBest, ctx.nodes, depthBestMove});
 
         if (depthBest > kMateThreshold) break; // forced mate found, no need to search deeper
+        // Past the soft limit, the next depth -- typically taking as long as
+        // all the previous ones together -- would likely be cut off
+        // unfinished and thrown away, so stop here instead.
+        if (std::chrono::steady_clock::now() >= softDeadline) break;
     }
 
     result.nodes = ctx.nodes;
@@ -1135,7 +1141,10 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     }
 
     tt.newSearch();
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeBudgetMs);
+    auto now = std::chrono::steady_clock::now();
+    auto deadline = now + std::chrono::milliseconds(timeBudgetMs);
+    auto softDeadline = options.softTimeMs > 0 ? now + std::chrono::milliseconds(options.softTimeMs)
+                                               : std::chrono::steady_clock::time_point::max();
 
     // Use about half the machine's hardware threads (e.g. 12 of 24), leaving
     // headroom for the OS/UI thread. Every thread searches the FULL root
@@ -1173,10 +1182,10 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
                                                                            : std::function<void(const SearchProgress&)>{};
         futures.push_back(std::async(
             std::launch::async,
-            [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, &tt, t, stopFlag, progressCb,
+            [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, softDeadline, &tt, t, stopFlag, progressCb,
              &gameHistory = options.gameHistory]() mutable {
                 return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t, stopFlag,
-                                       progressCb, gameHistory);
+                                       progressCb, gameHistory, softDeadline);
             }));
     }
 

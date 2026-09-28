@@ -188,6 +188,7 @@ int runUci() {
 
             int maxDepth = 64;
             long long timeBudgetMs = -1;
+            long long softTimeMs = 0;
             long long movetime = -1, wtime = -1, btime = -1, winc = 0, binc = 0;
             int movestogo = 0;
             for (size_t i = 1; i < tok.size(); i++) {
@@ -224,11 +225,14 @@ int runUci() {
                 long long myTime = (aiColor == Color::White) ? wtime : btime;
                 long long myInc = (aiColor == Color::White) ? winc : binc;
                 int divisor = movestogo > 0 ? movestogo : 30;
-                timeBudgetMs = myTime / divisor + myInc - moveOverheadMs;
-                // Hard safety clamp regardless of the math above: must
-                // never lose on time, only needs to be safe, not tuned
-                // (that's later-phase scope).
-                timeBudgetMs = std::min<long long>(timeBudgetMs, myTime / 2);
+                // What this move should take on average. No new depth is
+                // started after half of it (the soft limit), but one under
+                // way may run to twice it: an unfinished depth is thrown
+                // away, so stopping between depths wastes less of the clock
+                // than cutting one off. Never more than half the clock left.
+                long long optimum = myTime / divisor + myInc - moveOverheadMs;
+                softTimeMs = optimum / 2;
+                timeBudgetMs = std::min<long long>(optimum * 2, myTime / 2);
             }
             if (timeBudgetMs < 0) {
                 // Only fall back to "search until depth/mate/stop" when no
@@ -250,6 +254,7 @@ int runUci() {
             opts.threadOverride = threadsOption;
             opts.stopFlag = &stopFlag;
             opts.gameHistory = gameHistory;
+            opts.softTimeMs = static_cast<int>(std::max<long long>(softTimeMs, 0));
             auto start = std::chrono::steady_clock::now();
             opts.onDepthComplete = [&tt, searchBoard, start, history = gameHistory](const SearchProgress& p) {
                 // p.bestMove is the authoritative move for this depth --
