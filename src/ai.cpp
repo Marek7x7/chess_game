@@ -699,17 +699,32 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
             bool completedLocal = true;
             ctx.path.resize(rootPathSize); // drop anything a previous TimeUp unwind left behind
             try {
+                bool first = true;
                 for (const Move& m : moves) {
                     Board::UndoState undo;
                     board.makeMove(m, undo);
-                    int score =
-                        -negamax(board, depth - 1, 1, -hi, -lo, opponent(aiColor), ctx, kMaxCheckExtensions);
+                    // PVS, as in negamax: the first move gets the full window;
+                    // the rest a null window that only shows they're no
+                    // better, re-searched in full when one might be.
+                    int score;
+                    if (first) {
+                        score = -negamax(board, depth - 1, 1, -hi, -lo, opponent(aiColor), ctx, kMaxCheckExtensions);
+                        first = false;
+                    } else {
+                        score =
+                            -negamax(board, depth - 1, 1, -lo - 1, -lo, opponent(aiColor), ctx, kMaxCheckExtensions);
+                        if (score > lo && score < hi) {
+                            score =
+                                -negamax(board, depth - 1, 1, -hi, -lo, opponent(aiColor), ctx, kMaxCheckExtensions);
+                        }
+                    }
                     board.unmakeMove(m, undo);
                     if (score > bestLocal) {
                         bestLocal = score;
                         bestMoveLocal = m;
                     }
                     if (bestLocal > lo) lo = bestLocal;
+                    if (lo >= hi) break; // failed high: the caller widens the window and redoes this depth
                 }
             } catch (const TimeUp&) {
                 completedLocal = false;
