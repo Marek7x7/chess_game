@@ -1,8 +1,10 @@
 #include "ai.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <future>
@@ -269,6 +271,20 @@ int fromTT(int score, int ply) {
 int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, SearchContext& ctx,
             int extensionsLeft);
 
+// Late-move reduction: how many plies less a late, quiet move gets searched
+// with. Grows with the remaining depth and with how late the move comes in
+// the ordering -- the later it's ordered, the less likely it is to be best
+// -- from the standard 0.75 + ln(depth) * ln(move number) / 2.25 formula.
+int lmrReduction(int depth, int moveNumber) {
+    static const auto table = [] {
+        std::array<std::array<int, 64>, 64> t{};
+        for (int d = 1; d < 64; d++)
+            for (int m = 1; m < 64; m++) t[d][m] = static_cast<int>(0.75 + std::log(d) * std::log(m) / 2.25);
+        return t;
+    }();
+    return table[std::min(depth, 63)][std::min(moveNumber, 63)];
+}
+
 // Searches captures/promotions (all moves if in check) until the position is
 // "quiet," to avoid evaluating mid-capture-sequence (the horizon effect).
 //
@@ -365,6 +381,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     if (depth <= 0) return quiescence(board, alpha, beta, color, ply, ctx);
 
     int origAlpha = alpha;
+    bool pvNode = beta - alpha > 1; // searched with an open window: its exact score matters
     Move ttMove{};
     TTEntry ttEntry;
     if (ctx.tt.probe(key, ttEntry)) {
@@ -441,7 +458,12 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         bool lmrCandidate = moveIndex >= kLmrStartIndex && depth >= kLmrMinDepth && m.captured == PieceType::None &&
                              m.promotion == PieceType::None && !isKiller;
         bool doLMR = lmrCandidate && !board.isInCheck(opponent(color));
-        int reduction = doLMR ? 1 : 0;
+        int reduction = 0;
+        if (doLMR) {
+            // At least 1 ply, and never so much that the move drops straight
+            // into quiescence; a PV node gets one ply less.
+            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0), 1, depth - 2);
+        }
 
         // PVS: the first move (typically the TT move / best-ordered guess)
         // gets the full window, since it's expected to be the actual best
