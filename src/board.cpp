@@ -289,22 +289,38 @@ int Board::rawEvalFromScratch() const {
     return score + bishopPairTerm(bishops, phaseFrac) + static_cast<int>(pawnShift * (1.0 - phaseFrac));
 }
 
-void Board::recomputeHash() {
+void Board::recomputeHash() { computeHashes(hash, pawnHash); }
+
+uint64_t Board::hashKeyFromScratch() const {
+    uint64_t full, pawns;
+    computeHashes(full, pawns);
+    return full;
+}
+
+uint64_t Board::pawnKeyFromScratch() const {
+    uint64_t full, pawns;
+    computeHashes(full, pawns);
+    return pawns;
+}
+
+void Board::computeHashes(uint64_t& full, uint64_t& pawns) const {
     const ZobristKeys& z = zobrist();
-    hash = 0;
+    full = pawns = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
             if (p.isEmpty()) continue;
-            hash ^= z.piece[colorIndex(p.color)][pieceTypeIndex(p.type)][x][y];
+            uint64_t key = z.piece[colorIndex(p.color)][pieceTypeIndex(p.type)][x][y];
+            full ^= key;
+            if (p.type == PieceType::Pawn) pawns ^= key;
         }
     }
-    if (castleKingside[0]) hash ^= z.castle[0][0];
-    if (castleQueenside[0]) hash ^= z.castle[0][1];
-    if (castleKingside[1]) hash ^= z.castle[1][0];
-    if (castleQueenside[1]) hash ^= z.castle[1][1];
-    if (enPassantX != -1) hash ^= z.enPassantFile[enPassantX];
-    if (turn == Color::Black) hash ^= z.sideToMove;
+    if (castleKingside[0]) full ^= z.castle[0][0];
+    if (castleQueenside[0]) full ^= z.castle[0][1];
+    if (castleKingside[1]) full ^= z.castle[1][0];
+    if (castleQueenside[1]) full ^= z.castle[1][1];
+    if (enPassantX != -1) full ^= z.enPassantFile[enPassantX];
+    if (turn == Color::Black) full ^= z.sideToMove;
 }
 
 Board Board::fromFEN(const std::string& fen) {
@@ -624,7 +640,9 @@ MoveList Board::filterLegal(const MoveList& pseudo, Color color) const {
 void Board::makeMove(const Move& m) {
     const ZobristKeys& z = zobrist();
     auto togglePiece = [&](Color c, PieceType t, int x, int y) {
-        hash ^= z.piece[colorIndex(c)][pieceTypeIndex(t)][x][y];
+        uint64_t key = z.piece[colorIndex(c)][pieceTypeIndex(t)][x][y];
+        hash ^= key;
+        if (t == PieceType::Pawn) pawnHash ^= key;
     };
     // Kings are excluded from nonKingScore (see kingTerm()); non-king pieces
     // are summed incrementally at exactly the points their placement changes.
@@ -720,6 +738,7 @@ void Board::makeMove(const Move& m) {
 
 void Board::makeMove(const Move& m, UndoState& undo) {
     undo.prevHash = hash;
+    undo.prevPawnHash = pawnHash;
     undo.prevCastleKingside[0] = castleKingside[0];
     undo.prevCastleKingside[1] = castleKingside[1];
     undo.prevCastleQueenside[0] = castleQueenside[0];
@@ -776,6 +795,7 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     enPassantX = undo.prevEnPassantX;
     enPassantY = undo.prevEnPassantY;
     hash = undo.prevHash;
+    pawnHash = undo.prevPawnHash;
     nonKingScore = undo.prevNonKingScore;
     phaseUnits = undo.prevPhaseUnits;
     kingX[0] = undo.prevKingX[0];

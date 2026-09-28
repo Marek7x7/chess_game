@@ -26,6 +26,9 @@ public:
     // Plies since the last capture or pawn move (the fifty-move-rule count).
     int halfmoveClock() const { return halfmoveCount; }
     uint64_t hashKey() const { return hash; }
+    // Zobrist hash of the pawns alone (both colors), for caching evaluation
+    // terms that depend only on where the pawns are.
+    uint64_t pawnKey() const { return pawnHash; }
 
     // Material + piece-square-table evaluation, positive = good for White.
     // Non-king contributions are maintained incrementally in makeMove(); the
@@ -45,6 +48,11 @@ public:
     // the incrementally-maintained fields entirely. Verification-only: used
     // to confirm the incremental score never drifts from a full recompute.
     int rawEvalFromScratch() const;
+
+    // Recompute hashKey() / pawnKey() from scratch -- verification only,
+    // like rawEvalFromScratch().
+    uint64_t hashKeyFromScratch() const;
+    uint64_t pawnKeyFromScratch() const;
 
     static bool inBounds(int x, int y) { return x >= 0 && x < 8 && y >= 0 && y < 8; }
 
@@ -68,6 +76,7 @@ public:
     // but the moving piece's original type is needed to undo promotions).
     struct UndoState {
         uint64_t prevHash;
+        uint64_t prevPawnHash;
         bool prevCastleKingside[2];
         bool prevCastleQueenside[2];
         int prevEnPassantX, prevEnPassantY;
@@ -123,6 +132,7 @@ private:
     bool castleQueenside[2];
     int enPassantX, enPassantY; // target square a capturing pawn would move to; (-1,-1) if none
     uint64_t hash;
+    uint64_t pawnHash; // see pawnKey()
     int halfmoveCount = 0;
 
     // Running material+PST sum over every piece except kings, positive =
@@ -138,6 +148,7 @@ private:
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 
     void recomputeHash();
+    void computeHashes(uint64_t& full, uint64_t& pawns) const;
     void recomputeEval();
     int kingTerm() const; // White king's PST bonus minus Black's, at current phase
 

@@ -109,8 +109,8 @@ std::string squareStr(int x, int y) {
 }
 
 // Walks the same tree as perftUnmake(), but at every node (not just leaves)
-// asserts the incrementally-maintained eval/hash match a from-scratch
-// recompute. This is the equivalence check for Step 2: it must never fire
+// asserts the incrementally-maintained eval, hash and pawn hash match a
+// from-scratch recompute. This is the equivalence check for Step 2: it must never fire
 // across thousands of positions spanning captures, castling, promotions,
 // and en passant, since the incremental fields are the ones the real search
 // evaluates at every node.
@@ -121,6 +121,10 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
         mismatches++;
         std::fprintf(stderr, "EVAL MISMATCH at depth=%d: incremental=%d fromScratch=%d\n", depth, incremental,
                      fromScratch);
+    }
+    if (board.hashKey() != board.hashKeyFromScratch() || board.pawnKey() != board.pawnKeyFromScratch()) {
+        mismatches++;
+        std::fprintf(stderr, "HASH MISMATCH at depth=%d\n", depth);
     }
     if (depth == 0) return 1;
     long long nodes = 0;
