@@ -248,6 +248,106 @@ void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const S
     });
 }
 
+// ---------------------------------------------------------------------
+// Static exchange evaluation: the material outcome of the capture sequence
+// on one square, each side recapturing with its least valuable attacker and
+// free to stop whenever continuing would lose more. Pins are ignored.
+// ---------------------------------------------------------------------
+
+uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
+
+// The least valuable piece of `color` attacking (tx, ty), treating every
+// square in `removed` as empty -- so once a piece has captured (and is
+// removed from its origin), a slider lined up behind it joins in, which is
+// how x-ray recaptures come out of this without special-casing.
+bool leastValuableAttacker(const Board& board, int tx, int ty, Color color, uint64_t removed, int& ax, int& ay) {
+    int bestValue = INT_MAX;
+    auto consider = [&](int x, int y) {
+        int value = pieceValue(board.at(x, y).type);
+        if (board.at(x, y).type == PieceType::King) value = 100'000; // only ever the last resort
+        if (value < bestValue) {
+            bestValue = value;
+            ax = x;
+            ay = y;
+        }
+    };
+    auto isAttacker = [&](int x, int y, PieceType type) {
+        Piece p = board.at(x, y);
+        return p.color == color && p.type == type && !(removed & squareBit(x, y));
+    };
+
+    int pawnY = ty - (color == Color::White ? 1 : -1); // where a pawn capturing onto (tx, ty) stands
+    for (int dx : {-1, 1}) {
+        if (Board::inBounds(tx + dx, pawnY) && isAttacker(tx + dx, pawnY, PieceType::Pawn)) consider(tx + dx, pawnY);
+    }
+    for (const auto& jump : kKnightJumps) {
+        int x = tx + jump[0], y = ty + jump[1];
+        if (Board::inBounds(x, y) && isAttacker(x, y, PieceType::Knight)) consider(x, y);
+    }
+    for (int d = 0; d < 8; d++) {
+        bool diagonal = d >= 4; // kSlideDirs: rook directions first, then bishop directions
+        int x = tx + kSlideDirs[d][0], y = ty + kSlideDirs[d][1];
+        while (Board::inBounds(x, y)) {
+            Piece p = board.at(x, y);
+            if (!p.isEmpty() && !(removed & squareBit(x, y))) {
+                bool slides = p.type == PieceType::Queen || p.type == (diagonal ? PieceType::Bishop : PieceType::Rook);
+                if (p.color == color && slides) consider(x, y);
+                break;
+            }
+            x += kSlideDirs[d][0];
+            y += kSlideDirs[d][1];
+        }
+    }
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            int x = tx + dx, y = ty + dy;
+            if ((dx || dy) && Board::inBounds(x, y) && isAttacker(x, y, PieceType::King)) consider(x, y);
+        }
+    }
+    return bestValue != INT_MAX;
+}
+
+// Material gained by `m` (a capture or promotion) once the exchange on its
+// target square has played out, in centipawns from the mover's side.
+int see(const Board& board, const Move& m) {
+    const int tx = m.toX, ty = m.toY;
+    Piece mover = board.at(m.fromX, m.fromY);
+    uint64_t removed = squareBit(m.fromX, m.fromY);
+    if (m.isEnPassant) removed |= squareBit(tx, m.fromY);
+
+    int gain[32];
+    int d = 0;
+    gain[0] = pieceValue(m.captured);
+    if (m.promotion != PieceType::None) gain[0] += pieceValue(m.promotion) - pieceValue(PieceType::Pawn);
+    int onSquare = pieceValue(m.promotion != PieceType::None ? m.promotion : mover.type);
+    Color side = opponent(mover.color);
+    int ax, ay;
+    while (d < 31 && leastValuableAttacker(board, tx, ty, side, removed, ax, ay)) {
+        // A king can only recapture if nothing defends the square anymore.
+        int ox, oy;
+        if (board.at(ax, ay).type == PieceType::King &&
+            leastValuableAttacker(board, tx, ty, opponent(side), removed | squareBit(ax, ay), ox, oy))
+            break;
+        d++;
+        gain[d] = onSquare - gain[d - 1];
+        if (std::max(-gain[d - 1], gain[d]) < 0) break; // neither side can come out ahead by continuing
+        onSquare = pieceValue(board.at(ax, ay).type);
+        removed |= squareBit(ax, ay);
+        side = opponent(side);
+    }
+    for (; d > 0; d--) gain[d - 1] = -std::max(-gain[d - 1], gain[d]);
+    return gain[0];
+}
+
+// see(board, m) >= 0, skipping the exchange when taking a piece worth at
+// least as much as the capturer can't come out behind.
+bool seeNonNegative(const Board& board, const Move& m) {
+    if (m.promotion == PieceType::None &&
+        pieceValue(m.captured) >= pieceValue(board.at(m.fromX, m.fromY).type))
+        return true;
+    return see(board, m) >= 0;
+}
+
 void checkTime(SearchContext& ctx) {
     if ((ctx.nodes & 0xFFF) != 0) return;
     if (std::chrono::steady_clock::now() >= ctx.deadline) throw TimeUp{};
@@ -337,6 +437,9 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
     bool haveBestMove = false;
     int best = inCheck ? INT_MIN : standPat;
     for (const Move& m : candidates) {
+        // A capture that loses material once the exchange plays out can't
+        // raise the stand-pat score, so it isn't worth searching.
+        if (!inCheck && !seeNonNegative(board, m)) continue;
         Board::UndoState undo;
         board.makeMove(m, undo);
         int score = -quiescence(board, -beta, -alpha, opponent(color), ply + 1, ctx);
