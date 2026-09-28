@@ -373,6 +373,11 @@ struct App {
     bool hasLastMove = false;
     Move lastMove{};
 
+    // hashKey() of every position in the current human game (two-player or
+    // vs-computer), passed to the AI's search so it knows which moves would
+    // repeat a position. Bot matches keep their own in botGame.
+    std::vector<uint64_t> positionHistory;
+
     bool promotionPending = false;
     int promoFromX = -1, promoFromY = -1, promoToX = -1, promoToY = -1;
 
@@ -404,6 +409,7 @@ struct App {
 
 void startGame(App& app) {
     app.board = Board();
+    app.positionHistory.assign(1, app.board.hashKey());
     app.flipped = app.vsAi && app.humanColor == Color::Black;
     app.dragState = DragState::None;
     app.hasLastMove = false;
@@ -489,6 +495,7 @@ void finishCustomSetup(App& app, Color sideToMoveFirst) {
         return;
     }
     app.board = candidate;
+    app.positionHistory.assign(1, app.board.hashKey());
     app.flipped = app.humanColor == Color::Black;
     app.dragState = DragState::None;
     app.hasLastMove = false;
@@ -498,6 +505,15 @@ void finishCustomSetup(App& app, Color sideToMoveFirst) {
     app.customDragActive = false;
     app.customErrorMsg.clear();
     app.screen = Screen::Game;
+}
+
+// Plays a legal move in the human game (either player's, or the AI's),
+// recording it for the last-move highlight and the AI's repetition detection.
+void playMove(App& app, const Move& m) {
+    app.board.makeMove(m);
+    app.hasLastMove = true;
+    app.lastMove = m;
+    app.positionHistory.push_back(app.board.hashKey());
 }
 
 // Attempts a move between two squares. If it's a promotion, opens the
@@ -519,19 +535,13 @@ void tryMove(App& app, int fromX, int fromY, int toX, int toY) {
         return;
     }
     Move m;
-    if (app.board.findLegalMove(fromX, fromY, toX, toY, PieceType::None, m)) {
-        app.board.makeMove(m);
-        app.hasLastMove = true;
-        app.lastMove = m;
-    }
+    if (app.board.findLegalMove(fromX, fromY, toX, toY, PieceType::None, m)) playMove(app, m);
 }
 
 void resolvePromotion(App& app, PieceType chosen) {
     Move m;
     if (app.board.findLegalMove(app.promoFromX, app.promoFromY, app.promoToX, app.promoToY, chosen, m)) {
-        app.board.makeMove(m);
-        app.hasLastMove = true;
-        app.lastMove = m;
+        playMove(app, m);
     }
     app.promotionPending = false;
 }
@@ -1182,6 +1192,7 @@ int runGui() {
                     int depth = app.aiDepthCap, budget = app.aiTimeBudgetMs;
                     SearchOptions options;
                     options.stopFlag = &app.aiStop;
+                    options.gameHistory = app.positionHistory;
                     app.aiFuture = std::async(std::launch::async,
                                               [snapshot, aiColor, depth, budget, options, &tt = app.tt] {
                                                   return findBestMove(snapshot, aiColor, depth, budget, tt, options);
@@ -1189,9 +1200,7 @@ int runGui() {
                 } else if (app.aiFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
                     Move m = app.aiFuture->get();
                     app.aiFuture.reset();
-                    app.board.makeMove(m);
-                    app.hasLastMove = true;
-                    app.lastMove = m;
+                    playMove(app, m);
                 }
             }
         }

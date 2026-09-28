@@ -84,10 +84,10 @@ Done, all SPRT-accepted: passed pawns (+34), doubled/isolated pawns +
 bishop pair (+27), mobility (+54). The engine still rates its middlegame
 positions about a pawn better than Stockfish does.
 
+Also done: the GUI's human-vs-computer mode now passes the game history to
+the search, so repetition detection works there too.
+
 Next, in suggested order:
-1. **GUI repetition fix:** the GUI's human-vs-computer search in `gui.cpp`
-   doesn't set `SearchOptions::gameHistory`, so repetition detection is off
-   in the mode used against chess.com (UCI and bot matches already pass it).
 2. **Search (Phase 3):** log-based late-move reductions (currently a flat 1
    ply), SEE + delta pruning in `quiescence()`, captures-only move
    generation in quiescence (it currently generates all legal moves and
