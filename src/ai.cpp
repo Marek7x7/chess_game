@@ -834,19 +834,6 @@ struct RootSearchResult {
     long long nodes = 0;
 };
 
-// Only ever called to compare results that already reached the SAME depth
-// (see findBestMove) — an 8-ply score from one search and a 9-ply score
-// from another aren't comparable, so this deliberately doesn't try to
-// arbitrate across different depths at all. Within a shared depth, a
-// proven mate always wins; among two mates the faster one (higher score,
-// since mate score is kMateScore-ply) wins; otherwise higher score wins.
-bool isBetterAtSameDepth(const RootSearchResult& a, const RootSearchResult& b) {
-    bool aMate = a.score > kMateThreshold;
-    bool bMate = b.score > kMateThreshold;
-    if (aMate != bMate) return aMate;
-    return a.score > b.score;
-}
-
 // Runs a full iterative-deepening search over the *entire* root move list —
 // every thread sees every candidate move, Lazy-SMP style — sharing `tt`
 // with every other concurrently-running thread. A cutoff or refutation one
@@ -1200,44 +1187,13 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         results.push_back(r);
     }
 
-    // Aggregation only ever compares results that reached the same depth:
-    // find the deepest depth any thread actually completed, then pick the
-    // best score among just the threads that reached that depth. Since
-    // every thread searched the full root move list, every candidate in
-    // that comparison had access to every move — the comparison is finally
-    // apples-to-apples, unlike the old disjoint-bucket scheme.
-    int maxDepthReached = 0;
-    for (const RootSearchResult& r : results) maxDepthReached = std::max(maxDepthReached, r.depthReached);
-
-    RootSearchResult best;
-    int bestThread = -1;
-    int bestScoreAmongMaxDepth = INT_MIN;
-    size_t threadsAtMaxDepth = 0;
-    for (size_t t = 0; t < results.size(); t++) {
-        const RootSearchResult& r = results[t];
-        if (r.depthReached != maxDepthReached) continue;
-        threadsAtMaxDepth++;
-        bestScoreAmongMaxDepth = std::max(bestScoreAmongMaxDepth, r.score);
-        if (bestThread == -1 || isBetterAtSameDepth(r, best)) {
-            best = r;
-            bestThread = static_cast<int>(t);
-        }
+    // Thread 0 -- the one with unperturbed move ordering -- decides. The
+    // helper threads' job is filling the shared transposition table with
+    // results thread 0 then finds there instead of searching them itself.
+    const RootSearchResult& main = results.front();
+    if (g_aiDebugLog && main.depthReached == 0) {
+        std::fprintf(stderr, "[ai] FALLBACK: thread 0 completed no depth; returning rootMoves.front()=%s\n",
+                     moveStr(rootMoves.front()).c_str());
     }
-
-    if (g_aiDebugLog) {
-        std::fprintf(stderr,
-                     "[ai] maxDepthReached=%d (%zu/%zu threads) | winner=thread[%d] score=%d move=%s | best score "
-                     "at that depth=%d%s\n",
-                     maxDepthReached, threadsAtMaxDepth, results.size(), bestThread, best.score,
-                     moveStr(best.move).c_str(), bestScoreAmongMaxDepth,
-                     (bestThread != -1 && best.score != bestScoreAmongMaxDepth)
-                         ? "  <-- WINNER IS NOT HIGHEST SCORE (BUG)"
-                         : "");
-        if (maxDepthReached == 0) {
-            std::fprintf(stderr, "[ai] FALLBACK: no thread completed depth 1; returning rootMoves.front()=%s\n",
-                         moveStr(rootMoves.front()).c_str());
-        }
-    }
-
-    return maxDepthReached > 0 ? best.move : rootMoves.front();
+    return main.depthReached > 0 ? main.move : rootMoves.front();
 }
