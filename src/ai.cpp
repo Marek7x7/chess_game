@@ -87,23 +87,51 @@ constexpr int kIsolatedMg = 10, kIsolatedEg = 15;
 // up either (Fruit 2.1's values).
 constexpr int kBackwardMg = 8, kBackwardEg = 10;
 
-// Positive = good for White: passed-pawn bonuses minus doubled/isolated/
-// backward penalties. A passed pawn has no enemy pawn in front of it on its own or an
-// adjacent file.
-int pawnStructure(const Board& board) {
+uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
+constexpr uint64_t kFileMask = 0xFF;                  // file a; shift by x * 8 for file x
+constexpr uint64_t kRankMask = 0x0101010101010101ULL; // rank 1; shift by y for rank y
+
+// Everything the evaluation needs from the pawns alone. Pawns move far less
+// often than the evaluation runs, so probePawns() keeps this in a per-thread
+// cache keyed by Board::pawnKey(): most evaluations neither recompute the
+// pawn structure nor re-scan the board for the pawn questions that rooks,
+// outposts and king shelter ask.
+struct PawnInfo {
+    uint64_t key;
+    int mg, eg;             // pawn structure score (see computePawnInfo), positive = good for White
+    uint64_t pawns[2];      // [White, Black] pawn squares, as squareBit()s
+    uint64_t attacks[2];    // squares each side's pawns attack
+    uint64_t attackSpan[2]; // squares each side's pawns could ever attack by advancing
+};
+
+bool fileHasPawn(const PawnInfo& info, int side, int x) { return (info.pawns[side] >> (x * 8)) & kFileMask; }
+
+// Fills in everything but the key. The score: passed-pawn bonuses minus
+// doubled/isolated/backward penalties. A passed pawn has no enemy pawn in
+// front of it on its own or an adjacent file.
+void computePawnInfo(const Board& board, PawnInfo& info) {
     // Per file, the rank of the rearmost pawn of each color: the only one
     // that decides whether an enemy pawn on that file is passed.
     int whiteLowest[8], blackHighest[8];
     std::fill(std::begin(whiteLowest), std::end(whiteLowest), 8);
     std::fill(std::begin(blackHighest), std::end(blackHighest), -1);
     int count[2][8] = {}; // [White, Black] pawns per file
+    for (int side = 0; side < 2; side++) info.pawns[side] = info.attacks[side] = info.attackSpan[side] = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 1; y < 7; y++) {
             Piece p = board.at(x, y);
             if (p.type != PieceType::Pawn) continue;
             if (p.color == Color::White) whiteLowest[x] = std::min(whiteLowest[x], y);
             else blackHighest[x] = std::max(blackHighest[x], y);
-            count[p.color == Color::White ? 0 : 1][x]++;
+            int side = p.color == Color::White ? 0 : 1;
+            count[side][x]++;
+            info.pawns[side] |= squareBit(x, y);
+            int dir = side == 0 ? 1 : -1;
+            for (int ax : {x - 1, x + 1}) {
+                if (ax < 0 || ax > 7) continue;
+                info.attacks[side] |= squareBit(ax, y + dir);
+                for (int ty = y + dir; ty >= 0 && ty <= 7; ty += dir) info.attackSpan[side] |= squareBit(ax, ty);
+            }
         }
     }
 
@@ -157,8 +185,23 @@ int pawnStructure(const Board& board) {
             eg -= sign * ((n - 1) * kDoubledEg + (isolated ? n * kIsolatedEg : 0));
         }
     }
-    double phase = board.gamePhase();
-    return static_cast<int>(mg * phase + eg * (1.0 - phase));
+    info.mg = mg;
+    info.eg = eg;
+}
+
+// Per-thread pawn cache. Zero-initialized, so an empty slot reads as key 0
+// with no pawns -- exactly right for a pawnless position, whose key is 0.
+constexpr size_t kPawnCacheSize = size_t(1) << 13;
+thread_local PawnInfo pawnCache[kPawnCacheSize];
+
+const PawnInfo& probePawns(const Board& board) {
+    uint64_t key = board.pawnKey();
+    PawnInfo& entry = pawnCache[key & (kPawnCacheSize - 1)];
+    if (entry.key != key) {
+        computePawnInfo(board, entry);
+        entry.key = key;
+    }
+    return entry;
 }
 
 // Mobility, per square a knight/bishop/rook/queen can move to above or below
@@ -203,19 +246,12 @@ constexpr int kQueenOn7thMg = 10, kQueenOn7thEg = 20;
 constexpr int kKnightOutpostMg = 20, kKnightOutpostEg = 10;
 constexpr int kBishopOutpostMg = 10, kBishopOutpostEg = 5;
 
-bool isOutpost(const Board& board, int x, int y, Color color) {
+bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
     int rank = color == Color::White ? y : 7 - y;
     if (rank < 3 || rank > 5) return false;
-    int dir = color == Color::White ? 1 : -1;
-    auto pawnOf = [&](int px, int py, Color c) {
-        return Board::inBounds(px, py) && board.at(px, py).type == PieceType::Pawn && board.at(px, py).color == c;
-    };
-    if (!pawnOf(x - 1, y - dir, color) && !pawnOf(x + 1, y - dir, color)) return false;
-    // An enemy pawn on an adjacent file anywhere ahead could still advance to attack it.
-    for (int py = y + dir; py >= 1 && py <= 6; py += dir) {
-        if (pawnOf(x - 1, py, opponent(color)) || pawnOf(x + 1, py, opponent(color))) return false;
-    }
-    return true;
+    int side = color == Color::White ? 0 : 1;
+    // Defended by an own pawn, and no enemy pawn could ever advance to attack it.
+    return (pawns.attacks[side] & squareBit(x, y)) && !(pawns.attackSpan[1 - side] & squareBit(x, y));
 }
 
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
@@ -224,7 +260,7 @@ bool isOutpost(const Board& board, int x, int y, Color color) {
 // outposts.
 // Also fills attacks[c] with the
 // pieces attacking color c's king zone (the squares next to that king).
-int pieceTerms(const Board& board, KingAttack (&attacks)[2]) {
+int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[2]) {
     int mg = 0, eg = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
@@ -262,27 +298,22 @@ int pieceTerms(const Board& board, KingAttack (&attacks)[2]) {
             int sign = p.color == Color::White ? 1 : -1;
             mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
             eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
+            int side = p.color == Color::White ? 0 : 1;
             if (p.type == PieceType::Rook) {
-                bool ownPawn = false, enemyPawn = false;
-                for (int fy = 1; fy < 7; fy++) {
-                    Piece q = board.at(x, fy);
-                    if (q.type == PieceType::Pawn) (q.color == p.color ? ownPawn : enemyPawn) = true;
-                }
-                int bonus = ownPawn ? 0 : enemyPawn ? kRookSemiOpenFile : kRookOpenFile;
+                int bonus = fileHasPawn(pawns, side, x)       ? 0
+                            : fileHasPawn(pawns, 1 - side, x) ? kRookSemiOpenFile
+                                                              : kRookOpenFile;
                 mg += sign * bonus;
                 eg += sign * bonus;
             }
-            if ((p.type == PieceType::Knight || p.type == PieceType::Bishop) && isOutpost(board, x, y, p.color)) {
+            if ((p.type == PieceType::Knight || p.type == PieceType::Bishop) && isOutpost(pawns, x, y, p.color)) {
                 bool knight = p.type == PieceType::Knight;
                 mg += sign * (knight ? kKnightOutpostMg : kBishopOutpostMg);
                 eg += sign * (knight ? kKnightOutpostEg : kBishopOutpostEg);
             }
             int seventh = p.color == Color::White ? 6 : 1;
             if ((p.type == PieceType::Rook || p.type == PieceType::Queen) && y == seventh) {
-                bool targets = eky == (p.color == Color::White ? 7 : 0);
-                for (int fx = 0; fx < 8 && !targets; fx++) {
-                    targets = board.at(fx, y).type == PieceType::Pawn && board.at(fx, y).color == enemy;
-                }
+                bool targets = eky == (p.color == Color::White ? 7 : 0) || (pawns.pawns[1 - side] & (kRankMask << y));
                 if (targets) {
                     bool rook = p.type == PieceType::Rook;
                     mg += sign * (rook ? kRookOn7thMg : kQueenOn7thMg);
@@ -312,22 +343,17 @@ constexpr int kKingFileSemiOpen = 15;
 constexpr int kKingFileOpen = 10; // on top of kKingFileSemiOpen
 
 // Shelter penalty for `color`'s king, as a positive number.
-int kingShelterPenalty(const Board& board, Color color) {
+int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
     int kx = board.kingFile(color), ky = board.kingRank(color);
-    int dir = color == Color::White ? 1 : -1;
-    auto ownPawn = [&](int x, int y) {
-        return Board::inBounds(x, y) && board.at(x, y).type == PieceType::Pawn && board.at(x, y).color == color;
-    };
+    int side = color == Color::White ? 0 : 1;
+    int dir = side == 0 ? 1 : -1;
+    auto ownPawn = [&](int x, int y) { return Board::inBounds(x, y) && (pawns.pawns[side] & squareBit(x, y)); };
     int penalty = 0;
     for (int x = std::max(0, kx - 1); x <= std::min(7, kx + 1); x++) {
         if (!ownPawn(x, ky + dir)) penalty += ownPawn(x, ky + 2 * dir) ? kShelterPushedOnce : kShelterMissing;
-        bool ownOnFile = false, enemyOnFile = false;
-        for (int y = 1; y < 7; y++) {
-            Piece p = board.at(x, y);
-            if (p.type != PieceType::Pawn) continue;
-            (p.color == color ? ownOnFile : enemyOnFile) = true;
+        if (!fileHasPawn(pawns, side, x)) {
+            penalty += kKingFileSemiOpen + (fileHasPawn(pawns, 1 - side, x) ? 0 : kKingFileOpen);
         }
-        if (!ownOnFile) penalty += kKingFileSemiOpen + (enemyOnFile ? 0 : kKingFileOpen);
     }
     return penalty;
 }
@@ -343,16 +369,19 @@ int kingAttackPenalty(const KingAttack& a) {
 }
 
 // Positive = good for White. `attacks` comes from pieceTerms().
-int kingSafety(const Board& board, const KingAttack (&attacks)[2]) {
-    int mg = kingShelterPenalty(board, Color::Black) + kingAttackPenalty(attacks[1]) -
-             kingShelterPenalty(board, Color::White) - kingAttackPenalty(attacks[0]);
+int kingSafety(const Board& board, const PawnInfo& pawns, const KingAttack (&attacks)[2]) {
+    int mg = kingShelterPenalty(board, pawns, Color::Black) + kingAttackPenalty(attacks[1]) -
+             kingShelterPenalty(board, pawns, Color::White) - kingAttackPenalty(attacks[0]);
     return static_cast<int>(mg * board.gamePhase());
 }
 
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
+    const PawnInfo& pawns = probePawns(board);
+    double phase = board.gamePhase();
     KingAttack attacks[2]; // on White's king, on Black's king
-    int score = board.rawEval() + pawnStructure(board) + pieceTerms(board, attacks) + kingSafety(board, attacks);
+    int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
+                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks);
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
@@ -418,8 +447,6 @@ void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const S
 // on one square, each side recapturing with its least valuable attacker and
 // free to stop whenever continuing would lose more. Pins are ignored.
 // ---------------------------------------------------------------------
-
-uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
 
 // The least valuable piece of `color` attacking (tx, ty), treating every
 // square in `removed` as empty -- so once a piece has captured (and is
