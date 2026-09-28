@@ -549,6 +549,14 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     constexpr int kLmrStartIndex = 4; // first 4 moves (index 0-3) always searched at full depth
     constexpr int kLmrMinDepth = 3;
 
+    // Futility pruning: this close to the leaves, a quiet move is assumed to
+    // move the eval by at most kFutilityMargin[depth]. If even that can't
+    // lift the static eval to alpha, every quiet, non-checking move after
+    // the first is skipped. Not at PV nodes, in check, or near mate scores.
+    constexpr int kFutilityMargin[3] = {0, 150, 300};
+    bool futile = !pvNode && !inCheck && depth <= 2 && alpha > -kMateThreshold && alpha < kMateThreshold &&
+                  evaluate(board, color) + kFutilityMargin[depth] <= alpha;
+
     Move bestMove = moves.front();
     int best = INT_MIN;
     int moveIndex = 0;
@@ -556,6 +564,13 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     for (const Move& m : moves) {
         Board::UndoState undo;
         board.makeMove(m, undo);
+
+        if (futile && moveIndex > 0 && m.captured == PieceType::None && m.promotion == PieceType::None &&
+            !board.isInCheck(opponent(color))) {
+            board.unmakeMove(m, undo);
+            moveIndex++;
+            continue;
+        }
 
         // LMR candidate check: quiet (no capture/promotion), ordered late,
         // not a killer, at enough depth to meaningfully reduce. isInCheck()
