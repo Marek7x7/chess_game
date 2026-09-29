@@ -414,11 +414,6 @@ struct SearchContext {
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
 
-bool sameMove(const Move& a, const Move& b) {
-    return a.fromX == b.fromX && a.fromY == b.fromY && a.toX == b.toX && a.toY == b.toY &&
-           a.promotion == b.promotion;
-}
-
 // Score used to order moves before searching them: TT move first, then
 // captures via MVV-LVA, then promotions, then killer moves, then history.
 int moveScore(const Board& board, const Move& m, const Move& ttMove, const SearchContext& ctx, int ply,

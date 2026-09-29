@@ -13,6 +13,11 @@ struct Move {
     PieceType captured = PieceType::None;
 };
 
+inline bool sameMove(const Move& a, const Move& b) {
+    return a.fromX == b.fromX && a.fromY == b.fromY && a.toX == b.toX && a.toY == b.toY &&
+           a.promotion == b.promotion;
+}
+
 // Fixed-capacity move list: a stack array instead of a per-node heap
 // allocation. 218 is the known maximum legal moves in any reachable chess
 // position; 256 keeps headroom for pseudo-legal generation (which can

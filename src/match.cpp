@@ -41,10 +41,6 @@ bool insufficientMaterial(const Board& board) {
     return minors <= 1;
 }
 
-bool sameMove(const Move& a, const Move& b) {
-    return a.fromX == b.fromX && a.fromY == b.fromY && a.toX == b.toX && a.toY == b.toY && a.promotion == b.promotion;
-}
-
 } // namespace
 
 int presetIndexByName(const std::string& name) {
