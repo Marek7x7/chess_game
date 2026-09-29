@@ -91,15 +91,22 @@ void filledPolygon(SDL_Renderer* r, const std::vector<Point>& pts, SDL_Color col
     }
 }
 
-void outlinePolygon(SDL_Renderer* r, const std::vector<Point>& pts, SDL_Color color) {
-    SDL_SetRenderDrawColor(r, color.r, color.g, color.b, color.a);
-    size_t n = pts.size();
-    for (size_t i = 0; i < n; i++) {
-        const Point& a = pts[i];
-        const Point& b = pts[(i + 1) % n];
-        SDL_RenderDrawLine(r, static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x),
-                            static_cast<int>(b.y));
+// A line of the given width: a quad plus round caps (caps only when wide
+// enough to matter -- at 1px the plain quad is already the line).
+void thickLine(SDL_Renderer* r, Point a, Point b, float w, SDL_Color color) {
+    float dx = b.x - a.x, dy = b.y - a.y;
+    float len = std::sqrt(dx * dx + dy * dy);
+    if (len < 0.001f) return;
+    float nx = -dy / len * w / 2, ny = dx / len * w / 2;
+    filledPolygon(r, {{a.x + nx, a.y + ny}, {b.x + nx, b.y + ny}, {b.x - nx, b.y - ny}, {a.x - nx, a.y - ny}}, color);
+    if (w >= 2) {
+        filledCircle(r, a.x, a.y, w / 2, color);
+        filledCircle(r, b.x, b.y, w / 2, color);
     }
+}
+
+void outlinePolygon(SDL_Renderer* r, const std::vector<Point>& pts, SDL_Color color, float w) {
+    for (size_t i = 0; i < pts.size(); i++) thickLine(r, pts[i], pts[(i + 1) % pts.size()], w, color);
 }
 
 Point xf(Point p, float cx, float cy, float scale) { return {cx + p.x * scale, cy + p.y * scale}; }
@@ -111,9 +118,10 @@ std::vector<Point> xfAll(const std::vector<Point>& pts, float cx, float cy, floa
     return out;
 }
 
-void filledOutlinedPolygon(SDL_Renderer* r, const std::vector<Point>& pts, SDL_Color fill, SDL_Color outline) {
+void filledOutlinedPolygon(SDL_Renderer* r, const std::vector<Point>& pts, SDL_Color fill, SDL_Color outline,
+                           float w = 1.5f) {
     filledPolygon(r, pts, fill);
-    outlinePolygon(r, pts, outline);
+    outlinePolygon(r, pts, outline, w);
 }
 
 // ---------------------------------------------------------------------
@@ -195,12 +203,11 @@ void drawChar(SDL_Renderer* r, float x, float y, float size, SDL_Color color, ch
         if (uc == ':') filledCircle(r, x + size * 0.5f, y + size * 0.35f, size * 0.08f, color);
         return;
     }
-    SDL_SetRenderDrawColor(r, color.r, color.g, color.b, color.a);
+    float w = std::max(1.0f, size * 0.06f);
     for (const Stroke& stroke : glyphFor(uc)) {
         for (size_t i = 0; i + 1 < stroke.size(); i++) {
-            SDL_RenderDrawLine(r, static_cast<int>(x + stroke[i].x * size), static_cast<int>(y + stroke[i].y * size),
-                                static_cast<int>(x + stroke[i + 1].x * size),
-                                static_cast<int>(y + stroke[i + 1].y * size));
+            thickLine(r, {x + stroke[i].x * size, y + stroke[i].y * size},
+                      {x + stroke[i + 1].x * size, y + stroke[i + 1].y * size}, w, color);
         }
     }
 }
@@ -227,49 +234,77 @@ void drawTextCentered(SDL_Renderer* r, float centerX, float y, float size, SDL_C
 SDL_Color pieceFillColor(Color c) { return c == Color::White ? SDL_Color{245, 245, 245, 255} : SDL_Color{40, 40, 40, 255}; }
 SDL_Color pieceOutlineColor(Color c) { return c == Color::White ? SDL_Color{30, 30, 30, 255} : SDL_Color{225, 225, 225, 255}; }
 
+void disc(SDL_Renderer* r, float cx, float cy, float rad, SDL_Color fill, SDL_Color outline) {
+    filledCircle(r, cx, cy, rad + 1.0f, outline);
+    filledCircle(r, cx, cy, rad, fill);
+}
+
+// Every piece stands on the same two-step plinth.
+void drawBase(SDL_Renderer* r, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
+    filledOutlinedPolygon(r, xfAll({{-0.2f, 0.24f}, {0.2f, 0.24f}, {0.26f, 0.31f}, {-0.26f, 0.31f}}, cx, cy, s), fill, outline);
+    filledOutlinedPolygon(r, xfAll({{-0.3f, 0.31f}, {0.3f, 0.31f}, {0.3f, 0.4f}, {-0.3f, 0.4f}}, cx, cy, s), fill, outline);
+}
+
+void drawPoly(SDL_Renderer* r, std::vector<Point> pts, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
+    filledOutlinedPolygon(r, xfAll(pts, cx, cy, s), fill, outline);
+}
+
 void drawPawn(SDL_Renderer* r, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
-    filledCircle(r, cx, cy - 0.16f * s, 0.12f * s, fill);
-    filledOutlinedPolygon(r, xfAll({{-0.12f, 0}, {0.12f, 0}, {0.22f, 0.3f}, {-0.22f, 0.3f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.28f, 0.3f}, {0.28f, 0.3f}, {0.28f, 0.38f}, {-0.28f, 0.38f}}, cx, cy, s), fill, outline);
+    drawPoly(r, {{-0.07f, -0.06f}, {0.07f, -0.06f}, {0.1f, 0.1f}, {0.2f, 0.24f}, {-0.2f, 0.24f}, {-0.1f, 0.1f}}, cx, cy, s, fill, outline);
+    drawPoly(r, {{-0.14f, -0.09f}, {0.14f, -0.09f}, {0.14f, -0.03f}, {-0.14f, -0.03f}}, cx, cy, s, fill, outline);
+    disc(r, cx, cy - 0.2f * s, 0.13f * s, fill, outline);
+    drawBase(r, cx, cy, s, fill, outline);
 }
 
 void drawRook(SDL_Renderer* r, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
-    filledOutlinedPolygon(r, xfAll({{-0.22f, -0.05f}, {0.22f, -0.05f}, {0.22f, 0.3f}, {-0.22f, 0.3f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.22f, -0.32f}, {-0.1f, -0.32f}, {-0.1f, -0.05f}, {-0.22f, -0.05f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.06f, -0.32f}, {0.06f, -0.32f}, {0.06f, -0.05f}, {-0.06f, -0.05f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{0.1f, -0.32f}, {0.22f, -0.32f}, {0.22f, -0.05f}, {0.1f, -0.05f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.3f, 0.3f}, {0.3f, 0.3f}, {0.3f, 0.4f}, {-0.3f, 0.4f}}, cx, cy, s), fill, outline);
+    drawPoly(r, {{-0.25f, -0.36f}, {-0.13f, -0.36f}, {-0.13f, -0.28f}, {-0.045f, -0.28f}, {-0.045f, -0.36f},
+                 {0.045f, -0.36f}, {0.045f, -0.28f}, {0.13f, -0.28f}, {0.13f, -0.36f}, {0.25f, -0.36f},
+                 {0.25f, -0.18f}, {0.17f, -0.12f}, {0.19f, 0.2f}, {0.24f, 0.24f}, {-0.24f, 0.24f},
+                 {-0.19f, 0.2f}, {-0.17f, -0.12f}, {-0.25f, -0.18f}}, cx, cy, s, fill, outline);
+    drawBase(r, cx, cy, s, fill, outline);
 }
 
 void drawBishop(SDL_Renderer* r, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
-    filledOutlinedPolygon(r, xfAll({{0, -0.2f}, {0.18f, 0.28f}, {-0.18f, 0.28f}}, cx, cy, s), fill, outline);
-    filledCircle(r, cx, cy - 0.3f * s, 0.09f * s, fill);
-    filledOutlinedPolygon(r, xfAll({{-0.28f, 0.28f}, {0.28f, 0.28f}, {0.28f, 0.36f}, {-0.28f, 0.36f}}, cx, cy, s), fill, outline);
-    Point a = xf({-0.05f, -0.05f}, cx, cy, s);
-    Point b = xf({0.05f, 0.08f}, cx, cy, s);
-    SDL_SetRenderDrawColor(r, outline.r, outline.g, outline.b, outline.a);
-    SDL_RenderDrawLine(r, static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y));
+    drawPoly(r, {{-0.07f, 0.02f}, {0.07f, 0.02f}, {0.1f, 0.14f}, {0.2f, 0.24f}, {-0.2f, 0.24f}, {-0.1f, 0.14f}}, cx, cy, s, fill, outline);
+    drawPoly(r, {{-0.15f, 0.0f}, {0.15f, 0.0f}, {0.15f, 0.07f}, {-0.15f, 0.07f}}, cx, cy, s, fill, outline);
+    std::vector<Point> head;  // pointed mitre: an ellipse narrowing toward the tip
+    for (int i = 0; i < 24; i++) {
+        float t = 6.2831853f * static_cast<float>(i) / 24.0f;
+        float v = -std::cos(t);  // -1 top .. +1 bottom
+        head.push_back({0.14f * std::sin(t) * (0.35f + 0.65f * (0.5f + 0.5f * v)), -0.17f + 0.2f * v});
+    }
+    drawPoly(r, head, cx, cy, s, fill, outline);
+    disc(r, cx, cy - 0.39f * s, 0.045f * s, fill, outline);
+    thickLine(r, {cx - 0.02f * s, cy - 0.2f * s}, {cx + 0.06f * s, cy - 0.1f * s}, 1.5f, outline);
+    drawBase(r, cx, cy, s, fill, outline);
 }
 
 void drawKnight(SDL_Renderer* r, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
-    filledOutlinedPolygon(r, xfAll({{0.15f, 0.35f}, {-0.25f, 0.35f}, {-0.25f, 0.15f}, {-0.1f, 0.05f},
-                                     {-0.22f, -0.05f}, {-0.22f, -0.2f}, {-0.05f, -0.3f}, {0.1f, -0.28f},
-                                     {0.2f, -0.15f}, {0.12f, -0.05f}, {0.22f, 0.05f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.3f, 0.35f}, {0.3f, 0.35f}, {0.3f, 0.42f}, {-0.3f, 0.42f}}, cx, cy, s), fill, outline);
+    // Horse head in profile, facing left: ear, forehead, long nose, jaw, neck.
+    drawPoly(r, {{0.24f, 0.24f}, {0.22f, -0.05f}, {0.16f, -0.22f}, {0.09f, -0.33f}, {0.06f, -0.42f}, {-0.01f, -0.34f},
+                 {-0.1f, -0.28f}, {-0.2f, -0.14f}, {-0.3f, -0.02f}, {-0.28f, 0.06f}, {-0.2f, 0.05f}, {-0.12f, 0.0f},
+                 {-0.05f, 0.05f}, {-0.06f, 0.14f}, {-0.16f, 0.2f}, {-0.24f, 0.24f}}, cx, cy, s, fill, outline);
+    disc(r, cx - 0.05f * s, cy - 0.2f * s, 0.03f * s, outline, outline);
+    thickLine(r, {cx + 0.1f * s, cy - 0.2f * s}, {cx + 0.12f * s, cy + 0.12f * s}, 1.5f, outline);  // mane
+    drawBase(r, cx, cy, s, fill, outline);
 }
 
 void drawQueen(SDL_Renderer* r, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
-    filledOutlinedPolygon(r, xfAll({{-0.12f, -0.05f}, {0.12f, -0.05f}, {0.2f, 0.3f}, {-0.2f, 0.3f}}, cx, cy, s), fill, outline);
-    for (float x : {-0.2f, -0.1f, 0.0f, 0.1f, 0.2f}) filledCircle(r, cx + x * s, cy - 0.28f * s, 0.045f * s, fill);
-    filledOutlinedPolygon(r, xfAll({{-0.28f, 0.3f}, {0.28f, 0.3f}, {0.28f, 0.38f}, {-0.28f, 0.38f}}, cx, cy, s), fill, outline);
+    drawPoly(r, {{-0.08f, 0.0f}, {0.08f, 0.0f}, {0.11f, 0.12f}, {0.2f, 0.24f}, {-0.2f, 0.24f}, {-0.11f, 0.12f}}, cx, cy, s, fill, outline);
+    drawPoly(r, {{-0.22f, -0.02f}, {-0.25f, -0.3f}, {-0.12f, -0.14f}, {-0.06f, -0.34f}, {0.0f, -0.14f}, {0.06f, -0.34f},
+                 {0.12f, -0.14f}, {0.25f, -0.3f}, {0.22f, -0.02f}}, cx, cy, s, fill, outline);
+    for (float x : {-0.25f, -0.06f, 0.06f, 0.25f}) disc(r, cx + x * s, cy - 0.32f * s, 0.04f * s, fill, outline);
+    disc(r, cx, cy - 0.38f * s, 0.045f * s, fill, outline);
+    drawBase(r, cx, cy, s, fill, outline);
 }
 
 void drawKing(SDL_Renderer* r, float cx, float cy, float s, SDL_Color fill, SDL_Color outline) {
-    filledOutlinedPolygon(r, xfAll({{-0.1f, -0.1f}, {0.1f, -0.1f}, {0.16f, 0.3f}, {-0.16f, 0.3f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.18f, -0.12f}, {0.18f, -0.12f}, {0.18f, -0.04f}, {-0.18f, -0.04f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.025f, -0.34f}, {0.025f, -0.34f}, {0.025f, -0.12f}, {-0.025f, -0.12f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.09f, -0.25f}, {0.09f, -0.25f}, {0.09f, -0.19f}, {-0.09f, -0.19f}}, cx, cy, s), fill, outline);
-    filledOutlinedPolygon(r, xfAll({{-0.28f, 0.3f}, {0.28f, 0.3f}, {0.28f, 0.38f}, {-0.28f, 0.38f}}, cx, cy, s), fill, outline);
+    drawPoly(r, {{-0.08f, -0.02f}, {0.08f, -0.02f}, {0.11f, 0.12f}, {0.2f, 0.24f}, {-0.2f, 0.24f}, {-0.11f, 0.12f}}, cx, cy, s, fill, outline);
+    drawPoly(r, {{-0.2f, -0.2f}, {0.2f, -0.2f}, {0.2f, -0.03f}, {-0.2f, -0.03f}}, cx, cy, s, fill, outline);
+    drawPoly(r, {{-0.035f, -0.42f}, {0.035f, -0.42f}, {0.035f, -0.34f}, {0.1f, -0.34f}, {0.1f, -0.28f}, {0.035f, -0.28f},
+                 {0.035f, -0.2f}, {-0.035f, -0.2f}, {-0.035f, -0.28f}, {-0.1f, -0.28f}, {-0.1f, -0.34f},
+                 {-0.035f, -0.34f}}, cx, cy, s, fill, outline);
+    drawBase(r, cx, cy, s, fill, outline);
 }
 
 void drawPieceIcon(SDL_Renderer* r, PieceType type, Color color, float cx, float cy, float squareSize) {
