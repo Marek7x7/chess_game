@@ -663,6 +663,7 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
         if (!inCheck && !seeNonNegative(board, m)) continue;
         Board::UndoState undo;
         board.makeMove(m, undo);
+        ctx.tt.prefetch(board.hashKey());
         int score = -quiescence(board, -beta, -alpha, opponent(color), ply + 1, ctx);
         board.unmakeMove(m, undo);
         if (score > best) {
@@ -800,6 +801,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     for (const Move& m : moves) {
         Board::UndoState undo;
         board.makeMove(m, undo);
+        ctx.tt.prefetch(board.hashKey());
 
         if (futile && moveIndex > 0 && m.captured == PieceType::None && m.promotion == PieceType::None &&
             !board.isInCheck(opponent(color))) {

@@ -41,6 +41,9 @@ public:
     bool probe(uint64_t key, TTEntry& out) const;
     void store(uint64_t key, int depth, int score, TTFlag flag, const Move& best, bool hasMove);
 
+    // Starts loading a key's bucket into the cache, for a probe a little later.
+    void prefetch(uint64_t key) const { __builtin_prefetch(&table[key & bucketMask]); }
+
     // Marks the start of a new search (call before its threads start):
     // entries stored before it become the first to be replaced.
     void newSearch() { generation = (generation + 1) & 63; }
