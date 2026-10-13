@@ -394,6 +394,44 @@ bool hasMatingMaterial(const Board& board, Color color) {
     return bishops >= 2 || (bishops == 1 && board.pieces(color, PieceType::Knight));
 }
 
+// Mop-up: against a bare king, a side with mating material wins by driving
+// the king to the edge (to a corner of the bishop's colour with bishop and
+// knight) and bringing its own king close, which nothing else in the
+// evaluation rewards. Positive = good for White.
+TUNE_INT(kMopEdge, 20);   // per step the bare king is nearer the board's edge
+TUNE_INT(kMopKing, 15);   // per step the two kings are nearer each other
+TUNE_INT(kMopCorner, 60); // bishop and knight: per step nearer the right corner
+
+int mopUp(const Board& board, const PawnInfo& pawns) {
+    for (int side = 0; side < 2; side++) {
+        const Color winner = side == 0 ? Color::White : Color::Black;
+        const Color loser = opponent(winner);
+        if (pawns.pawns[1 - side]) continue;
+        if (board.pieces(loser, PieceType::Knight) | board.pieces(loser, PieceType::Bishop) |
+            board.pieces(loser, PieceType::Rook) | board.pieces(loser, PieceType::Queen))
+            continue;
+        if (!hasMatingMaterial(board, winner)) continue;
+        const int lx = board.kingFile(loser), ly = board.kingRank(loser);
+        const int distance = std::abs(lx - board.kingFile(winner)) + std::abs(ly - board.kingRank(winner));
+        int bonus = kMopKing * (14 - distance);
+        const uint64_t bishops = board.pieces(winner, PieceType::Bishop);
+        const bool bishopAndKnight = bb::popcount(bishops) == 1 && board.pieces(winner, PieceType::Knight) &&
+                                     !(board.pieces(winner, PieceType::Queen) | board.pieces(winner, PieceType::Rook));
+        if (bishopAndKnight) {
+            const int bs = bb::lsb(bishops);
+            const int parity = (bs / 8 + bs % 8) % 2; // the colour of the bishop's squares
+            // Manhattan distance to the nearest corner of that colour: (0,0), (7,7) or (0,7), (7,0).
+            const int d = parity == 0 ? std::min(lx + ly, 14 - lx - ly) : std::min(lx + 7 - ly, 7 - lx + ly);
+            bonus += kMopCorner * (14 - d);
+        } else {
+            const int fromCentre = (lx < 4 ? 3 - lx : lx - 4) + (ly < 4 ? 3 - ly : ly - 4);
+            bonus += kMopEdge * fromCentre;
+        }
+        return side == 0 ? bonus : -bonus;
+    }
+    return 0;
+}
+
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
     const PawnInfo& pawns = probePawns(board);
@@ -404,7 +442,7 @@ int evaluate(const Board& board, Color color) {
     double phase = board.gamePhase();
     KingAttack attacks[2]; // on White's king, on Black's king
     int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
-                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks);
+                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns);
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
