@@ -322,6 +322,16 @@ Pins findPins(const Board& board, Color color) {
     return pins;
 }
 
+// Threats, indexed by the type of the attacked enemy piece. A piece attacked by
+// a pawn, or a rook or queen attacked by a minor piece, must move or be lost to
+// an exchange; one attacked and not defended at all can simply be taken. Each
+// attacked piece counts once, at the cheapest kind of attacker (pawn, then
+// minor piece, then rook).
+TUNE_ARR(kThreatPawn, 7, {0, 0, 45, 45, 55, 65, 0});
+TUNE_ARR(kThreatMinor, 7, {0, 5, 20, 20, 35, 45, 0});
+TUNE_ARR(kThreatRook, 7, {0, 3, 15, 15, 0, 40, 0});
+TUNE_ARR(kHanging, 7, {0, 8, 15, 15, 20, 25, 0}); // attacked by anything, defended by nothing
+
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece, checks aside,
 // and for a pinned piece only the squares along its pin -- rooks on open
@@ -332,6 +342,9 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
     int mg = 0, eg = 0;
     const uint64_t occupied = board.occupancy();
     const Pins pins[2] = {findPins(board, Color::White), findPins(board, Color::Black)};
+    uint64_t attackedBy[2] = {0, 0};      // every square each side's knights, bishops, rooks, queens attack
+    uint64_t attackedByMinor[2] = {0, 0}; // ... its knights and bishops
+    uint64_t attackedByRook[2] = {0, 0};  // ... its rooks
     for (int side = 0; side < 2; side++) {
         const Color color = side == 0 ? Color::White : Color::Black;
         const Color enemy = opponent(color);
@@ -355,6 +368,9 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
                     case PieceType::Rook: reach = bb::rookAttacks(sq, occupied); break;
                     default: reach = bb::queenAttacks(sq, occupied); break;
                 }
+                attackedBy[side] |= reach;
+                if (type == PieceType::Knight || type == PieceType::Bishop) attackedByMinor[side] |= reach;
+                else if (type == PieceType::Rook) attackedByRook[side] |= reach;
                 reach &= ~own;
                 // A pinned piece still attacks along every line (the king zone test
                 // below), but can only move along its pin.
@@ -390,6 +406,29 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
             }
         }
     }
+
+    // Threats against each side's pieces.
+    for (int side = 0; side < 2; side++) {
+        const Color color = side == 0 ? Color::White : Color::Black;
+        const Color enemy = opponent(color);
+        const int sign = side == 0 ? 1 : -1;
+        const uint64_t anyAttack =
+            attackedBy[side] | pawns.attacks[side] | bb::kingAttacks[board.kingFile(color) * 8 + board.kingRank(color)];
+        const uint64_t defended = attackedBy[1 - side] | pawns.attacks[1 - side] |
+                                  bb::kingAttacks[board.kingFile(enemy) * 8 + board.kingRank(enemy)];
+        int threat = 0;
+        for (int t = static_cast<int>(PieceType::Pawn); t <= static_cast<int>(PieceType::Queen); t++) {
+            const uint64_t victims = board.pieces(enemy, static_cast<PieceType>(t));
+            const uint64_t byPawn = victims & pawns.attacks[side];
+            const uint64_t byMinor = victims & attackedByMinor[side] & ~byPawn;
+            const uint64_t byRook = victims & attackedByRook[side] & ~byPawn & ~byMinor;
+            threat += kThreatPawn[t] * bb::popcount(byPawn) + kThreatMinor[t] * bb::popcount(byMinor) +
+                      kThreatRook[t] * bb::popcount(byRook) + kHanging[t] * bb::popcount(victims & anyAttack & ~defended);
+        }
+        mg += sign * threat;
+        eg += sign * threat;
+    }
+
     double phase = board.gamePhase();
     return static_cast<int>(mg * phase + eg * (1.0 - phase));
 }
