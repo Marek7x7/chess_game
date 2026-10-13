@@ -7,6 +7,7 @@
 #include <ostream>
 #include <random>
 
+#include "bitboard.hpp"
 #include "tune.hpp"
 
 namespace {
@@ -198,6 +199,45 @@ const ZobristKeys& zobrist() {
 
 } // namespace
 
+void Board::setSquare(int x, int y, Piece piece) {
+    const uint64_t b = bb::bit(x, y);
+    const Piece old = squares[x][y];
+    if (!old.isEmpty()) {
+        pieceBB[colorIndex(old.color)][static_cast<int>(old.type)] &= ~b;
+        occBB[colorIndex(old.color)] &= ~b;
+    }
+    if (!piece.isEmpty()) {
+        pieceBB[colorIndex(piece.color)][static_cast<int>(piece.type)] |= b;
+        occBB[colorIndex(piece.color)] |= b;
+    }
+    squares[x][y] = piece;
+}
+
+void Board::recomputeBitboards() {
+    for (auto& byColor : pieceBB)
+        for (uint64_t& b : byColor) b = 0;
+    occBB[0] = occBB[1] = 0;
+    for (int x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            const Piece& p = squares[x][y];
+            if (p.isEmpty()) continue;
+            pieceBB[colorIndex(p.color)][static_cast<int>(p.type)] |= bb::bit(x, y);
+            occBB[colorIndex(p.color)] |= bb::bit(x, y);
+        }
+    }
+}
+
+bool Board::bitboardsConsistent() const {
+    Board copy = *this;
+    copy.recomputeBitboards();
+    for (int c = 0; c < 2; c++) {
+        if (copy.occBB[c] != occBB[c]) return false;
+        for (int t = 0; t < 7; t++)
+            if (copy.pieceBB[c][t] != pieceBB[c][t]) return false;
+    }
+    return true;
+}
+
 Board::Board() {
     for (int x = 0; x < 8; x++)
         for (int y = 0; y < 8; y++)
@@ -220,6 +260,7 @@ Board::Board() {
     enPassantX = -1;
     enPassantY = -1;
 
+    recomputeBitboards();
     recomputeHash();
     recomputeEval();
 }
@@ -395,6 +436,7 @@ Board Board::fromFEN(const std::string& fen) {
         board.halfmoveCount = std::atoi(nextField().c_str());
     }
 
+    board.recomputeBitboards();
     board.recomputeHash();
     board.recomputeEval();
     return board;
@@ -709,7 +751,7 @@ void Board::makeMove(const Move& m) {
         togglePiece(capturedPawn.color, capturedPawn.type, m.toX, m.fromY);
         removeEval(capturedPawn.color, capturedPawn.type, m.toX, m.fromY);
         phaseUnits -= phaseValue(capturedPawn.type);
-        squares[m.toX][m.fromY] = Piece{};
+        setSquare(m.toX, m.fromY, Piece{});
     } else if (!captured.isEmpty()) {
         togglePiece(captured.color, captured.type, m.toX, m.toY);
         removeEval(captured.color, captured.type, m.toX, m.toY);
@@ -723,21 +765,21 @@ void Board::makeMove(const Move& m) {
             togglePiece(color, PieceType::Rook, 5, homeY);
             removeEval(color, PieceType::Rook, 7, homeY);
             addEval(color, PieceType::Rook, 5, homeY);
-            squares[5][homeY] = squares[7][homeY];
-            squares[7][homeY] = Piece{};
+            setSquare(5, homeY, squares[7][homeY]);
+            setSquare(7, homeY, Piece{});
         } else {
             togglePiece(color, PieceType::Rook, 0, homeY);
             togglePiece(color, PieceType::Rook, 3, homeY);
             removeEval(color, PieceType::Rook, 0, homeY);
             addEval(color, PieceType::Rook, 3, homeY);
-            squares[3][homeY] = squares[0][homeY];
-            squares[0][homeY] = Piece{};
+            setSquare(3, homeY, squares[0][homeY]);
+            setSquare(0, homeY, Piece{});
         }
     }
 
-    squares[m.toX][m.toY] = moving;
-    squares[m.fromX][m.fromY] = Piece{};
-    if (m.promotion != PieceType::None) squares[m.toX][m.toY].type = m.promotion;
+    setSquare(m.toX, m.toY, moving);
+    setSquare(m.fromX, m.fromY, Piece{});
+    if (m.promotion != PieceType::None) setSquare(m.toX, m.toY, Piece{m.promotion, color});
     togglePiece(color, squares[m.toX][m.toY].type, m.toX, m.toY);
     addEval(color, squares[m.toX][m.toY].type, m.toX, m.toY);
     if (m.promotion != PieceType::None) phaseUnits += phaseValue(m.promotion);
@@ -808,24 +850,24 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     Color enemy = opponent(color);
 
     if (m.isEnPassant) {
-        squares[m.toX][m.toY] = Piece{};
-        squares[m.toX][m.fromY] = Piece{PieceType::Pawn, enemy};
+        setSquare(m.toX, m.toY, Piece{});
+        setSquare(m.toX, m.fromY, Piece{PieceType::Pawn, enemy});
     } else if (m.captured != PieceType::None) {
-        squares[m.toX][m.toY] = Piece{m.captured, enemy};
+        setSquare(m.toX, m.toY, Piece{m.captured, enemy});
     } else {
-        squares[m.toX][m.toY] = Piece{};
+        setSquare(m.toX, m.toY, Piece{});
     }
 
-    squares[m.fromX][m.fromY] = Piece{undo.movedType, color};
+    setSquare(m.fromX, m.fromY, Piece{undo.movedType, color});
 
     if (m.isCastle) {
         int homeY = m.fromY;
         if (m.toX == 6) {
-            squares[7][homeY] = Piece{PieceType::Rook, color};
-            squares[5][homeY] = Piece{};
+            setSquare(7, homeY, Piece{PieceType::Rook, color});
+            setSquare(5, homeY, Piece{});
         } else {
-            squares[0][homeY] = Piece{PieceType::Rook, color};
-            squares[3][homeY] = Piece{};
+            setSquare(0, homeY, Piece{PieceType::Rook, color});
+            setSquare(3, homeY, Piece{});
         }
     }
 
@@ -892,23 +934,23 @@ void Board::makeMoveLight(const Move& m, LightUndo& undo) {
         // The captured pawn is NOT on the destination square -- it's on the
         // same file as the destination but the same rank the capturing
         // pawn started on.
-        squares[m.toX][m.fromY] = Piece{};
+        setSquare(m.toX, m.fromY, Piece{});
     } else if (m.isCastle) {
         int homeY = m.fromY;
         if (m.toX == 6) {
-            squares[5][homeY] = squares[7][homeY];
-            squares[7][homeY] = Piece{};
+            setSquare(5, homeY, squares[7][homeY]);
+            setSquare(7, homeY, Piece{});
         } else {
-            squares[3][homeY] = squares[0][homeY];
-            squares[0][homeY] = Piece{};
+            setSquare(3, homeY, squares[0][homeY]);
+            setSquare(0, homeY, Piece{});
         }
     }
     // Ordinary captures need no extra step: squares[m.toX][m.toY] below
     // simply overwrites whatever was there.
 
-    squares[m.toX][m.toY] = moving;
-    squares[m.fromX][m.fromY] = Piece{};
-    if (m.promotion != PieceType::None) squares[m.toX][m.toY].type = m.promotion;
+    setSquare(m.toX, m.toY, moving);
+    setSquare(m.fromX, m.fromY, Piece{});
+    if (m.promotion != PieceType::None) setSquare(m.toX, m.toY, Piece{m.promotion, color});
 
     if (moving.type == PieceType::King) {
         int ci = colorIndex(color);
@@ -922,24 +964,24 @@ void Board::unmakeMoveLight(const Move& m, const LightUndo& undo) {
     Color enemy = opponent(color);
 
     if (m.isEnPassant) {
-        squares[m.toX][m.toY] = Piece{};
-        squares[m.toX][m.fromY] = Piece{PieceType::Pawn, enemy};
+        setSquare(m.toX, m.toY, Piece{});
+        setSquare(m.toX, m.fromY, Piece{PieceType::Pawn, enemy});
     } else if (m.captured != PieceType::None) {
-        squares[m.toX][m.toY] = Piece{m.captured, enemy};
+        setSquare(m.toX, m.toY, Piece{m.captured, enemy});
     } else {
-        squares[m.toX][m.toY] = Piece{};
+        setSquare(m.toX, m.toY, Piece{});
     }
 
-    squares[m.fromX][m.fromY] = Piece{undo.movedType, color};
+    setSquare(m.fromX, m.fromY, Piece{undo.movedType, color});
 
     if (m.isCastle) {
         int homeY = m.fromY;
         if (m.toX == 6) {
-            squares[7][homeY] = Piece{PieceType::Rook, color};
-            squares[5][homeY] = Piece{};
+            setSquare(7, homeY, Piece{PieceType::Rook, color});
+            setSquare(5, homeY, Piece{});
         } else {
-            squares[0][homeY] = Piece{PieceType::Rook, color};
-            squares[3][homeY] = Piece{};
+            setSquare(0, homeY, Piece{PieceType::Rook, color});
+            setSquare(3, homeY, Piece{});
         }
     }
 

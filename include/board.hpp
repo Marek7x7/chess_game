@@ -20,6 +20,15 @@ public:
     static Board fromFEN(const std::string& fen);
 
     Piece at(int x, int y) const { return squares[x][y]; }
+
+    // Bitboards (see bitboard.hpp) of where `color`'s pieces of a type stand, of
+    // all of one color's pieces, and of every piece. Kept in step with squares[][]
+    // by setSquare(), the only place a square is written.
+    uint64_t pieces(Color color, PieceType type) const { return pieceBB[colorIndex(color)][static_cast<int>(type)]; }
+    uint64_t occupancy(Color color) const { return occBB[colorIndex(color)]; }
+    uint64_t occupancy() const { return occBB[0] | occBB[1]; }
+    // Verification only: do the bitboards match squares[][]?
+    bool bitboardsConsistent() const;
     Color sideToMove() const { return turn; }
     int kingFile(Color c) const { return kingX[colorIndex(c)]; }
     int kingRank(Color c) const { return kingY[colorIndex(c)]; }
@@ -129,6 +138,8 @@ public:
 
 private:
     Piece squares[8][8];
+    uint64_t pieceBB[2][7]; // [color][PieceType]; index 0 (None) is unused
+    uint64_t occBB[2];      // [color]
     Color turn;
     bool castleKingside[2];
     bool castleQueenside[2];
@@ -149,6 +160,8 @@ private:
 
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 
+    void setSquare(int x, int y, Piece piece); // writes squares[x][y] and both bitboards
+    void recomputeBitboards();
     void recomputeHash();
     void computeHashes(uint64_t& full, uint64_t& pawns) const;
     void recomputeEval();

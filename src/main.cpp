@@ -126,6 +126,10 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
         mismatches++;
         std::fprintf(stderr, "HASH MISMATCH at depth=%d\n", depth);
     }
+    if (!board.bitboardsConsistent()) {
+        mismatches++;
+        std::fprintf(stderr, "BITBOARD MISMATCH at depth=%d\n", depth);
+    }
     if (depth == 0) return 1;
     long long nodes = 0;
     for (const Move& m : board.legalMoves(color)) {
