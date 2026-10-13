@@ -54,7 +54,9 @@ public:
     uint64_t hashKeyFromScratch() const;
     uint64_t pawnKeyFromScratch() const;
 
-    static bool inBounds(int x, int y) { return x >= 0 && x < 8 && y >= 0 && y < 8; }
+    // One unsigned compare: a negative coordinate sets the sign bit of x | y, and
+    // one that is 8 or more sets a bit above the low three.
+    static bool inBounds(int x, int y) { return static_cast<unsigned>(x | y) < 8u; }
 
     // All moves for `color` that don't leave that color's own king in check.
     MoveList legalMoves(Color color) const;
