@@ -412,9 +412,6 @@ struct SearchContext {
     std::vector<uint64_t> path;
 };
 
-// History scores stay inside +-kHistoryMax (below the killer scores in moveScore).
-constexpr int kHistoryMax = 60'000;
-
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
 
 // Score used to order moves before searching them: TT move first, then
@@ -772,8 +769,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     Move bestMove = moves.front();
     int best = INT_MIN;
     int moveIndex = 0;
-    Move triedQuiets[64];
-    int numTriedQuiets = 0;
     ctx.path.push_back(key); // popped below; a TimeUp unwind leaves it, see searchWindow
     for (const Move& m : moves) {
         Board::UndoState undo;
@@ -842,19 +837,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                     ctx.killers[ply][1] = ctx.killers[ply][0];
                     ctx.killers[ply][0] = m;
                 }
-                // Reward the cutoff move, and penalise the quiet moves that were
-                // tried first and failed to cut.
-                auto bump = [&](const Move& q, int delta) {
-                    int& h = ctx.history[colorIdx(color)][q.fromX][q.fromY][q.toX][q.toY];
-                    h = std::clamp(h + delta, -kHistoryMax, kHistoryMax);
-                };
-                bump(m, depth * depth);
-                for (int i = 0; i < numTriedQuiets; i++) bump(triedQuiets[i], -depth * depth);
+                ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY] += depth * depth;
             }
             break;
         }
-        if (m.captured == PieceType::None && m.promotion == PieceType::None && numTriedQuiets < 64)
-            triedQuiets[numTriedQuiets++] = m;
     }
     ctx.path.pop_back();
 
