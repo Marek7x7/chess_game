@@ -384,9 +384,23 @@ int kingSafety(const Board& board, const PawnInfo& pawns, const KingAttack (&att
     return static_cast<int>(mg * board.gamePhase());
 }
 
+// Mating material: enough that the side could checkmate a lone king with its
+// king's help -- a queen or a rook, two bishops, or a bishop and a knight.
+// Without it (a lone king, king and one minor piece, king and two knights) it
+// has no forced mate however far ahead it looks.
+bool hasMatingMaterial(const Board& board, Color color) {
+    if (board.pieces(color, PieceType::Queen) | board.pieces(color, PieceType::Rook)) return true;
+    const int bishops = bb::popcount(board.pieces(color, PieceType::Bishop));
+    return bishops >= 2 || (bishops == 1 && board.pieces(color, PieceType::Knight));
+}
+
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
     const PawnInfo& pawns = probePawns(board);
+    // A dead draw: no pawns and neither side can mate.
+    if (!(pawns.pawns[0] | pawns.pawns[1]) && !hasMatingMaterial(board, Color::White) &&
+        !hasMatingMaterial(board, Color::Black))
+        return 0;
     double phase = board.gamePhase();
     KingAttack attacks[2]; // on White's king, on Black's king
     int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
