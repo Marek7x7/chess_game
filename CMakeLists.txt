@@ -29,6 +29,14 @@ if(CHESS_NATIVE_ARCH AND NOT MSVC)
     add_compile_options(-march=native)
 endif()
 
+# Link-time optimisation for release builds (inlines across source files, e.g.
+# pieceValue() into the move-ordering code) when the toolchain supports it.
+include(CheckIPOSupported)
+check_ipo_supported(RESULT CHESS_IPO_OK OUTPUT CHESS_IPO_MESSAGE)
+if(CHESS_IPO_OK)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
+
 # Find the SDL2 dependency portably
 find_package(SDL2 REQUIRED)
 
