@@ -108,6 +108,7 @@ struct PawnInfo {
     uint64_t pawns[2];      // [White, Black] pawn squares, as squareBit()s
     uint64_t attacks[2];    // squares each side's pawns attack
     uint64_t attackSpan[2]; // squares each side's pawns could ever attack by advancing
+    uint64_t passed[2];     // each side's passed pawns
 };
 
 bool fileHasPawn(const PawnInfo& info, int side, int x) { return (info.pawns[side] >> (x * 8)) & kFileMask; }
@@ -122,7 +123,7 @@ void computePawnInfo(const Board& board, PawnInfo& info) {
     std::fill(std::begin(whiteLowest), std::end(whiteLowest), 8);
     std::fill(std::begin(blackHighest), std::end(blackHighest), -1);
     int count[2][8] = {}; // [White, Black] pawns per file
-    for (int side = 0; side < 2; side++) info.pawns[side] = info.attacks[side] = info.attackSpan[side] = 0;
+    for (int side = 0; side < 2; side++) info.pawns[side] = info.attacks[side] = info.attackSpan[side] = info.passed[side] = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 1; y < 7; y++) {
             Piece p = board.at(x, y);
@@ -174,6 +175,7 @@ void computePawnInfo(const Board& board, PawnInfo& info) {
                 if (p.color == Color::White ? blackHighest[f] > y : whiteLowest[f] < y) passed = false;
             }
             if (!passed) continue;
+            info.passed[side] |= squareBit(x, y);
             int rank = p.color == Color::White ? y : 7 - y;
             int sign = p.color == Color::White ? 1 : -1;
             mg += sign * kPassedMg[rank];
@@ -394,6 +396,38 @@ bool hasMatingMaterial(const Board& board, Color color) {
     return bishops >= 2 || (bishops == 1 && board.pieces(color, PieceType::Knight));
 }
 
+// A rook behind a passed pawn, either side's (the rook's owner gains): from
+// behind it keeps supporting (or attacking) the pawn all the way to the
+// queening square. Middlegame / endgame.
+TUNE_INT(kRookBehindPasserMg, 5);
+TUNE_INT(kRookBehindPasserEg, 20);
+
+// Positive = good for White.
+int rookBehindPasser(const Board& board, const PawnInfo& pawns) {
+    int mg = 0, eg = 0;
+    for (int side = 0; side < 2; side++) {
+        const int dir = side == 0 ? 1 : -1;
+        uint64_t passers = pawns.passed[side];
+        while (passers) {
+            const int sq = bb::lsb(passers);
+            passers = bb::clearLsb(passers);
+            const int x = sq / 8, y = sq % 8;
+            for (int ry = y - dir; ry >= 0 && ry <= 7; ry -= dir) {
+                const Piece q = board.at(x, ry);
+                if (q.isEmpty()) continue;
+                if (q.type == PieceType::Rook) {
+                    const int rookSign = q.color == Color::White ? 1 : -1;
+                    mg += rookSign * kRookBehindPasserMg;
+                    eg += rookSign * kRookBehindPasserEg;
+                }
+                break;
+            }
+        }
+    }
+    const double phase = board.gamePhase();
+    return static_cast<int>(mg * phase + eg * (1.0 - phase));
+}
+
 // Mop-up: against a bare king, a side with mating material wins by driving
 // the king to the edge (to a corner of the bishop's colour with bishop and
 // knight) and bringing its own king close, which nothing else in the
@@ -446,6 +480,7 @@ int evaluate(const Board& board, Color color) {
     KingAttack attacks[2]; // on White's king, on Black's king
     int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
                 pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns) +
+                rookBehindPasser(board, pawns) +
                 (board.sideToMove() == Color::White ? kTempo : -kTempo);
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
