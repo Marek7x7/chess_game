@@ -779,8 +779,12 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         Board::UndoState undo;
         board.makeMove(m, undo);
 
-        if (futile && moveIndex > 0 && m.captured == PieceType::None && m.promotion == PieceType::None &&
-            !board.isInCheck(opponent(color))) {
+        // Late-move pruning: at shallow depth in a non-PV node, the quiet moves
+        // ordered after the first few are very unlikely to matter.
+        bool lateQuiet = !pvNode && !inCheck && depth <= 3 && moveIndex >= 4 + depth * depth &&
+                         best > -kMateThreshold && m.captured == PieceType::None && m.promotion == PieceType::None;
+        if (((futile && moveIndex > 0) || lateQuiet) && m.captured == PieceType::None &&
+            m.promotion == PieceType::None && !board.isInCheck(opponent(color))) {
             board.unmakeMove(m, undo);
             moveIndex++;
             continue;
