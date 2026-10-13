@@ -2,7 +2,8 @@
 
 #include <atomic>
 #include <cstdint>
-#include <vector>
+#include <cstdlib>
+#include <memory>
 
 #include "move.hpp"
 
@@ -54,7 +55,12 @@ private:
     };
     static_assert(sizeof(Slot) == kEntryBytes, "kEntryBytes must match the slot layout");
 
-    std::vector<Slot> table;
+    // Cache-line aligned: a bucket is 32 bytes, so with only the allocator's
+    // 16-byte alignment half the buckets would straddle two cache lines.
+    struct FreeDeleter {
+        void operator()(void* p) const { std::free(p); }
+    };
+    std::unique_ptr<Slot[], FreeDeleter> table;
     size_t bucketMask; // slot index of a key's bucket = key & bucketMask (always even)
     uint64_t generation = 0;
 };

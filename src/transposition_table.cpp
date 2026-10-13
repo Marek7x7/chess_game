@@ -1,6 +1,7 @@
 #include "transposition_table.hpp"
 
 #include <algorithm>
+#include <new>
 #include <stdexcept>
 
 namespace {
@@ -40,11 +41,15 @@ TTEntry unpack(uint64_t key, uint64_t data) {
 
 } // namespace
 
-TranspositionTable::TranspositionTable(size_t sizePowerOfTwo)
-    : table(sizePowerOfTwo), bucketMask((sizePowerOfTwo - 1) & ~size_t(1)) {
+TranspositionTable::TranspositionTable(size_t sizePowerOfTwo) : bucketMask((sizePowerOfTwo - 1) & ~size_t(1)) {
     if (sizePowerOfTwo < 2 || (sizePowerOfTwo & (sizePowerOfTwo - 1)) != 0) {
         throw std::invalid_argument("TranspositionTable: sizePowerOfTwo must be a power of two, at least 2");
     }
+    size_t bytes = (sizePowerOfTwo * sizeof(Slot) + 63) & ~size_t(63); // aligned_alloc wants a multiple of 64
+    void* memory = std::aligned_alloc(64, bytes);
+    if (!memory) throw std::bad_alloc();
+    table.reset(static_cast<Slot*>(memory));
+    for (size_t i = 0; i < sizePowerOfTwo; i++) new (&table[i]) Slot();
 }
 
 bool TranspositionTable::probe(uint64_t key, TTEntry& out) const {
