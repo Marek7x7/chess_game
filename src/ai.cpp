@@ -4,6 +4,7 @@
 #include <array>
 #include <chrono>
 #include <climits>
+#include <cstring>
 #include <cmath>
 #include <cstdlib>
 #include <cstdint>
@@ -447,9 +448,20 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
 
 void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx,
                  int ply, Color color) {
-    std::sort(moves.begin(), moves.end(), [&](const Move& a, const Move& b) {
-        return moveScore(board, a, ttMove, ctx, ply, color) > moveScore(board, b, ttMove, ctx, ply, color);
-    });
+    // Score each move once, sort the small (score, index) pairs, then permute
+    // the moves. Sorting the moves directly re-scored them on every comparison;
+    // the comparison results are the same, so the order is too.
+    struct Scored {
+        int score;
+        int index;
+    };
+    Scored scored[MoveList::kCapacity];
+    const int n = static_cast<int>(moves.size());
+    for (int i = 0; i < n; i++) scored[i] = {moveScore(board, moves[i], ttMove, ctx, ply, color), i};
+    std::sort(scored, scored + n, [](const Scored& a, const Scored& b) { return a.score > b.score; });
+    alignas(Move) unsigned char sorted[MoveList::kCapacity * sizeof(Move)];
+    for (int i = 0; i < n; i++) std::memcpy(sorted + i * sizeof(Move), &moves[scored[i].index], sizeof(Move));
+    std::memcpy(moves.begin(), sorted, n * sizeof(Move));
 }
 
 // ---------------------------------------------------------------------
