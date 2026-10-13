@@ -43,3 +43,16 @@ target_include_directories(chess PRIVATE include)
 
 # Link SDL2 portably
 target_link_libraries(chess PRIVATE SDL2::SDL2)
+
+# Texel tuner for the evaluation weights (tools/tune.cpp). Not part of the
+# default build: cmake --build <dir> --target chess_tune. Compiled with
+# -DTUNING so every TUNE_ weight is a registered, mutable variable.
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    set(TUNE_SRC ${SRC_FILES})
+    list(FILTER TUNE_SRC EXCLUDE REGEX ".*/(main|gui)\\.cpp$")
+    add_executable(chess_tune EXCLUDE_FROM_ALL ${TUNE_SRC} tools/tune.cpp)
+    target_include_directories(chess_tune PRIVATE include)
+    target_compile_definitions(chess_tune PRIVATE TUNING)
+    target_link_libraries(chess_tune PRIVATE OpenMP::OpenMP_CXX)
+endif()
