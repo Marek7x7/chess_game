@@ -102,6 +102,7 @@ struct PawnInfo {
     uint64_t pawns[2];      // [White, Black] pawn squares, as squareBit()s
     uint64_t attacks[2];    // squares each side's pawns attack
     uint64_t attackSpan[2]; // squares each side's pawns could ever attack by advancing
+    uint64_t passed[2];     // each side's passed pawns
 };
 
 bool fileHasPawn(const PawnInfo& info, int side, int x) { return (info.pawns[side] >> (x * 8)) & kFileMask; }
@@ -116,7 +117,7 @@ void computePawnInfo(const Board& board, PawnInfo& info) {
     std::fill(std::begin(whiteLowest), std::end(whiteLowest), 8);
     std::fill(std::begin(blackHighest), std::end(blackHighest), -1);
     int count[2][8] = {}; // [White, Black] pawns per file
-    for (int side = 0; side < 2; side++) info.pawns[side] = info.attacks[side] = info.attackSpan[side] = 0;
+    for (int side = 0; side < 2; side++) info.pawns[side] = info.attacks[side] = info.attackSpan[side] = info.passed[side] = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 1; y < 7; y++) {
             Piece p = board.at(x, y);
@@ -168,6 +169,7 @@ void computePawnInfo(const Board& board, PawnInfo& info) {
                 if (p.color == Color::White ? blackHighest[f] > y : whiteLowest[f] < y) passed = false;
             }
             if (!passed) continue;
+            info.passed[side] |= squareBit(x, y);
             int rank = p.color == Color::White ? y : 7 - y;
             int sign = p.color == Color::White ? 1 : -1;
             mg += sign * kPassedMg[rank];
@@ -279,6 +281,36 @@ void findPins(const Board& board, Color color, int8_t (&pinDir)[8][8]) {
             break;
         }
     }
+}
+
+// Rook behind a passed pawn, either side's (the rook's owner gains): from
+// behind, the rook keeps supporting (or attacking) the pawn all the way to
+// the queening square. Middlegame / endgame.
+constexpr int kRookBehindPasserMg = 5, kRookBehindPasserEg = 20;
+
+// Positive = good for White.
+int passedPawnTerms(const Board& board, const PawnInfo& pawns) {
+    int mg = 0, eg = 0;
+    for (int side = 0; side < 2; side++) {
+        int dir = side == 0 ? 1 : -1;
+        for (int x = 0; x < 8; x++) {
+            for (int y = 1; y < 7; y++) {
+                if (!(pawns.passed[side] & squareBit(x, y))) continue;
+                for (int ry = y - dir; ry >= 0 && ry <= 7; ry -= dir) {
+                    Piece q = board.at(x, ry);
+                    if (q.isEmpty()) continue;
+                    if (q.type == PieceType::Rook) {
+                        int rs = q.color == Color::White ? 1 : -1;
+                        mg += rs * kRookBehindPasserMg;
+                        eg += rs * kRookBehindPasserEg;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    double phase = board.gamePhase();
+    return static_cast<int>(mg * phase + eg * (1.0 - phase));
 }
 
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
@@ -413,7 +445,7 @@ int evaluate(const Board& board, Color color) {
     double phase = board.gamePhase();
     KingAttack attacks[2]; // on White's king, on Black's king
     int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
-                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks);
+                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + passedPawnTerms(board, pawns);
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
