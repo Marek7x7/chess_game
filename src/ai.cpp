@@ -994,7 +994,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // unwind only ever stops at searchRootFull's catch, which never reads
     // `board` again.
     constexpr int kNullMoveMinDepth = 3;
-    constexpr int kNullMoveReduction = 2;
+    const int nullMoveReduction = 3 + depth / 6; // deeper nodes can afford to cut deeper
     // Only at a non-PV node whose static eval already reaches beta: where it
     // doesn't, passing is unlikely to hold the score, and the search it costs is wasted.
     if (haveStaticEval && staticEval >= beta && depth >= kNullMoveMinDepth && beta < kMateThreshold &&
@@ -1002,7 +1002,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         Board::NullMoveUndo nu;
         board.makeNullMove(nu);
         int nullScore =
-            -negamax(board, depth - 1 - kNullMoveReduction, ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
+            -negamax(board, depth - 1 - nullMoveReduction, ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
         board.unmakeNullMove(nu);
         if (nullScore >= beta) return beta;
     }
