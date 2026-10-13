@@ -662,13 +662,19 @@ int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
 // History scores stay below the killer moves' (79'000 and 80'000) in moveScore().
 constexpr int kHistoryMax = 60'000;
 
+bool seeNonNegative(const Board& board, const Move& m); // below
+
 // Score used to order moves before searching them: TT move first, then
 // captures via MVV-LVA, then promotions, then killer moves, then history.
+// With `seeOrder`, a capture that loses material once the exchange plays out
+// goes after all the quiet moves instead of before them.
 int moveScore(const Board& board, const Move& m, const Move& ttMove, const SearchContext& ctx, int ply,
-              Color color) {
+              Color color, bool seeOrder = false) {
     if (sameMove(m, ttMove)) return 1'000'000;
     if (m.captured != PieceType::None) {
-        return 100'000 + pieceValue(m.captured) * 10 - pieceValue(board.at(m.fromX, m.fromY).type);
+        const int mvvLva = pieceValue(m.captured) * 10 - pieceValue(board.at(m.fromX, m.fromY).type);
+        if (seeOrder && m.promotion == PieceType::None && !seeNonNegative(board, m)) return -50'000 + mvvLva;
+        return 100'000 + mvvLva;
     }
     if (m.promotion == PieceType::Queen) return 90'000;
     if (ply < kMaxPly) {
@@ -679,7 +685,7 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
 }
 
 void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx,
-                 int ply, Color color) {
+                 int ply, Color color, bool seeOrder = false) {
     // Score each move once, sort the small (score, index) pairs, then permute
     // the moves. Sorting the moves directly re-scored them on every comparison;
     // the comparison results are the same, so the order is too.
@@ -689,7 +695,7 @@ void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const S
     };
     Scored scored[MoveList::kCapacity];
     const int n = static_cast<int>(moves.size());
-    for (int i = 0; i < n; i++) scored[i] = {moveScore(board, moves[i], ttMove, ctx, ply, color), i};
+    for (int i = 0; i < n; i++) scored[i] = {moveScore(board, moves[i], ttMove, ctx, ply, color, seeOrder), i};
     std::sort(scored, scored + n, [](const Scored& a, const Scored& b) { return a.score > b.score; });
     alignas(Move) unsigned char sorted[MoveList::kCapacity * sizeof(Move)];
     for (int i = 0; i < n; i++) std::memcpy(sorted + i * sizeof(Move), &moves[scored[i].index], sizeof(Move));
@@ -1015,7 +1021,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         if (inCheck) return -(kMateScore - ply);
         return 0; // stalemate
     }
-    orderMoves(board, moves, ttMove, ctx, ply, color);
+    orderMoves(board, moves, ttMove, ctx, ply, color, true);
 
     constexpr int kLmrStartIndex = 4; // first 4 moves (index 0-3) always searched at full depth
     constexpr int kLmrMinDepth = 3;
