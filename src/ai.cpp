@@ -956,12 +956,8 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     bool pvNode = beta - alpha > 1; // searched with an open window: its exact score matters
     Move ttMove{};
     TTEntry ttEntry;
-    bool haveTTMove = false;
     if (ctx.tt.probe(key, ttEntry)) {
-        if (ttEntry.hasMove) {
-            ttMove = ttEntry.best;
-            haveTTMove = true;
-        }
+        if (ttEntry.hasMove) ttMove = ttEntry.best;
         if (ttEntry.depth >= depth) {
             int score = fromTT(ttEntry.score, ply);
             if (ttEntry.flag == TTFlag::Exact) return score;
@@ -970,13 +966,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             if (alpha >= beta) return score;
         }
     }
-
-    // Internal iterative reduction: with no stored best move to try first the
-    // move ordering is blind, so a deep search of this node is mostly wasted;
-    // search it one ply shallower now, and the result will name a move for the
-    // next iteration.
-    constexpr int kIirMinDepth = 6;
-    if (!haveTTMove && depth >= kIirMinDepth) depth--;
 
     // The static eval, for the pruning decisions below -- only computed where
     // one of them can apply, since it isn't free.
