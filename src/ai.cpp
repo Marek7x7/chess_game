@@ -659,6 +659,12 @@ struct SearchContext {
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
 
+// Contempt: a draw is worth a little less than an equal position to the side
+// that started the search, so it is avoided when the position is slightly
+// better and accepted when worse. `ply` even = the side to move at the root.
+constexpr int kContempt = 12;
+int drawScore(int ply) { return (ply & 1) ? kContempt : -kContempt; }
+
 // History scores stay below the killer moves' (79'000 and 80'000) in moveScore().
 constexpr int kHistoryMax = 60'000;
 
@@ -939,9 +945,9 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // is scored as a draw: repeating once more is always available to the
     // side it suits, so the true value is at best a draw either way.
     uint64_t key = board.hashKey();
-    if (std::find(ctx.path.begin(), ctx.path.end(), key) != ctx.path.end()) return 0;
+    if (std::find(ctx.path.begin(), ctx.path.end(), key) != ctx.path.end()) return drawScore(ply);
     // Fifty-move rule: 100 plies without a capture or pawn move is a draw.
-    if (board.halfmoveClock() >= 100) return 0;
+    if (board.halfmoveClock() >= 100) return drawScore(ply);
 
     // Mate distance pruning: nothing from here can beat mating right at
     // this ply or be worse than being mated at the next, so a window
@@ -1019,7 +1025,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     MoveList moves = board.legalMoves(color);
     if (moves.empty()) {
         if (inCheck) return -(kMateScore - ply);
-        return 0; // stalemate
+        return drawScore(ply); // stalemate
     }
     orderMoves(board, moves, ttMove, ctx, ply, color, true);
 
