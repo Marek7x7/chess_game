@@ -288,11 +288,21 @@ void findPins(const Board& board, Color color, int8_t (&pinDir)[8][8]) {
 // the queening square. Middlegame / endgame.
 constexpr int kRookBehindPasserMg = 5, kRookBehindPasserEg = 20;
 
+// King distance to passed pawns, endgame only: per square of Chebyshev
+// distance, a passer is worth more the closer its own king is to the square
+// in front of it and the farther the enemy king is, scaled by how far the
+// pawn has advanced (rank counted from its own side).
+constexpr int kPasserKingEg[8] = {0, 0, 1, 2, 3, 4, 5, 0};
+
 // Positive = good for White.
 int passedPawnTerms(const Board& board, const PawnInfo& pawns) {
     int mg = 0, eg = 0;
     for (int side = 0; side < 2; side++) {
+        int sign = side == 0 ? 1 : -1;
+        Color color = side == 0 ? Color::White : Color::Black;
         int dir = side == 0 ? 1 : -1;
+        int okx = board.kingFile(color), oky = board.kingRank(color);
+        int ekx = board.kingFile(opponent(color)), eky = board.kingRank(opponent(color));
         for (int x = 0; x < 8; x++) {
             for (int y = 1; y < 7; y++) {
                 if (!(pawns.passed[side] & squareBit(x, y))) continue;
@@ -306,6 +316,11 @@ int passedPawnTerms(const Board& board, const PawnInfo& pawns) {
                     }
                     break;
                 }
+                int rank = side == 0 ? y : 7 - y;
+                int stopY = y + dir;
+                int own = std::max(std::abs(okx - x), std::abs(oky - stopY));
+                int enemy = std::max(std::abs(ekx - x), std::abs(eky - stopY));
+                eg += sign * kPasserKingEg[rank] * (enemy - own);
             }
         }
     }
