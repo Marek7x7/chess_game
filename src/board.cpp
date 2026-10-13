@@ -580,60 +580,17 @@ MoveList Board::pseudoLegalMoves(Color color, bool noisyOnly) const {
 }
 
 bool Board::isSquareAttacked(int x, int y, Color byColor) const {
-    int pawnDir = (byColor == Color::White) ? 1 : -1;
-    int attackerY = y - pawnDir;
-    for (int dx : {-1, 1}) {
-        int ax = x + dx;
-        if (inBounds(ax, attackerY) && squares[ax][attackerY].type == PieceType::Pawn &&
-            squares[ax][attackerY].color == byColor)
-            return true;
-    }
-
-    for (auto& off : kKnightOffsets) {
-        int nx = x + off[0], ny = y + off[1];
-        if (inBounds(nx, ny) && squares[nx][ny].type == PieceType::Knight &&
-            squares[nx][ny].color == byColor)
-            return true;
-    }
-
-    for (int dx = -1; dx <= 1; dx++) {
-        for (int dy = -1; dy <= 1; dy++) {
-            if (dx == 0 && dy == 0) continue;
-            int nx = x + dx, ny = y + dy;
-            if (inBounds(nx, ny) && squares[nx][ny].type == PieceType::King &&
-                squares[nx][ny].color == byColor)
-                return true;
-        }
-    }
-
-    for (auto& dir : kBishopDirs) {
-        int nx = x + dir[0], ny = y + dir[1];
-        while (inBounds(nx, ny)) {
-            const Piece& p = squares[nx][ny];
-            if (!p.isEmpty()) {
-                if (p.color == byColor && (p.type == PieceType::Bishop || p.type == PieceType::Queen))
-                    return true;
-                break;
-            }
-            nx += dir[0];
-            ny += dir[1];
-        }
-    }
-
-    for (auto& dir : kRookDirs) {
-        int nx = x + dir[0], ny = y + dir[1];
-        while (inBounds(nx, ny)) {
-            const Piece& p = squares[nx][ny];
-            if (!p.isEmpty()) {
-                if (p.color == byColor && (p.type == PieceType::Rook || p.type == PieceType::Queen))
-                    return true;
-                break;
-            }
-            nx += dir[0];
-            ny += dir[1];
-        }
-    }
-
+    const int sq = x * 8 + y;
+    const int c = colorIndex(byColor);
+    const uint64_t occupied = occBB[0] | occBB[1];
+    // A pawn of byColor attacks (x, y) from where a pawn of the other color
+    // standing on (x, y) would attack.
+    if (bb::pawnAttacks[1 - c][sq] & pieceBB[c][static_cast<int>(PieceType::Pawn)]) return true;
+    if (bb::knightAttacks[sq] & pieceBB[c][static_cast<int>(PieceType::Knight)]) return true;
+    if (bb::kingAttacks[sq] & pieceBB[c][static_cast<int>(PieceType::King)]) return true;
+    const uint64_t queens = pieceBB[c][static_cast<int>(PieceType::Queen)];
+    if (bb::bishopAttacks(sq, occupied) & (pieceBB[c][static_cast<int>(PieceType::Bishop)] | queens)) return true;
+    if (bb::rookAttacks(sq, occupied) & (pieceBB[c][static_cast<int>(PieceType::Rook)] | queens)) return true;
     return false;
 }
 
