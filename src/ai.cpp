@@ -379,10 +379,34 @@ int kingAttackPenalty(const KingAttack& a) {
     return a.weight * kAttackerScalePercent[std::min(a.attackers, 7)] / 100;
 }
 
+// Pawn storm: enemy pawns advancing on the king's file and the two beside it
+// are the usual spearhead of an attack (most of all when the kings castled on
+// opposite wings). Penalty per such pawn by how many ranks it stands in front
+// of the king (1 = the next rank); pawns level with or behind the king count
+// for nothing.
+TUNE_ARR(kStormMg, 8, {0, 10, 25, 15, 8, 3, 0, 0});
+
+int pawnStormPenalty(const Board& board, const PawnInfo& pawns, Color color) {
+    const int kx = board.kingFile(color), ky = board.kingRank(color);
+    const int enemySide = color == Color::White ? 1 : 0;
+    int penalty = 0;
+    for (int x = std::max(0, kx - 1); x <= std::min(7, kx + 1); x++) {
+        uint64_t filePawns = (pawns.pawns[enemySide] >> (x * 8)) & 0xFF; // bit y: a pawn on rank y
+        while (filePawns) {
+            const int y = bb::lsb(filePawns);
+            filePawns = bb::clearLsb(filePawns);
+            const int ahead = color == Color::White ? y - ky : ky - y;
+            if (ahead >= 1) penalty += kStormMg[std::min(ahead, 7)];
+        }
+    }
+    return penalty;
+}
+
 // Positive = good for White. `attacks` comes from pieceTerms().
 int kingSafety(const Board& board, const PawnInfo& pawns, const KingAttack (&attacks)[2]) {
-    int mg = kingShelterPenalty(board, pawns, Color::Black) + kingAttackPenalty(attacks[1]) -
-             kingShelterPenalty(board, pawns, Color::White) - kingAttackPenalty(attacks[0]);
+    int mg = kingShelterPenalty(board, pawns, Color::Black) + kingAttackPenalty(attacks[1]) +
+             pawnStormPenalty(board, pawns, Color::Black) - kingShelterPenalty(board, pawns, Color::White) -
+             kingAttackPenalty(attacks[0]) - pawnStormPenalty(board, pawns, Color::White);
     return static_cast<int>(mg * board.gamePhase());
 }
 
