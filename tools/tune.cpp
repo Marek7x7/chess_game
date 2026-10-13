@@ -3,6 +3,7 @@
 //
 // Build: cmake --build build-tune --target chess_tune   (a -DTUNING build, where
 // every TUNE_INT / TUNE_ARR weight is a registered mutable variable).
+// Check: build-tune/chess_tune --symmetry pairs.csv   (static eval of a position and its mirror)
 // Run:   build-tune/chess_tune labels.csv [out.txt] [name,name,...] [K]
 //   labels.csv: header "game,fen,sf_cp_white", one quiet position per row.
 //   out.txt:    one line per weight, "NAME v0 v1 ...", the best-validation weights.
@@ -71,7 +72,29 @@ bool isValidationGame(const std::string& game) {
 
 } // namespace
 
+// --symmetry pairs.csv: each row "fen,mirrored fen" (colors swapped, board flipped,
+// side to move swapped); the static evaluations must be exact opposites.
+int checkSymmetry(const char* path) {
+    std::ifstream in(path);
+    std::string line;
+    std::getline(in, line); // header
+    int rows = 0, bad = 0;
+    while (std::getline(in, line)) {
+        std::vector<std::string> f = split(line, ',');
+        if (f.size() < 2) continue;
+        int a = tunerEvaluate(Board::fromFEN(f[0])), b = tunerEvaluate(Board::fromFEN(f[1]));
+        rows++;
+        if (a != -b) {
+            bad++;
+            if (bad <= 5) std::printf("ASYMMETRIC %d vs %d: %s\n", a, b, f[0].c_str());
+        }
+    }
+    std::printf("symmetry: %d of %d positions asymmetric\n", bad, rows);
+    return bad == 0 ? 0 : 1;
+}
+
 int main(int argc, char** argv) {
+    if (argc > 2 && std::string(argv[1]) == "--symmetry") return checkSymmetry(argv[2]);
     if (argc < 2) {
         std::fprintf(stderr, "usage: %s labels.csv [out.txt] [name,name,...]\n", argv[0]);
         return 1;
