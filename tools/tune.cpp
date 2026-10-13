@@ -4,18 +4,20 @@
 // Build: cmake --build build-tune --target chess_tune   (a -DTUNING build, where
 // every TUNE_INT / TUNE_ARR weight is a registered mutable variable).
 // Check: build-tune/chess_tune --symmetry pairs.csv   (static eval of a position and its mirror)
-// Run:   build-tune/chess_tune labels.csv [out.txt] [name,name,...] [K]
+// Run:   build-tune/chess_tune labels.csv [out.txt] [name,name,...|all] [K] [widen]
 //   labels.csv: header "game,fen,sf_cp_white", one quiet position per row.
 //   out.txt:    one line per weight, "NAME v0 v1 ...", the best-validation weights.
 //   names:      optional comma-separated subset of weights to tune (default: all).
+//               "all" tunes everything.
 //   K:          optional sigmoid scale in centipawns (default 400 / ln 10).
+//   widen:      optional integer factor on all the bounds below (default 1).
 //
 // The loss is the mean squared difference between sigmoid(reference / K) and
 // sigmoid(ours / K) -- both mapped to a win-probability-like number, so a
 // position that is +9 pawns for the reference and +5 for us costs little
 // while +0.3 against -0.3 costs a lot.
 // Whole games go to either the training or the validation side. Each weight is
-// moved by +-step while that lowers the training loss (steps 8, 4, 2, 1), and
+// moved by +-step while that lowers the training loss (steps 16, 8, 4, 2, 1), and
 // the weights with the lowest validation loss seen are kept.
 
 #include <omp.h>
@@ -100,8 +102,9 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::string outPath = argc > 2 ? argv[2] : "tuned.txt";
+    int widen = argc > 5 ? std::atoi(argv[5]) : 1;
     std::set<std::string> only;
-    if (argc > 3)
+    if (argc > 3 && std::string(argv[3]) != "all")
         for (const std::string& n : split(argv[3], ',')) only.insert(n);
 
     std::vector<Sample> train, valid;
@@ -133,18 +136,24 @@ int main(int argc, char** argv) {
         // pin down stays plausible: between half and double (at least +-3), the
         // sign unchanged, and a weight that starts at 0 is an unused slot and
         // stays there. Piece-square tables are the exception: any square may move
-        // by up to 15 either way.
+        // by up to 15 either way, and material values by up to 40 (the pawn, the
+        // unit everything is measured in, stays at 100). `widen` scales all of it.
         bool table = std::string(p.name).find("Table") != std::string::npos;
+        bool material = std::string(p.name) == "kPieceValue";
         for (int i = 0; i < p.count; i++) {
             int v = p.values[i];
             int lo, hi;
-            if (table) {
-                lo = v - 15;
-                hi = v + 15;
+            if (material) {
+                lo = v - 40 * widen;
+                hi = v + 40 * widen;
+                if (i < 2 || v == 0) lo = hi = v;
+            } else if (table) {
+                lo = v - 15 * widen;
+                hi = v + 15 * widen;
             } else if (v == 0) {
                 lo = hi = 0;
             } else {
-                int a = std::max(std::abs(v) / 2, 3), b = std::max(std::abs(v), 3);
+                int a = std::max(std::abs(v) * widen / 2, 3 * widen), b = std::max(std::abs(v) * widen, 3 * widen);
                 lo = v > 0 ? std::max(1, v - a) : v - b;
                 hi = v > 0 ? v + b : std::min(-1, v + a);
             }
@@ -176,7 +185,7 @@ int main(int argc, char** argv) {
     double bestValidSeen = startValid;
     int sinceImprovement = 0;
 
-    for (int step : {8, 4, 2, 1}) {
+    for (int step : {16, 8, 4, 2, 1}) {
         for (int sweep = 0; sweep < 40; sweep++) {
             int accepted = 0;
             for (Slot& s : slots) {
