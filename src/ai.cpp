@@ -327,10 +327,10 @@ Pins findPins(const Board& board, Color color) {
 // an exchange; one attacked and not defended at all can simply be taken. Each
 // attacked piece counts once, at the cheapest kind of attacker (pawn, then
 // minor piece, then rook).
-TUNE_ARR(kThreatPawn, 7, {0, 0, 45, 45, 55, 65, 0});
-TUNE_ARR(kThreatMinor, 7, {0, 5, 20, 20, 35, 45, 0});
-TUNE_ARR(kThreatRook, 7, {0, 3, 15, 15, 0, 40, 0});
-TUNE_ARR(kHanging, 7, {0, 8, 15, 15, 20, 25, 0}); // attacked by anything, defended by nothing
+TUNE_ARR(kThreatPawn, 7, {0, 0, 40, 43, 40, 39, 0});
+TUNE_ARR(kThreatMinor, 7, {0, 1, 25, 39, 41, 45, 0});
+TUNE_ARR(kThreatRook, 7, {0, 1, 8, 15, 0, 40, 0});
+TUNE_ARR(kHanging, 7, {0, 24, 23, 21, 20, 2, 0}); // attacked by anything, defended by nothing
 
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece, checks aside,
