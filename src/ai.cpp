@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include "bitboard.hpp"
 #include "opening_book.hpp"
 #include "transposition_table.hpp"
 #include "tune.hpp"
@@ -278,68 +279,60 @@ bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
 // pieces attacking color c's king zone (the squares next to that king).
 int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[2]) {
     int mg = 0, eg = 0;
-    for (int x = 0; x < 8; x++) {
-        for (int y = 0; y < 8; y++) {
-            Piece p = board.at(x, y);
-            if (p.type < PieceType::Knight || p.type > PieceType::Queen) continue;
-            Color enemy = opponent(p.color);
-            int ekx = board.kingFile(enemy), eky = board.kingRank(enemy);
-            bool hitsKingZone = false;
-            int moves = 0;
-            auto reach = [&](int tx, int ty) {
-                moves++;
-                if (std::abs(tx - ekx) <= 1 && std::abs(ty - eky) <= 1) hitsKingZone = true;
-            };
-            if (p.type == PieceType::Knight) {
-                for (const auto& jump : kKnightJumps) {
-                    int tx = x + jump[0], ty = y + jump[1];
-                    if (Board::inBounds(tx, ty) && board.at(tx, ty).color != p.color) reach(tx, ty);
+    const uint64_t occupied = board.occupancy();
+    for (int side = 0; side < 2; side++) {
+        const Color color = side == 0 ? Color::White : Color::Black;
+        const Color enemy = opponent(color);
+        const int sign = side == 0 ? 1 : -1;
+        const uint64_t own = board.occupancy(color);
+        const int ekx = board.kingFile(enemy), eky = board.kingRank(enemy);
+        // The enemy king's square and the squares around it.
+        const uint64_t zone = bb::kingAttacks[ekx * 8 + eky] | bb::bit(ekx, eky);
+        for (PieceType type : {PieceType::Knight, PieceType::Bishop, PieceType::Rook, PieceType::Queen}) {
+            const int t = static_cast<int>(type);
+            uint64_t pieces = board.pieces(color, type);
+            while (pieces) {
+                const int sq = bb::lsb(pieces);
+                pieces = bb::clearLsb(pieces);
+                const int x = sq / 8, y = sq % 8;
+                // Every square the piece could move to: empty or holding an enemy piece.
+                uint64_t reach;
+                switch (type) {
+                    case PieceType::Knight: reach = bb::knightAttacks[sq]; break;
+                    case PieceType::Bishop: reach = bb::bishopAttacks(sq, occupied); break;
+                    case PieceType::Rook: reach = bb::rookAttacks(sq, occupied); break;
+                    default: reach = bb::queenAttacks(sq, occupied); break;
                 }
-            } else {
-                int first = p.type == PieceType::Bishop ? 4 : 0;
-                int last = p.type == PieceType::Rook ? 4 : 8;
-                for (int d = first; d < last; d++) {
-                    int tx = x + kSlideDirs[d][0], ty = y + kSlideDirs[d][1];
-                    while (Board::inBounds(tx, ty)) {
-                        Piece target = board.at(tx, ty);
-                        if (target.color == p.color) break;
-                        reach(tx, ty);
-                        if (!target.isEmpty()) break;
-                        tx += kSlideDirs[d][0];
-                        ty += kSlideDirs[d][1];
+                reach &= ~own;
+                const int moves = bb::popcount(reach);
+                mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
+                eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
+                if (type == PieceType::Rook) {
+                    int bonus = fileHasPawn(pawns, side, x)       ? 0
+                                : fileHasPawn(pawns, 1 - side, x) ? kRookSemiOpenFile
+                                                                  : kRookOpenFile;
+                    mg += sign * bonus;
+                    eg += sign * bonus;
+                }
+                if ((type == PieceType::Knight || type == PieceType::Bishop) && isOutpost(pawns, x, y, color)) {
+                    bool knight = type == PieceType::Knight;
+                    mg += sign * (knight ? kKnightOutpostMg : kBishopOutpostMg);
+                    eg += sign * (knight ? kKnightOutpostEg : kBishopOutpostEg);
+                }
+                int seventh = color == Color::White ? 6 : 1;
+                if ((type == PieceType::Rook || type == PieceType::Queen) && y == seventh) {
+                    bool targets = eky == (color == Color::White ? 7 : 0) || (pawns.pawns[1 - side] & (kRankMask << y));
+                    if (targets) {
+                        bool rook = type == PieceType::Rook;
+                        mg += sign * (rook ? kRookOn7thMg : kQueenOn7thMg);
+                        eg += sign * (rook ? kRookOn7thEg : kQueenOn7thEg);
                     }
                 }
-            }
-            int t = static_cast<int>(p.type);
-            int sign = p.color == Color::White ? 1 : -1;
-            mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
-            eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
-            int side = p.color == Color::White ? 0 : 1;
-            if (p.type == PieceType::Rook) {
-                int bonus = fileHasPawn(pawns, side, x)       ? 0
-                            : fileHasPawn(pawns, 1 - side, x) ? kRookSemiOpenFile
-                                                              : kRookOpenFile;
-                mg += sign * bonus;
-                eg += sign * bonus;
-            }
-            if ((p.type == PieceType::Knight || p.type == PieceType::Bishop) && isOutpost(pawns, x, y, p.color)) {
-                bool knight = p.type == PieceType::Knight;
-                mg += sign * (knight ? kKnightOutpostMg : kBishopOutpostMg);
-                eg += sign * (knight ? kKnightOutpostEg : kBishopOutpostEg);
-            }
-            int seventh = p.color == Color::White ? 6 : 1;
-            if ((p.type == PieceType::Rook || p.type == PieceType::Queen) && y == seventh) {
-                bool targets = eky == (p.color == Color::White ? 7 : 0) || (pawns.pawns[1 - side] & (kRankMask << y));
-                if (targets) {
-                    bool rook = p.type == PieceType::Rook;
-                    mg += sign * (rook ? kRookOn7thMg : kQueenOn7thMg);
-                    eg += sign * (rook ? kRookOn7thEg : kQueenOn7thEg);
+                if (reach & zone) {
+                    KingAttack& a = attacks[enemy == Color::White ? 0 : 1];
+                    a.attackers++;
+                    a.weight += kKingAttackWeight[t];
                 }
-            }
-            if (hitsKingZone) {
-                KingAttack& a = attacks[enemy == Color::White ? 0 : 1];
-                a.attackers++;
-                a.weight += kKingAttackWeight[t];
             }
         }
     }
