@@ -16,7 +16,8 @@
 // sigmoid(ours / K) -- both mapped to a win-probability-like number, so a
 // position that is +9 pawns for the reference and +5 for us costs little
 // while +0.3 against -0.3 costs a lot.
-// Whole games go to either the training or the validation side. Each weight is
+// Whole games go to either the training or the validation side; afterwards the
+// changes that do not clearly help on the validation games are pruned. Each weight is
 // moved by +-step while that lowers the training loss (steps 16, 8, 4, 2, 1), and
 // the weights with the lowest validation loss seen are kept.
 
@@ -220,6 +221,28 @@ int main(int argc, char** argv) {
 
     // Restore the weights that scored best on the validation games.
     for (size_t i = 0; i < slots.size(); i++) *slots[i].value = bestValues[i];
+
+    // Prune: a weight the data cannot pin down (one that few positions depend on)
+    // fits the training games' quirks. Put each changed weight back to its starting
+    // value and keep the change only if it lowers the validation loss by a margin.
+    {
+        const double kKeepMargin = 5e-8;
+        double current = lossOf(valid, k);
+        int reverted = 0;
+        for (Slot& s : slots) {
+            if (*s.value == s.start) continue;
+            int tuned = *s.value;
+            *s.value = s.start;
+            double without = lossOf(valid, k);
+            if (without - current < kKeepMargin) { // not worth keeping
+                current = std::min(current, without);
+                reverted++;
+            } else {
+                *s.value = tuned;
+            }
+        }
+        std::printf("pruning: %d weights put back, validation loss %.6f\n", reverted, lossOf(valid, k));
+    }
     std::printf("scale after tuning: reference ~= %.3f x ours\n", slope(train));
     std::printf("final loss: train %.6f (start %.6f), validation %.6f (start %.6f)\n", lossOf(train, k), startTrain,
                 lossOf(valid, k), startValid);
