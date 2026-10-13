@@ -254,33 +254,6 @@ bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
     return (pawns.attacks[side] & squareBit(x, y)) && !(pawns.attackSpan[1 - side] & squareBit(x, y));
 }
 
-// For each of `color`'s pieces pinned to its king by an enemy slider, the
-// index into kSlideDirs of the pin line (-1 for pieces that aren't pinned).
-// A pinned piece can only move along that line, so counting its other moves
-// as mobility overrates it.
-void findPins(const Board& board, Color color, int8_t (&pinDir)[8][8]) {
-    for (auto& row : pinDir) std::fill(std::begin(row), std::end(row), int8_t(-1));
-    int kx = board.kingFile(color), ky = board.kingRank(color);
-    for (int d = 0; d < 8; d++) {
-        bool diagonal = d >= 4;
-        int px = -1, py = -1;
-        for (int tx = kx + kSlideDirs[d][0], ty = ky + kSlideDirs[d][1]; Board::inBounds(tx, ty);
-             tx += kSlideDirs[d][0], ty += kSlideDirs[d][1]) {
-            Piece q = board.at(tx, ty);
-            if (q.isEmpty()) continue;
-            if (q.color == color) {
-                if (px >= 0) break; // two own pieces in a row: nothing is pinned
-                px = tx;
-                py = ty;
-                continue;
-            }
-            bool slides = q.type == PieceType::Queen || q.type == (diagonal ? PieceType::Bishop : PieceType::Rook);
-            if (slides && px >= 0) pinDir[px][py] = static_cast<int8_t>(d);
-            break;
-        }
-    }
-}
-
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece, pins and
 // checks aside -- rooks on open files, rooks/queens on the 7th rank, and
@@ -289,9 +262,6 @@ void findPins(const Board& board, Color color, int8_t (&pinDir)[8][8]) {
 // pieces attacking color c's king zone (the squares next to that king).
 int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[2]) {
     int mg = 0, eg = 0;
-    int8_t pinDir[2][8][8];
-    findPins(board, Color::White, pinDir[0]);
-    findPins(board, Color::Black, pinDir[1]);
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             Piece p = board.at(x, y);
@@ -300,10 +270,8 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
             int ekx = board.kingFile(enemy), eky = board.kingRank(enemy);
             bool hitsKingZone = false;
             int moves = 0;
-            int pin = pinDir[p.color == Color::White ? 0 : 1][x][y];
             auto reach = [&](int tx, int ty) {
-                // A pinned piece only really moves along its pin line.
-                if (pin < 0 || (tx - x) * kSlideDirs[pin][1] == (ty - y) * kSlideDirs[pin][0]) moves++;
+                moves++;
                 if (std::abs(tx - ekx) <= 1 && std::abs(ty - eky) <= 1) hitsKingZone = true;
             };
             if (p.type == PieceType::Knight) {
