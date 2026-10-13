@@ -805,7 +805,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         if (doLMR) {
             // At least 1 ply, and never so much that the move drops straight
             // into quiescence; a PV node gets one ply less.
-            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0), 1, depth - 2);
+            // Moves with a good history reduce less, ones with a bad history more.
+            int h = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
+            int histAdj = h > 4000 ? -1 : (h < -4000 ? 1 : 0);
+            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) + histAdj, 1, depth - 2);
         }
 
         // PVS: the first move (typically the TT move / best-ordered guess)
