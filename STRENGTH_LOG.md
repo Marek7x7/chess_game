@@ -48,6 +48,8 @@ little (it gains more from time than depth-limited Stockfish does).
 |---|---|---|---|---|---|
 | 2026-09-28 | Original: the tree before this session's work (`8ec47f2`) | Stockfish, UCI_Elo 2050 | 60+0.6 | 110W 36L 4D, 74.7% of 150: Elo +187.77 ± 58.16 | ≈ 2240 (2180-2295) |
 | 2026-09-28 | All of the above changes (`ba4462d`) | Stockfish, UCI_Elo 2500 | 60+0.6 | 101W 41L 8D, 70.0% of 150: Elo +147.19 ± 55.82 | ≈ 2650 (2590-2705) |
+| 2026-10-13 | Bundle 4, search refinements from the 50 self-play games: history malus, late-move pruning (depth <= 3), history-aware LMR | `a35ffe1`..`42a8df5` vs `cfff7e5` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo -10.66 ± 12.83 (2054 games, LLR -2.97) | REVERTED (H0 accepted; split below) |
+| 2026-10-13 | History malus alone (split from bundle 4) | `a35ffe1` vs `cfff7e5` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10, suite=8moves_v3 | Elo -6.37 ± 10.54 (2838 games, LLR -2.99) | REVERTED (H0 accepted); the three commits were reverted in `e244f1a`, `9f32745`, `effd370`. Late-move pruning and history-aware LMR were not tested alone. |
 
 Head to head at 10+0.1 over 200 games, the same two builds: +463.16 ±
 86.13 Elo for the new one (181W 7L 12D, 93.5%).
