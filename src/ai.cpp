@@ -432,6 +432,9 @@ int mopUp(const Board& board, const PawnInfo& pawns) {
     return 0;
 }
 
+// The side to move gets the first chance to use any advantage, worth a little on top of the rest.
+TUNE_INT(kTempo, 10);
+
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
     const PawnInfo& pawns = probePawns(board);
@@ -442,7 +445,8 @@ int evaluate(const Board& board, Color color) {
     double phase = board.gamePhase();
     KingAttack attacks[2]; // on White's king, on Black's king
     int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
-                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns);
+                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns) +
+                (board.sideToMove() == Color::White ? kTempo : -kTempo);
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
