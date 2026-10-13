@@ -2,18 +2,16 @@
 
 #include <cctype>
 
+#include "tune.hpp"
+
 char Piece::symbol() const {
     char c = ".pnbrqk"[static_cast<int>(type)];
     return color == Color::White ? static_cast<char>(std::toupper(c)) : c;
 }
 
-int pieceValue(PieceType t) {
-    switch (t) {
-        case PieceType::Pawn: return 100;
-        case PieceType::Knight: return 320;
-        case PieceType::Bishop: return 330;
-        case PieceType::Rook: return 500;
-        case PieceType::Queen: return 900;
-        default: return 0;
-    }
-}
+// Material values in centipawns, indexed by PieceType (None, Pawn, Knight,
+// Bishop, Rook, Queen, King). The pawn's 100 is the unit everything else is
+// measured in, so it is not tuned.
+TUNE_ARR(kPieceValue, 7, {0, 100, 320, 330, 500, 900, 0});
+
+int pieceValue(PieceType t) { return kPieceValue[static_cast<int>(t)]; }
