@@ -626,8 +626,44 @@ MoveList Board::filterLegal(const MoveList& pseudo, Color color) const {
     // kingX/kingY), so there's nothing to gain from updating the rest --
     // only cost.
     Board& self = const_cast<Board&>(*this);
+
+    // Most pseudo-legal moves cannot be illegal. With the king not in check,
+    // a move by a piece other than the king can only expose it by unblocking
+    // a line -- the piece is pinned -- or, for en passant, by removing two
+    // pieces from a rank at once. So those moves, the king's own moves, and
+    // every move while in check get the full make-and-test; the rest pass.
+    const int ci = colorIndex(color);
+    const int kx = kingX[ci], ky = kingY[ci];
+    const bool inCheckNow = isSquareAttacked(kx, ky, opponent(color));
+    uint64_t pinned = 0; // bit x * 8 + y: an own piece pinned against the king
+    if (!inCheckNow) {
+        for (const auto& dir : kQueenDirs) {
+            const bool diagonal = dir[0] != 0 && dir[1] != 0;
+            int px = -1, py = -1; // the first own piece along the ray
+            for (int nx = kx + dir[0], ny = ky + dir[1]; inBounds(nx, ny); nx += dir[0], ny += dir[1]) {
+                const Piece& p = squares[nx][ny];
+                if (p.isEmpty()) continue;
+                if (p.color == color) {
+                    if (px >= 0) break; // two own pieces in a row: nothing is pinned on this ray
+                    px = nx;
+                    py = ny;
+                    continue;
+                }
+                bool slides = p.type == PieceType::Queen || p.type == (diagonal ? PieceType::Bishop : PieceType::Rook);
+                if (slides && px >= 0) pinned |= uint64_t(1) << (px * 8 + py);
+                break;
+            }
+        }
+    }
+
     MoveList result;
     for (const Move& m : pseudo) {
+        const bool needsTest = inCheckNow || m.isEnPassant || (m.fromX == kx && m.fromY == ky) ||
+                               ((pinned >> (m.fromX * 8 + m.fromY)) & 1);
+        if (!needsTest) {
+            result.push_back(m);
+            continue;
+        }
         LightUndo undo;
         self.makeMoveLight(m, undo);
         // isInCheck(color): check the side that just moved (the candidate
