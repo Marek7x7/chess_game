@@ -71,25 +71,25 @@ std::string movesStr(const std::vector<Move>& moves) {
 // starting rank, 6 = one step from promoting), middlegame and endgame. A
 // passer is worth far more once pieces come off: fewer pieces are left to
 // blockade it or to stop it while also doing everything else.
-TUNE_ARR(kPassedMg, 8, {0, 5, 10, 15, 25, 45, 70, 0});
-TUNE_ARR(kPassedEg, 8, {0, 10, 15, 25, 45, 75, 120, 0});
+TUNE_ARR(kPassedMg, 8, {0, 2, 5, 8, 13, 48, 76, 0});
+TUNE_ARR(kPassedEg, 8, {0, 5, 8, 14, 41, 72, 125, 0});
 
 // Penalties per pawn, middlegame and endgame. Doubled: every pawn beyond the
 // first on a file (the rear one blocks the front one and no pawn can defend
 // either). Isolated: no friendly pawn on either adjacent file, so only
 // pieces can ever defend it. Both weigh more in the endgame, where a weak
 // pawn is a long-term target the defender runs out of pieces to protect.
-TUNE_INT(kDoubledMg, 10);
+TUNE_INT(kDoubledMg, 18);
 TUNE_INT(kDoubledEg, 25);
-TUNE_INT(kIsolatedMg, 10);
-TUNE_INT(kIsolatedEg, 15);
+TUNE_INT(kIsolatedMg, 14);
+TUNE_INT(kIsolatedEg, 11);
 
 // Backward pawn: every friendly pawn on the adjacent files has already
 // advanced past it, so no pawn can ever defend it, and an enemy pawn
 // controls the square in front of it, so it can't safely advance to catch
 // up either (Fruit 2.1's values).
 TUNE_INT(kBackwardMg, 8);
-TUNE_INT(kBackwardEg, 10);
+TUNE_INT(kBackwardEg, 20);
 
 uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
 constexpr uint64_t kFileMask = 0xFF;                  // file a; shift by x * 8 for file x
