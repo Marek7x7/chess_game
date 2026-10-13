@@ -12,6 +12,6 @@ char Piece::symbol() const {
 // Material values in centipawns, indexed by PieceType (None, Pawn, Knight,
 // Bishop, Rook, Queen, King). The pawn's 100 is the unit everything else is
 // measured in, so it is not tuned.
-TUNE_ARR(kPieceValue, 7, {0, 100, 320, 332, 541, 980, 0});
+TUNE_ARR(kPieceValue, 7, {0, 100, 320, 330, 541, 991, 0});
 
 int pieceValue(PieceType t) { return kPieceValue[static_cast<int>(t)]; }
