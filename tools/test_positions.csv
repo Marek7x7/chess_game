@@ -1,0 +1,796 @@
+source,game,move,fen,played,sf_best,sf_eval,played_loss,note
+komodo,game3,13,r1bq1rk1/pp2bppp/2np1n2/4p3/4P1P1/2NQ1N1P/PPPB1P2/1K1R1B1R b - - 2 13,c8e6,c8e6,-123,0,
+komodo,game3,14,r2q1rk1/pp2bppp/2npbn2/3Np3/4P1P1/3Q1N1P/PPPB1P2/1K1R1B1R b - - 4 14,e6d5,a8c8,-96,33,
+komodo,game3,15,r2q1rk1/pp2bppp/2np1n2/3Pp3/6P1/3Q1N1P/PPPB1P2/1K1R1B1R b - - 0 15,e5e4,e5e4,-131,4,
+komodo,game3,16,r2q1rk1/pp2bppp/2np1n2/1Q1P4/4p1P1/5N1P/PPPB1P2/1K1R1B1R b - - 1 16,f6d5,e4f3,-128,49,
+komodo,game3,17,r2q1rk1/pp2bppp/2np4/3Q4/4p1P1/5N1P/PPPB1P2/1K1R1B1R b - - 0 17,e4f3,e4f3,-184,0,
+komodo,game3,18,r2q1rk1/pp2bppp/2np4/8/6P1/5Q1P/PPPB1P2/1K1R1B1R b - - 0 18,e7f6,d6d5,-185,64,
+komodo,game3,19,r2q1rk1/pp3ppp/2np1b2/8/6P1/5Q1P/PPPB1PB1/1K1R3R b - - 2 19,d8b6,a8c8,-154,29,
+komodo,game3,20,r4rk1/pp3ppp/1qnp1b2/8/6P1/2P2Q1P/PP1B1PB1/1K1R3R b - - 0 20,f8d8,d6d5,-194,96,
+komodo,game3,21,r2r2k1/pp3ppp/1qnp1b2/8/6P1/2P1BQ1P/PP3PB1/1K1R3R b - - 2 21,b6c7,b6a6,-281,0,
+komodo,game3,22,r2r2k1/ppq2ppp/2np1b2/6P1/8/2P1BQ1P/PP3PB1/1K1R3R b - - 0 22,f6e7,f6e5,-278,47,
+komodo,game3,23,r2r2k1/ppq1bppp/2np4/6P1/7P/2P1BQ2/PP3PB1/1K1R3R b - - 0 23,d8e8,d6d5,-293,90,
+komodo,game3,24,r3r1k1/ppq1bppp/2np4/6PP/8/2P1BQ2/PP3PB1/1K1R3R b - - 0 24,a8b8,e7d8,-394,31,
+komodo,game3,25,1r2r1k1/ppq1bppp/2np4/6PP/5Q2/2P1B3/PP3PB1/1K1R3R b - - 2 25,a7a6,c6e5,-417,51,
+komodo,game3,26,1r2r1k1/1pq1bppp/p1np2P1/7P/5Q2/2P1B3/PP3PB1/1K1R3R b - - 0 26,c6e5,c6e5,-447,19,
+komodo,game3,27,1r2r1k1/1pq1bppp/p2p2P1/3Bn2P/5Q2/2P1B3/PP3P2/1K1R3R b - - 2 27,h7g6,e7f6,-485,91,
+komodo,game3,30,3rr1k1/1pq2pp1/p2p1bP1/3Bn3/4QP2/2P1B3/PP6/1K1R3R b - - 0 30,e5g6,e5g6,-459,0,
+komodo,game3,31,3rr1k1/1pq2pp1/p2p1bQ1/3B4/5P2/2P1B3/PP6/1K1R3R b - - 0 31,e8e3,e8e3,-455,20,
+komodo,game3,32,3r2k1/1pq2Bp1/p2p1bQ1/8/5P2/2P1r3/PP6/1K1R3R b - - 0 32,c7f7,c7f7,-477,0,
+komodo,game3,33,3r2kR/1p3qp1/p2p1bQ1/8/5P2/2P1r3/PP6/1K1R4 b - - 1 33,g8h8,g8h8,-459,22,
+komodo,game3,34,3r3k/1p3Qp1/p2p1b2/8/5P2/2P1r3/PP6/1K1R4 b - - 0 34,e3h3,e3h3,-453,1,
+komodo,game3,35,3r3k/1Q4p1/p2p1b2/8/5P2/2P4r/PP6/1K1R4 b - - 0 35,h3h2,h8g8,-449,49,
+komodo,game3,37,3r3k/6p1/p2p1b2/8/5P2/2P5/PP6/1K5Q b - - 0 37,h8g8,h8g8,-481,14,
+komodo,game3,38,3r2k1/6p1/p2p1b2/3Q4/5P2/2P5/PP6/1K6 b - - 2 38,g8f8,g8h8,-474,53,
+komodo,game3,39,3r1k2/6p1/p2p1b2/3Q4/5P2/2P5/PPK5/8 b - - 4 39,f8e7,f8e7,-484,31,
+komodo,game4,13,r1bq1rk1/ppp3pp/4pb2/2Pp1p2/1P1Pn3/P1NQ1NP1/4PPBP/1RR3K1 b - - 0 13,a7a5,c8d7,-26,56,
+komodo,game4,14,r1bq1rk1/1pp3pp/4pb2/p1PpNp2/1P1Pn3/P1NQ2P1/4PPBP/1RR3K1 b - - 1 14,a5b4,a5b4,-14,0,
+komodo,game4,15,r1bq1rk1/1pp3pp/4pb2/2PpNp2/1P1Pn3/2NQ2P1/4PPBP/1RR3K1 b - - 0 15,c8d7,a8a3,-16,7,
+komodo,game4,16,r2q1rk1/1ppb2pp/4pb2/2PpNp2/1P1Pn3/2NQ2P1/4PPBP/R1R3K1 b - - 2 16,d8e7,f6e5,-13,28,
+komodo,game4,17,r4rk1/1ppbq1pp/4pb2/2PpNp2/1P1Pn3/2NQP1P1/5PBP/R1R3K1 b - - 0 17,f8e8,f6e5,-20,64,
+komodo,game4,18,r3r1k1/1ppbq1pp/4pb2/2PpNp2/1P1Pn3/3QP1P1/4NPBP/R1R3K1 b - - 2 18,e8d8,e4g5,-85,48,
+komodo,game4,19,r2r2k1/1ppbq1pp/4pb2/2PpNp2/1P1Pn3/3QPPP1/4N1BP/R1R3K1 b - - 0 19,a8a1,e4g5,-48,39,
+komodo,game4,20,3r2k1/1ppbq1pp/4pb2/2PpNp2/1P1Pn3/3QPPP1/4N1BP/R5K1 b - - 0 20,e4g5,e4g5,-94,0,
+komodo,game4,21,3r2k1/Rppbq1pp/4pb2/2PpNpn1/1P1P4/3QPPP1/4N1BP/6K1 b - - 2 21,d7c8,d8b8,-92,137,
+komodo,game4,22,2br2k1/Rpp1q1pp/4pb2/2PpNpn1/1P1P4/2Q1PPP1/4N1BP/6K1 b - - 4 22,g5f7,e7e8,-226,0,
+komodo,game4,23,2br2k1/Rpp1qnpp/4pb2/2PpNp2/1P1P3P/2Q1PPP1/4N1B1/6K1 b - - 0 23,e7e8,h7h6,-216,22,
+komodo,game4,24,2brq1k1/Rpp2npp/4pb2/2PpNp2/1P1P3P/2Q1PPP1/4N3/5BK1 b - - 2 24,f6e7,c7c6,-170,14,
+komodo,game4,25,2brq1k1/Rpp1bnpp/4p3/2PpNp2/1P1P1N1P/2Q1PPP1/8/5BK1 b - - 4 25,f7e5,f7e5,-175,0,
+komodo,game4,26,2brq1k1/Rpp1b1pp/4p3/2PpPp2/1P3N1P/2Q1PPP1/8/5BK1 b - - 0 26,e8c6,c7c6,-160,51,
+komodo,game4,27,2br2k1/Rpp1b1pp/2q1p3/2PpPp2/1P1Q1N1P/4PPP1/8/5BK1 b - - 2 27,c8d7,c8d7,-156,0,
+komodo,game4,28,3r2k1/Rppbb1pp/2q1p3/2PpPp2/1P1Q1N1P/4PPP1/5K2/5B2 b - - 4 28,e7f8,e7f8,-128,48,
+komodo,game4,29,3r1bk1/Rppb2pp/2q1p3/2PpPp2/1P3N1P/4PPP1/5K2/Q4B2 b - - 6 29,b7b6,b7b6,-110,13,
+komodo,game4,30,3r1bk1/R1pb2pp/1pq1p3/2PpPp2/1P3N1P/2Q1PPP1/5K2/5B2 b - - 1 30,d7c8,g8f7,-83,37,
+komodo,game4,31,2br1bk1/R1p3pp/1pq1p3/2PpPp2/1P5P/2QNPPP1/5K2/5B2 b - - 3 31,b6c5,c8d7,-121,0,
+komodo,game4,32,2br1bk1/R1p3pp/2q1p3/2NpPp2/1P5P/2Q1PPP1/5K2/5B2 b - - 0 32,c6b6,g7g6,-122,18,
+komodo,game4,33,R1br1bk1/2p3pp/1q2p3/2NpPp2/1P5P/2Q1PPP1/5K2/5B2 b - - 2 33,b6c6,d8e8,-146,0,
+komodo,game4,34,1Rbr1bk1/2p3pp/2q1p3/2NpPp2/1P5P/2Q1PPP1/5K2/5B2 b - - 4 34,f8c5,c6e8,-133,181,
+komodo,game4,35,1Rbr2k1/2p3pp/2q1p3/2QpPp2/1P5P/4PPP1/5K2/5B2 b - - 0 35,c6c5,c6c5,-336,18,
+komodo,game4,36,1Rbr2k1/2p3pp/4p3/2PpPp2/7P/4PPP1/5K2/5B2 b - - 0 36,d8f8,d8f8,-308,66,
+komodo,game4,37,1Rb2rk1/2p3pp/4p3/1BPpPp2/7P/4PPP1/5K2/8 b - - 2 37,g8f7,g7g6,-324,26,
+komodo,game4,38,R1b2r2/2p2kpp/4p3/1BPpPp2/7P/4PPP1/5K2/8 b - - 4 38,f7e7,f7e7,-340,41,
+komodo,game4,39,R1b2r2/2p1k1pp/2P1p3/1B1pPp2/7P/4PPP1/5K2/8 b - - 0 39,h7h6,g7g6,-330,169,
+komodo,game4,40,R1b2r2/2p1k1p1/2P1p2p/1B1pPp2/5P1P/4P1P1/5K2/8 b - - 0 40,f8e8,g7g6,-452,51,
+komodo,game4,41,2b1r3/R1p1k1p1/2P1p2p/1B1pPp2/5P1P/4P1P1/5K2/8 b - - 2 41,e7d8,e7d8,-422,6,
+komodo,game4,42,2bkr3/R1p3p1/2P1p2p/3pPp2/5P1P/4P1P1/4BK2/8 b - - 4 42,e8f8,e8h8,-448,93,
+komodo,game4,43,2bk1r2/R1p3p1/2P1p2p/3pPp1B/5P1P/4P1P1/5K2/8 b - - 6 43,f8g8,f8g8,-387,0,
+komodo,game4,44,2bk2r1/R1p3p1/2P1p1Bp/3pPp2/5P1P/4P1P1/5K2/8 b - - 8 44,g8h8,g8f8,-363,18,
+komodo,game4,45,2bk3r/R1p3p1/2P1p1Bp/3pPp2/5P1P/4PKP1/8/8 b - - 10 45,h8f8,h8g8,-330,66,
+komodo,game4,46,2bk1r2/R1p3p1/2P1p1Bp/3pPp2/5PPP/4PK2/8/8 b - - 0 46,f5g4,f5g4,-348,101,
+komodo,game4,47,2bk1r2/R1p3p1/2P1p1Bp/3pP3/5PKP/4P3/8/8 b - - 0 47,f8h8,f8g8,-482,24,
+komodo,game4,48,2bk3r/R1p3p1/2P1p1Bp/3pP3/5P1P/4PK2/8/8 b - - 2 48,h8f8,h8f8,-331,103,
+komodo,game4,49,R1bk1r2/2p3p1/2P1p1Bp/3pP3/5P1P/4PK2/8/8 b - - 4 49,d8e7,d8e7,-343,0,
+komodo,game4,50,R1b2r2/2p1k1p1/2P1p1Bp/3pP3/5P1P/4P3/4K3/8 b - - 6 50,f8g8,f8g8,-339,12,
+komodo,game4,51,2b3r1/R1p1k1p1/2P1p1Bp/3pP3/5P1P/4P3/4K3/8 b - - 8 51,e7d8,e7d8,-341,39,
+komodo,game4,52,2bk2r1/R1p3p1/2P1p1Bp/3pP3/5P1P/3KP3/8/8 b - - 10 52,g8h8,g8f8,-334,66,
+komodo,game4,53,2bk3r/R1p3p1/2P1p1Bp/3pP2P/5P2/3KP3/8/8 b - - 0 53,h8g8,h8f8,-440,25,
+komodo,game4,54,2bk2r1/R1p3p1/2P1p1Bp/3pP2P/3K1P2/4P3/8/8 b - - 2 54,g8f8,g8f8,-378,109,
+komodo,game4,55,R1bk1r2/2p3p1/2P1p1Bp/3pP2P/3K1P2/4P3/8/8 b - - 4 55,d8e7,d8e7,-398,138,
+komodo,game4,57,2bk1r2/R1p3p1/2P1p2p/3pP2P/3K1P2/3BP3/8/8 b - - 8 57,f8e8,f8e8,-456,70,
+komodo,game4,58,R1bkr3/2p3p1/2P1p2p/3pP2P/3K1P2/3BP3/8/8 b - - 10 58,d8e7,d8e7,-409,71,
+komodo,game4,59,2b1r3/R1p1k1p1/2P1p2p/3pP2P/3K1P2/3BP3/8/8 b - - 12 59,e7d8,e7d8,-429,130,
+komodo,game4,60,2bkr3/2p3p1/2P1p2p/3pP2P/3K1P2/3BP3/8/R7 b - - 14 60,d8e7,e8f8,-432,88,
+komodo,game4,61,2b1r3/2p1k1p1/2P1p2p/3pP2P/3K1P2/3BP3/8/6R1 b - - 16 61,e7f8,e8g8,-466,107,
+komodo,game4,62,2b1rk2/2p3p1/2P1p1Bp/3pP2P/3K1P2/4P3/8/6R1 b - - 18 62,e8d8,e8d8,-491,72,
+komodo,game5,13,r3kb1r/1pqb1pp1/p1n1p3/3pP3/6Qp/2N2N2/PPP2PPP/R1B2RK1 w kq - 2 13,f1e1,f1e1,-52,0,
+komodo,game5,14,r3kb1r/1pqb1pp1/p1n1p3/3pP3/6Q1/2N2N1p/PPP2PPP/R1B1R1K1 w kq - 0 14,g2h3,c1g5,-42,10,
+komodo,game5,15,2kr1b1r/1pqb1pp1/p1n1p3/3pP3/6Q1/2N2N1P/PPP2P1P/R1B1R1K1 w - - 1 15,c1g5,c1f4,-77,10,
+komodo,game5,16,2k1rb1r/1pqb1pp1/p1n1p3/3pP1B1/6Q1/2N2N1P/PPP2P1P/R3R1K1 w - - 3 16,g5f4,g5f4,-51,14,
+komodo,game5,17,2k1r2r/1pqbbpp1/p1n1p3/3pP3/5BQ1/2N2N1P/PPP2P1P/R3R1K1 w - - 5 17,a1d1,c3d5,56,93,
+komodo,game5,18,2k2r1r/1pqbbpp1/p1n1p3/3pP3/5BQ1/2N2N1P/PPP2P1P/3RR1K1 w - - 7 18,g4g3,c3d5,190,254,
+komodo,game5,19,2k2r1r/1p1bbpp1/pqn1p3/3pP3/5B2/2N2NQP/PPP2P1P/3RR1K1 w - - 9 19,d1b1,c3a4,-24,158,
+komodo,game5,20,2k2r1r/1p1bbpp1/pq2p3/3pP3/3n1B2/2N2NQP/PPP2P1P/1R2R1K1 w - - 11 20,f3d4,f3d4,-74,0,
+komodo,game5,21,2k2r1r/1p1bbpp1/p3p3/3pP3/3q1B2/2N3QP/PPP2P1P/1R2R1K1 w - - 0 21,e1d1,e1d1,-69,0,
+komodo,game5,22,2k2r1r/1p1bbpp1/p3p3/3pP3/1q3B2/2N3QP/PPP2P1P/1R1R2K1 w - - 2 22,d1d3,a2a3,-37,42,
+komodo,game5,23,2k2r1r/1p1bbp2/p3p3/3pP1p1/1q3B2/2NR2QP/PPP2P1P/1R4K1 w - - 0 23,f4e3,f4e3,-52,0,
+komodo,game5,24,2k2r1r/1p1bbp2/p3p3/3pP1p1/7q/2NRB1QP/PPP2P1P/1R4K1 w - - 2 24,e3d4,b2b4,-15,21,
+komodo,game5,25,1k3r1r/1p1bbp2/p3p3/3pP1p1/3B3q/2NR2QP/PPP2P1P/1R4K1 w - - 4 25,b1d1,b1d1,-15,0,
+komodo,game5,26,1k3r1r/1p2bp2/p1b1p3/3pP1p1/3B3q/2NR2QP/PPP2P1P/3R2K1 w - - 6 26,g3g2,g3h4,0,103,
+komodo,game5,27,1k3r1r/1p2b3/p1b1p3/3pPpp1/3B3q/2NR3P/PPP2PQP/3R2K1 w - f6 0 27,d1e1,e5f6,-28,205,
+komodo,game5,28,1k4rr/1p2b3/p1b1p3/3pPpp1/3B3q/2NR3P/PPP2PQP/4R1K1 w - - 2 28,g1f1,g1h1,-217,36,
+komodo,game5,29,1k4rr/1p2b3/p1b1p3/3pPp2/3B2pq/2NR3P/PPP2PQP/4RK2 w - - 0 29,g2g3,d3g3,-270,70,
+komodo,game5,30,1k4rr/1p2b3/p1b1p2q/3pPp2/3B2p1/2NR2QP/PPP2P1P/4RK2 w - - 2 30,h3g4,c3e2,-321,108,
+komodo,game5,31,1k5r/1p2b3/p1b1p2q/3pPp2/3B2r1/2NR2Q1/PPP2P1P/4RK2 w - - 0 31,g3e3,g3f3,-419,52,
+komodo,game5,32,1k5r/1p6/p1b1p2q/3pPpb1/3B2r1/2NRQ3/PPP2P1P/4RK2 w - - 2 32,e3f3,e3f3,-447,42,
+komodo,game5,33,1k5r/1p6/p1b1p3/3pPpb1/3B2r1/2NR1Q2/PPP2P1q/4RK2 w - - 0 33,f3d1,b2b4,-466,111,
+komodo,game6,13,r3r1k1/pppb1ppp/5q2/8/3P4/1Q6/PP1N1PPP/R3KB1R w KQ - 1 13,f1e2,f1e2,113,0,
+komodo,game6,14,r3r1k1/pppb1ppp/8/8/3q4/1Q6/PP1NBPPP/R3K2R w KQ - 0 14,d2c4,d2c4,266,0,
+komodo,game6,15,r3r1k1/ppp2ppp/8/8/2Nq2b1/1Q6/PP2BPPP/R3K2R w KQ - 2 15,c4e3,c4e3,307,0,
+komodo,game6,16,r3r1k1/ppp2ppp/8/8/3q4/1Q2N3/PP2bPPP/R3K2R w KQ - 0 16,e1e2,e1e2,328,6,
+komodo,game6,17,r3r1k1/ppp2ppp/5q2/8/8/1Q2N3/PP2KPPP/R6R w - - 1 17,h1d1,h1d1,377,0,
+komodo,game6,18,r3r1k1/ppp2ppp/8/4q3/8/1Q2N3/PP2KPPP/R2R4 w - - 3 18,b3b7,d1d7,381,79,
+komodo,game6,19,1r2r1k1/pQp2ppp/8/4q3/8/4N3/PP2KPPP/R2R4 w - - 1 19,b7c7,b7f3,276,892,
+lichess_Blummo9v,game7,7,r1bqkb1r/ppp1nppp/2npp3/4P3/3P4/3B1N2/PPP2PPP/RNBQ1RK1 w kq - 0 7,e5d6,d1e2,124,36,
+lichess_Blummo9v,game7,8,r1bqkb1r/pp2nppp/2npp3/8/3P4/3B1N2/PPP2PPP/RNBQ1RK1 w kq - 0 8,b1c3,f1e1,85,0,
+lichess_Blummo9v,game7,9,r1bqkb1r/pp2nppp/2n1p3/3p4/3P4/2NB1N2/PPP2PPP/R1BQ1RK1 w kq - 0 9,c1f4,f1e1,92,25,
+lichess_Blummo9v,game7,10,r1bqkb1r/1p2nppp/p1n1p3/3p4/3P1B2/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 0 10,f4g5,f1e1,81,45,
+lichess_Blummo9v,game7,11,r1bqkb1r/1p2npp1/p1n1p2p/3p2B1/3P4/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 0 11,g5f4,g5f4,44,2,
+lichess_Blummo9v,game7,12,r1bqkb1r/1p2np2/p1n1p2p/3p2p1/3P1B2/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 0 12,f4e5,f4e5,87,0,
+lichess_Blummo9v,game7,13,r1bqkb1r/1p2np2/p3p2p/3pn1p1/3P4/2NB1N2/PPP2PPP/R2Q1RK1 w kq - 0 13,f3e5,f3e5,93,2,
+lichess_Blummo9v,game7,14,r1bqk2r/1p2npb1/p3p2p/3pN1p1/3P4/2NB4/PPP2PPP/R2Q1RK1 w kq - 1 14,f1e1,f2f4,108,93,
+lichess_Blummo9v,game7,15,r1bq1rk1/1p2npb1/p3p2p/3pN1p1/3P4/2NB4/PPP2PPP/R2QR1K1 w - - 3 15,d1h5,d1h5,51,22,
+lichess_Blummo9v,game7,16,r1bq1rk1/1p2n1b1/p3p2p/3pNppQ/3P4/2NB4/PPP2PPP/R3R1K1 w - - 0 16,c3a4,c3e2,40,20,
+lichess_Blummo9v,game7,17,r1bq1rk1/4n1b1/pp2p2p/3pNppQ/N2P4/3B4/PPP2PPP/R3R1K1 w - - 0 17,a4c3,g2g4,42,17,
+lichess_Blummo9v,game7,18,r1bq1rk1/4n3/pp2p2p/3pbppQ/3P4/2NB4/PPP2PPP/R3R1K1 w - - 0 18,e1e5,d4e5,19,0,
+lichess_Blummo9v,game7,19,r1bq2k1/4n3/pp2pr1p/3pRppQ/3P4/2NB4/PPP2PPP/R5K1 w - - 1 19,e5e1,e5e1,53,5,
+lichess_Blummo9v,game7,20,r2q2k1/3bn3/pp2pr1p/3p1ppQ/3P4/2NB4/PPP2PPP/R3R1K1 w - - 3 20,h5f3,c3e2,52,0,
+lichess_Blummo9v,game7,21,r2q2k1/3b4/ppn1pr1p/3p1pp1/3P4/2NB1Q2/PPP2PPP/R3R1K1 w - - 5 21,c3e2,c3e2,65,0,
+lichess_Blummo9v,game7,22,r2qb1k1/8/ppn1pr1p/3p1pp1/3P4/3B1Q2/PPP1NPPP/R3R1K1 w - - 7 22,f3e3,a1d1,66,57,
+lichess_Blummo9v,game7,23,r2qb1k1/8/ppn1pr1p/3p2p1/3P1p2/3BQ3/PPP1NPPP/R3R1K1 w - - 0 23,e3h3,e3d2,0,13,
+lichess_Blummo9v,game7,24,r2qb1k1/8/ppn1pr2/3p2pp/3P1p2/3B3Q/PPP1NPPP/R3R1K1 w - - 0 24,a2a4,c2c4,-1,45,
+lichess_Blummo9v,game7,25,r2qb1k1/8/ppn1p2r/3p2pp/P2P1p2/3B3Q/1PP1NPPP/R3R1K1 w - - 1 25,f2f3,f2f3,-56,0,
+lichess_Blummo9v,game7,26,r3b1k1/8/ppn1pq1r/3p2pp/P2P1p2/3B1P1Q/1PP1N1PP/R3R1K1 w - - 1 26,c2c3,g2g3,-104,13,
+lichess_Blummo9v,game7,27,4b1k1/r7/ppn1pq1r/3p2pp/P2P1p2/2PB1P1Q/1P2N1PP/R3R1K1 w - - 1 27,a1a3,g2g3,-40,172,
+lichess_Blummo9v,game7,28,4b1k1/6r1/ppn1pq1r/3p2pp/P2P1p2/R1PB1P1Q/1P2N1PP/4R1K1 w - - 3 28,g2g3,g2g3,-207,0,
+lichess_Blummo9v,game7,29,4b1k1/6r1/ppn1pq1r/3p3p/P2P1pp1/R1PB1PPQ/1P2N2P/4R1K1 w - - 0 29,f3g4,f3g4,-179,40,
+lichess_Blummo9v,game7,30,4b1k1/8/ppn1pq1r/3p3p/P2P1pr1/R1PB2PQ/1P2N2P/4R1K1 w - - 0 30,e1f1,g1h1,-187,88,
+lichess_Blummo9v,game7,31,4b1k1/8/ppn1pq1r/3p3p/P2P2r1/R1PB1pPQ/1P2N2P/5RK1 w - - 0 31,a3b3,g1h1,-262,108,
+lichess_Blummo9v,game7,32,4b1k1/8/ppn2q1r/3pp2p/P2P2r1/1RPB1pPQ/1P2N2P/5RK1 w - - 0 32,b3b6,d4e5,-354,18,
+lichess_Blummo9v,game7,33,4b1k1/8/pRn2q1r/3p3p/P2Pp1r1/2PB1pPQ/1P2N2P/5RK1 w - - 0 33,d3a6,d3a6,-368,0,
+lichess_Blummo9v,game7,34,4b1k1/8/BRn4r/3p2qp/P2Pp1r1/2P2pPQ/1P2N2P/5RK1 w - - 1 34,a4a5,b2b4,-395,71,
+lichess_Blummo9v,game7,35,6k1/3b4/BRn4r/P2p2qp/3Pp1r1/2P2pPQ/1P2N2P/5RK1 w - - 1 35,f1f2,a6b5,-399,162,
+selfplay_blunder,20261012_201750_game01,43,r1b1r1k1/2pn1ppp/1p1p1q2/3P1P2/p1P1p2P/P1Q1P1B1/1PB3P1/1R3RK1 w - - 3 22,g1h1,,54,161,SF depth14 loss
+selfplay_blunder,20261012_201750_game01,57,r1b1r1k1/2p3pp/1p1p1p2/2nP1P1P/p1P1pR2/P1P1P1B1/2B3P1/3R3K w - - 8 29,f4f1,,0,199,SF depth14 loss
+selfplay_blunder,20261012_201750_game02,35,2bq2kr/4rppp/p3n3/1pp5/3pP1n1/N2P2P1/PPQB1PBP/R4RK1 w - - 0 18,g2h3,,202,264,SF depth14 loss
+selfplay_blunder,20261012_201750_game02,38,2bq2kr/4rpp1/p3n3/1pp4p/3pP1n1/N2P2PB/PPQB1P1P/2R2RK1 b - - 1 19,g4e5,,151,221,SF depth14 loss
+selfplay_blunder,20261012_201750_game03,37,2rr2k1/1p2pp1p/p3bnp1/qPp5/P3P3/2N1QNP1/2P2P1P/1R2R1K1 w - - 1 19,b5a6,,20,157,SF depth14 loss
+selfplay_blunder,20261012_201750_game03,52,2rr4/4pk1p/Q3p1p1/2p5/P3P3/5RP1/2q2P1K/1R6 b - - 1 26,f7e8,,-74,334,SF depth14 loss
+selfplay_blunder,20261012_201750_game03,53,2rrk3/4p2p/Q3p1p1/2p5/P3P3/5RP1/2q2P1K/1R6 w - - 2 27,b1e1,,408,280,SF depth14 loss
+selfplay_blunder,20261012_201750_game03,55,2rrk3/4p2p/Q3p1p1/2p5/P3P3/5RP1/3q1P1K/4R3 w - - 4 28,a6e6,,162,162,SF depth14 loss
+selfplay_blunder,20261012_201750_game05,40,r1bq1k1r/ppp4p/3n1p2/2N3p1/3PB3/1QP3P1/P4P1P/R3R1K1 b - - 1 20,d6e4,,-159,198,SF depth14 loss
+selfplay_blunder,20261012_201750_game05,57,2rq4/2p2rkp/1pQ1Rp2/p5p1/P2P4/2P3PP/5P2/4R1K1 w - - 3 29,e6e8,,218,190,SF depth14 loss
+selfplay_blunder,20261012_201750_game05,68,8/2p1k2p/1p6/p5p1/P1PP4/6PP/5P2/6K1 b - - 0 34,e7f6,,-32,319,SF depth14 loss
+selfplay_blunder,20261012_201750_game05,78,8/2p4p/1p6/p4k2/P1PP1P1P/5K2/8/8 b - - 0 39,h7h5,,-478,194,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,28,r1b2rk1/1pppq1pp/8/p2P1p2/1nP1n3/B2B1N2/P4PPP/RQ2R1K1 b - - 1 14,f8e8,,21,201,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,29,r1b1r1k1/1pppq1pp/8/p2P1p2/1nP1n3/B2B1N2/P4PPP/RQ2R1K1 w - - 2 15,d3e4,,180,164,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,66,5r2/2p4k/1p4pp/p1pPr3/2P1P2q/P2Q3P/4R1P1/1R5K b - - 1 33,e5e7,,-18,156,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,78,8/2p1r2k/1p2P1p1/p2P3p/2P2r2/P2p3P/3R2P1/2R4K b - - 1 39,f4d4,,-45,152,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,113,8/8/5rp1/P5Rp/1k6/7P/6PK/8 w - - 1 57,h3h4,,387,205,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,138,8/8/6R1/r7/3k1K1P/8/8/8 b - - 0 69,d4d3,,-261,223,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,145,8/8/8/6R1/7P/r5K1/3k4/8 w - - 7 73,g3h2,,503,238,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,146,8/8/8/6R1/7P/r7/3k3K/8 b - - 8 73,a3a4,,-265,202,SF depth14 loss
+selfplay_blunder,20261012_201750_game06,149,8/8/8/6RP/r7/4k3/7K/8 w - - 1 75,g5g3,,419,396,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,31,r2qr3/pp4bk/6pp/2ppN3/3n1P1P/2NP2Pb/PPP5/R1BQ1RK1 w - - 3 16,f1e1,,-89,181,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,73,1B6/p5k1/1p4p1/3p3p/r6P/2P3P1/b4R1K/8 w - - 0 37,f2e2,,-66,161,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,139,8/8/6p1/2k3K1/2p4P/p1B5/p7/1b6 w - - 2 70,g5f4,,-485,171,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,150,8/8/6p1/3k4/2p4P/p7/p4K2/B4b2 b - - 13 75,f1h3,,662,211,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,151,8/8/6p1/3k4/2p4P/p6b/p4K2/B7 w - - 14 76,f2e3,,-451,193,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,152,8/8/6p1/3k4/2p4P/p3K2b/p7/B7 b - - 15 76,h3g2,,644,234,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,153,8/8/6p1/3k4/2p4P/p3K3/p5b1/B7 w - - 16 77,a1c3,,-410,204,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,156,8/8/6p1/2k5/2p2K1P/p1B5/p5b1/8 b - - 19 78,c5d6,,643,207,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,157,8/8/3k2p1/8/2p2K1P/p1B5/p5b1/8 w - - 20 79,f4e3,,-436,173,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,158,8/8/3k2p1/8/2p4P/p1B1K3/p5b1/8 b - - 21 79,d6c6,,609,237,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,159,8/8/2k3p1/8/2p4P/p1B1K3/p5b1/8 w - - 22 80,e3d4,,-372,235,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,228,8/8/2b3p1/1k6/2pK3P/p1B5/p7/8 b - - 91 114,c6f3,,640,539,SF depth14 loss
+selfplay_blunder,20261012_201750_game07,231,b7/8/6p1/1k6/2p4P/p1B1K3/p7/8 w - - 94 116,e3f2,,-74,498,SF depth14 loss
+selfplay_blunder,20261012_201750_game08,57,r4k2/3n2p1/3p1p2/3n1PB1/4p3/8/1P2B1PP/5R1K w - - 0 29,f1d1,,-89,187,SF depth14 loss
+selfplay_blunder,20261012_201750_game08,97,8/6p1/8/5P2/5K1P/2k5/8/3q4 w - - 0 49,f4g5,,-808,159,SF depth14 loss
+selfplay_blunder,20261012_201750_game09,68,6k1/1p2rp1p/p2N2p1/3P4/1PPb4/6P1/P6P/1R5K b - - 0 34,b7b5,,-221,194,SF depth14 loss
+selfplay_blunder,20261012_201750_game09,76,6k1/5pbp/p1P3p1/1p1P4/1P2N3/6P1/P1r4P/4R2K b - - 4 38,g7d4,,-336,218,SF depth14 loss
+selfplay_blunder,20261012_201750_game10,48,r2r2k1/2p2p1p/p1p3p1/2Qb4/1P1P1qN1/P4P2/4R1PP/4R2K b - - 0 24,d5e6,,-26,253,SF depth14 loss
+selfplay_blunder,20261012_201750_game10,49,r2r2k1/2p2p1p/p1p1b1p1/2Q5/1P1P1qN1/P4P2/4R1PP/4R2K w - - 1 25,e2e4,,279,181,SF depth14 loss
+selfplay_blunder,20261012_201750_game10,50,r2r2k1/2p2p1p/p1p1b1p1/2Q5/1P1PRqN1/P4P2/6PP/4R2K b - - 2 25,f4d2,,-98,279,SF depth14 loss
+selfplay_blunder,20261012_201750_game11,28,r4rk1/pppb1ppp/n2p1n2/6q1/2PNpP2/2Q1P2P/PP1PB1P1/R1B2R1K b - f3 0 14,g5c5,,88,205,SF depth14 loss
+selfplay_blunder,20261012_201750_game12,81,8/1p6/7k/3Kp1rp/p2pP3/8/PPP2R2/8 w - - 4 41,f2f6,,0,176,SF depth14 loss
+selfplay_blunder,20261012_201750_game12,84,8/1p4k1/8/3Kp1rp/p2pP3/5R2/PPP5/8 b - - 7 42,g5g2,,214,169,SF depth14 loss
+selfplay_blunder,20261012_201750_game12,102,1R6/8/8/4P1k1/p2K3p/8/r7/8 b - - 4 51,h4h3,,350,253,SF depth14 loss
+selfplay_blunder,20261012_201750_game12,103,1R6/8/8/4P1k1/p2K4/7p/r7/8 w - - 0 52,b8h8,,-97,157,SF depth14 loss
+selfplay_blunder,20261012_201750_game12,105,7R/8/8/4P1k1/p2K4/7p/7r/8 w - - 2 53,e5e6,,-216,150,SF depth14 loss
+selfplay_blunder,20261012_201750_game13,23,r1bq2k1/ppp2ppp/n2p1n2/4r3/2PNp3/1Q2P2P/PP1PBPP1/R1B2RK1 w - - 4 12,f1e1,,35,172,SF depth14 loss
+selfplay_blunder,20261012_201750_game13,32,r1bq2k1/1pp2ppp/3p1n2/p1n5/2PNpP2/4P1rP/PPQPB1PK/R1B1R3 b - - 2 16,g3g6,,309,186,SF depth14 loss
+selfplay_blunder,20261012_201750_game13,49,r5k1/1ppbqppp/3p3r/p1n2P2/2P1pRP1/P1Q1P2P/1P1PN2K/R1B5 w - - 3 25,f5f6,,-115,255,SF depth14 loss
+selfplay_blunder,20261012_201750_game13,50,r5k1/1ppbqppp/3p1P1r/p1n5/2P1pRP1/P1Q1P2P/1P1PN2K/R1B5 b - - 0 25,g7f6,,370,152,SF depth14 loss
+selfplay_blunder,20261012_201750_game13,60,r5k1/1pp1qp1p/3p1p1r/p4R2/2P1p1P1/P3PnKP/1PQP4/R1B5 b - - 4 30,c7c6,,366,163,SF depth14 loss
+selfplay_blunder,20261012_201750_game14,57,6kr/p4p2/1p1Qr3/n1p5/2P4p/1Pq1P3/P2RKPP1/5B1R w - - 3 29,d6b8,,176,178,SF depth14 loss
+selfplay_blunder,20261012_201750_game16,58,1r6/p6p/3k4/2pn4/4pP2/1P1bP3/P4K1P/R5R1 b - - 3 29,a7a6,,331,152,SF depth14 loss
+selfplay_blunder,20261012_201750_game16,91,8/5P2/p7/8/7P/4nr2/P2kp3/R5K1 w - - 3 46,f7f8q,,-739,261,SF depth14 loss
+selfplay_blunder,20261012_201750_game16,94,5r2/8/p7/8/7P/4n3/P2kp2K/R7 b - - 1 47,f8f3,,988,221,SF depth14 loss
+selfplay_blunder,20261012_201750_game17,41,r5k1/1p4pp/p1np4/3NprB1/PPq5/5N2/2P2KPP/R2Q4 w - - 1 21,d5b6,,289,178,SF depth14 loss
+selfplay_blunder,20261012_201750_game17,43,r5k1/1p4pp/pNnp4/4prB1/PP4q1/5N2/2P2KPP/R2Q4 w - - 3 22,b6a8,,152,176,SF depth14 loss
+selfplay_blunder,20261012_201750_game17,44,N5k1/1p4pp/p1np4/4prB1/PP4q1/5N2/2P2KPP/R2Q4 b - - 0 22,g4g5,,24,243,SF depth14 loss
+selfplay_blunder,20261012_201750_game17,138,8/8/6K1/8/4QN2/2k5/8/8 b - - 10 69,c3b3,,-582,407,SF depth14 loss
+selfplay_blunder,20261012_201750_game18,33,r2q2kr/ppp2ppp/5n2/6B1/3bN1b1/Q5P1/PP3PBP/R2R2K1 w - - 0 17,g5f6,,338,171,SF depth14 loss
+selfplay_blunder,20261012_201750_game18,39,r2q2kr/1pp2p1p/8/p4p2/1Q1bN1b1/6P1/PP1R1PBP/R5K1 w - - 0 20,b4b7,,255,240,SF depth14 loss
+selfplay_blunder,20261012_201750_game18,46,1r1q3r/2p2pkp/8/p7/3bQpb1/2N3P1/PP1R1PBP/R5K1 b - - 1 23,b8b4,,-66,187,SF depth14 loss
+selfplay_blunder,20261012_201750_game18,105,8/5Pb1/2R5/7p/2B2k1P/8/6K1/8 w - - 1 53,f7f8q,,723,169,SF depth14 loss
+selfplay_blunder,20261012_201750_game18,108,5b2/8/5R2/7p/2B2k1P/8/6K1/8 b - - 1 54,f4e3,,-515,153,SF depth14 loss
+selfplay_blunder,20261012_201750_game19,26,r1bq3r/pp4bk/2n3pp/2ppp3/8/1NNP2P1/PPP2P1P/R1BQR1K1 b - - 7 13,c5c4,,290,237,SF depth14 loss
+selfplay_blunder,20261012_201750_game19,27,r1bq3r/pp4bk/2n3pp/3pp3/2p5/1NNP2P1/PPP2P1P/R1BQR1K1 w - - 0 14,b3d2,,-53,254,SF depth14 loss
+selfplay_blunder,20261012_201750_game19,28,r1bq3r/pp4bk/2n3pp/3pp3/2p5/2NP2P1/PPPN1P1P/R1BQR1K1 b - - 1 14,c6d4,,307,159,SF depth14 loss
+selfplay_blunder,20261012_201750_game19,45,2r4r/1p4bk/p2q2pp/3Ppb2/8/1NN1B1P1/PP3P1P/R2Q2K1 w - - 4 23,f2f3,,39,196,SF depth14 loss
+selfplay_blunder,20261012_201750_game19,46,2r4r/1p4bk/p2q2pp/3Ppb2/8/1NN1BPP1/PP5P/R2Q2K1 b - - 0 23,h8d8,,157,172,SF depth14 loss
+selfplay_blunder,20261012_201750_game19,59,2r2r2/1p4bk/pB4pp/1bNPp3/4N1P1/5P2/PP5P/3R2K1 w - - 1 30,d5d6,,228,169,SF depth14 loss
+selfplay_blunder,20261012_201750_game20,29,r4rk1/p1Q2ppp/3p1q2/2b5/2P5/3B1n1P/PP3PP1/R1B2RK1 w - - 1 15,g2f3,,12,202,SF depth14 loss
+selfplay_blunder,20261012_201750_game20,31,r4rk1/p1Q2ppp/3p4/2b5/2P5/3B1q1P/PP3P2/R1B2RK1 w - - 0 16,d3b1,,-175,360,SF depth14 loss
+selfplay_blunder,20261012_201750_game20,41,3r2k1/p4ppp/8/2p5/2P5/4P1qP/PP6/RB3R1K w - - 3 21,b1d3,,-683,177,SF depth14 loss
+selfplay_blunder,20261012_201750_game21,61,4r1k1/6p1/3p4/1R1P1b1P/3p3b/P2p1B2/1P1B1P2/6K1 w - - 0 31,b5b6,,192,192,SF depth14 loss
+selfplay_blunder,20261012_201750_game21,137,r7/P4k2/2Pp4/R7/4K3/8/8/8 w - - 1 69,c6c7,,697,182,SF depth14 loss
+selfplay_blunder,20261012_201750_game21,140,r7/P1P5/3pk3/1R6/4K3/8/8/8 b - - 2 70,e6d7,,-549,314,SF depth14 loss
+selfplay_blunder,20261012_201750_game21,145,R7/Pk6/3p4/8/4K3/8/8/8 w - - 1 73,a8c8,,985,433,SF depth14 loss
+selfplay_blunder,20261012_201750_game21,146,2R5/Pk6/3p4/8/4K3/8/8/8 b - - 2 73,b7a7,,-552,431,SF depth14 loss
+selfplay_blunder,20261012_201750_game22,105,8/4B2k/2r5/8/6R1/p7/P6K/8 w - - 0 53,e7a3,,253,187,SF depth14 loss
+selfplay_blunder,20261012_201750_game22,106,8/7k/2r5/8/6R1/B7/P6K/8 b - - 0 53,c6a6,,-66,219,SF depth14 loss
+selfplay_blunder,20261012_201750_game22,113,8/7k/8/8/2r5/B5R1/P5K1/8 w - - 7 57,g2f1,,300,294,SF depth14 loss
+selfplay_blunder,20261012_201750_game22,114,8/7k/8/8/2r5/B5R1/P7/5K2 b - - 8 57,c4a4,,-6,320,SF depth14 loss
+selfplay_blunder,20261012_201750_game22,163,6R1/8/8/7k/3BK3/8/8/8 w - - 17 82,g8h8,,997,449,SF depth14 loss
+selfplay_blunder,20261012_201750_game23,33,rn2k2r/pb1p3p/1p2pq2/b4p2/2PP1PpN/P1P3B1/2Q1B1PP/R4RK1 w kq - 1 17,e2d3,,224,152,SF depth14 loss
+selfplay_blunder,20261012_201750_game23,35,rn3rk1/pb1p3p/1p2pq2/b4p2/2PP1PpN/P1PB2B1/2Q3PP/R4RK1 w - - 3 18,g1h1,,115,154,SF depth14 loss
+selfplay_blunder,20261012_201750_game23,56,6k1/p1r4p/Qp2pq2/b1rp1p2/2P2PpN/P5B1/2R3PP/1R5K b - - 0 28,f6g7,,99,178,SF depth14 loss
+selfplay_blunder,20261012_201750_game23,97,8/p3b2p/1p2p3/3k4/4pP2/P1p1K2P/2N2B2/8 w - - 12 49,c2b4,,-121,240,SF depth14 loss
+selfplay_blunder,20261012_201750_game24,71,8/p4k2/2p5/1p3p2/2p2PP1/7P/PP6/6K1 w - - 0 36,a2a3,,0,222,SF depth14 loss
+selfplay_blunder,20261012_201750_game25,122,5R2/1P6/2pP2kp/2P1r3/8/8/r7/5K2 b - - 0 61,e5c5,,352,310,SF depth14 loss
+selfplay_blunder,20261012_201750_game25,123,5R2/1P6/2pP2kp/2r5/8/8/r7/5K2 w - - 0 62,f1g1,,-42,292,SF depth14 loss
+selfplay_blunder,20261012_201750_game25,124,5R2/1P6/2pP2kp/2r5/8/8/r7/6K1 b - - 1 62,c5c1,,334,334,SF depth14 loss
+selfplay_blunder,20261012_201750_game26,30,r3kb2/ppq1pp1B/3p1p1p/2p1n1r1/2P2P2/1Q2P3/PP1P1P1P/R1B2R1K b q - 0 15,c7c6,,-116,150,SF depth14 loss
+selfplay_blunder,20261012_201750_game26,31,r3kb2/pp2pp1B/2qp1p1p/2p1n1r1/2P2P2/1Q2P3/PP1P1P1P/R1B2R1K w q - 1 16,e3e4,,266,266,SF depth14 loss
+selfplay_blunder,20261012_201750_game27,43,r4k1r/1bp2pp1/1p1p2q1/p1n5/1bBQPBPp/7P/PP1N1P2/2R1R1K1 w - - 0 22,g1g2,,66,182,SF depth14 loss
+selfplay_blunder,20261012_201750_game28,29,r2q1rk1/1bp1b1pp/p1n1p3/1p1nPp2/3P4/P1NB1N2/1PQB1PPP/R4RK1 w - f6 0 15,c2b3,,175,241,SF depth14 loss
+selfplay_blunder,20261012_201750_game28,45,r4rk1/2p1b1pp/pn2q3/4np2/Pp6/5P2/1PQBBP1P/RN3RK1 w - - 0 23,c2c7,,-259,170,SF depth14 loss
+selfplay_blunder,20261012_201750_game29,59,3r2kr/p1p2pp1/2p1n3/4n3/4P2p/2P3P1/P4PBP/1RB2RK1 w - - 2 30,b1b7,,143,159,SF depth14 loss
+selfplay_blunder,20261012_201750_game29,98,3R4/8/2p2p1k/6p1/4P3/1Br2nP1/P3KP2/8 b - - 5 49,h6g6,,-141,291,SF depth14 loss
+selfplay_blunder,20261012_201750_game29,157,8/8/4K3/n2B2k1/P3Q3/8/8/2q5 w - - 20 79,e6e5,,572,495,SF depth14 loss
+selfplay_blunder,20261012_201750_game29,160,8/8/8/n2BK1k1/P2Q4/8/1q6/8 b - - 23 80,b2d4,,-341,243,SF depth14 loss
+selfplay_blunder,20261012_201750_game29,175,8/P1n5/8/8/1K1k4/8/6B1/8 w - - 1 88,a7a8q,,584,538,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,43,3rr1k1/1bp2ppp/p1q5/4b3/P1p1N3/4PP2/1PQ3PP/R1B2RK1 w - - 4 22,g1h1,,-140,283,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,48,3rr1k1/2p2ppp/p6q/4b3/P1p1P3/4P2P/1PQ3P1/R1B2R1K b - - 0 24,h6c6,,464,240,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,92,6k1/3R2p1/p4p1p/6r1/4r3/7P/2R3P1/7K b - - 5 46,a6a5,,236,186,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,111,8/3R2pk/5p1p/pr2r3/8/7P/2R3PK/8 w - - 18 56,d7f7,,-45,195,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,112,8/5Rpk/5p1p/pr2r3/8/7P/2R3PK/8 b - - 19 56,h6h5,,240,159,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,119,8/R5p1/5p1k/prr4p/8/7P/2R3PK/8 w - - 6 60,c2f2,,-101,186,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,120,8/R5p1/5p1k/prr4p/8/7P/5RPK/8 b - - 7 60,c5f5,,287,176,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,134,8/R1R5/5p2/pr3kp1/7p/7P/6PK/5r2 b - - 3 67,f1f2,,399,182,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,135,8/R1R5/5p2/pr3kp1/7p/7P/5rPK/8 w - - 4 68,h2h1,,-217,160,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,143,8/2R5/5pk1/R5p1/7p/7P/1r1r2P1/7K w - - 1 72,a5a7,,-304,194,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,191,4R3/8/8/3k4/8/5pp1/r7/4K3 w - - 4 96,e8d8,,-844,156,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,192,3R4/8/8/3k4/8/5pp1/r7/4K3 b - - 5 96,d5c6,,1000,159,SF depth14 loss
+selfplay_blunder,20261012_201750_game30,195,2R5/1k6/8/8/8/5pp1/r7/4K3 w - - 8 98,c8g8,,-842,158,SF depth14 loss
+selfplay_blunder,20261012_201750_game31,36,r3r1k1/ppp1qppp/8/3pN3/1n1PnBb1/1Q2P1P1/PP3PBP/R4RK1 b - - 4 18,e4d2,,-116,192,SF depth14 loss
+selfplay_blunder,20261012_201750_game31,44,r3r1k1/pp2qppp/2p5/3p4/1n1P2N1/1Q2P1B1/PP3PBP/R5K1 b - - 1 22,g8h8,,-262,155,SF depth14 loss
+selfplay_blunder,20261012_201750_game31,101,1r6/5r1k/2BP2p1/R4p1p/Pp1N4/4P3/1P3P1P/6K1 w - - 1 51,d4e6,,667,196,SF depth14 loss
+selfplay_blunder,20261012_201750_game32,51,r3r1k1/p1p2ppb/1p1q3p/1P1nn2P/3Bp3/1R2P1N1/PQ1PBPP1/2R3K1 w - - 1 26,e2c4,,144,164,SF depth14 loss
+selfplay_blunder,20261012_201750_game32,52,r3r1k1/p1p2ppb/1p1q3p/1P1nn2P/2BBp3/1R2P1N1/PQ1P1PP1/2R3K1 b - - 2 26,d5f6,,20,162,SF depth14 loss
+selfplay_blunder,20261012_201750_game32,63,r3r2k/p1pq2pb/1pR2p1p/1P1n3P/Q2Bp3/4P1N1/P2P1PP1/2R3K1 w - - 0 32,a4a3,,52,173,SF depth14 loss
+selfplay_blunder,20261012_201750_game32,64,r3r2k/p1pq2pb/1pR2p1p/1P1n3P/3Bp3/Q3P1N1/P2P1PP1/2R3K1 b - - 1 32,d7g4,,121,179,SF depth14 loss
+selfplay_blunder,20261012_201750_game33,107,1r6/1p1Bpk2/1P1p2pB/3P4/7P/1P1K4/8/8 w - - 31 54,d7e6,,424,152,SF depth14 loss
+selfplay_blunder,20261012_201750_game33,126,4k3/1p2p3/1P1pB1K1/3P4/rP5P/4B3/8/8 b - - 2 63,a4b4,,-557,197,SF depth14 loss
+selfplay_blunder,20261012_201750_game33,128,4k3/1p2p3/1P1pB1K1/3P3P/1r6/4B3/8/8 b - - 0 64,b4b2,,-734,251,SF depth14 loss
+selfplay_blunder,20261012_201750_game34,63,3r1k2/p4pp1/2N1b2p/P2p4/3P4/1nP5/5PBP/R5K1 w - - 2 32,a1b1,,169,158,SF depth14 loss
+selfplay_blunder,20261012_201750_game34,142,5k2/3R2p1/6K1/5PN1/8/6r1/8/8 b - - 16 71,g3g2,,-627,167,SF depth14 loss
+selfplay_blunder,20261012_201750_game34,147,3k4/6R1/6K1/5PN1/8/8/6r1/8 w - - 1 74,g7g8,,799,294,SF depth14 loss
+selfplay_blunder,20261012_201750_game35,31,r2q1rk1/pppb4/2n1p2p/6pn/2QP1p2/P2BP1BN/1P3PPP/R4RK1 w - - 0 16,d3g6,,119,175,SF depth14 loss
+selfplay_blunder,20261012_201750_game35,32,r2q1rk1/pppb4/2n1p1Bp/6pn/2QP1p2/P3P1BN/1P3PPP/R4RK1 b - - 1 16,h5g3,,56,168,SF depth14 loss
+selfplay_blunder,20261012_201750_game35,114,8/1R6/1p3k1p/2p3p1/N1b1P1P1/P5P1/1r6/6K1 b - - 1 57,b2b3,,170,186,SF depth14 loss
+selfplay_blunder,20261012_201750_game35,136,2b5/8/8/P1k3pp/4P3/2K2NP1/8/8 b - - 1 68,g5g4,,-20,151,SF depth14 loss
+selfplay_blunder,20261012_201750_game35,180,8/8/6kP/5N2/6K1/8/8/8 b - - 8 90,g6h7,,-674,309,SF depth14 loss
+selfplay_blunder,20261012_201750_game36,25,r3kbnr/1p1q1pp1/p1np4/4pPPp/8/2N1B3/PPP1BP1P/R2Q1RK1 w kq - 1 13,e2h5,,232,195,SF depth14 loss
+selfplay_blunder,20261012_201750_game38,92,8/5k2/7R/6p1/5p2/4r3/3K4/8 b - - 1 46,e3a3,,727,249,SF depth14 loss
+selfplay_blunder,20261012_201750_game38,93,8/5k2/7R/6p1/5p2/r7/3K4/8 w - - 2 47,h6h5,,-478,221,SF depth14 loss
+selfplay_blunder,20261012_201750_game40,60,r5k1/5p2/1np1rqp1/p2p4/3P4/PP1BP3/2Q2P1R/K1R5 b - - 0 30,a5a4,,-14,187,SF depth14 loss
+selfplay_blunder,20261012_201750_game40,74,r5k1/5pqR/1np1r3/3p2p1/pP1P4/P2BPP2/K1Q5/7R b - - 1 37,g7f6,,-429,163,SF depth14 loss
+selfplay_blunder,20261012_201750_game40,99,r4Q2/2kq3R/1np3B1/3p4/pP1P4/P3PP2/K7/8 w - - 1 50,h7d7,,1000,163,SF depth14 loss
+selfplay_blunder,20261012_201750_game43,29,r2qr1k1/ppnb1ppp/2pb1n2/3p4/3P4/2N1BNPP/PPQ1PPB1/R3R1K1 w - - 1 15,g1h2,,13,246,SF depth14 loss
+selfplay_blunder,20261012_201750_game43,30,r2qr1k1/ppnb1ppp/2pb1n2/3p4/3P4/2N1BNPP/PPQ1PPBK/R3R3 b - - 2 15,c7a6,,233,282,SF depth14 loss
+selfplay_blunder,20261012_201750_game43,151,8/8/8/6p1/3K2k1/1R6/5p2/4r3 w - - 8 76,b3e3,,-754,246,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,68,8/3r4/R1p2pk1/P3p1p1/2P5/4KP2/7P/8 b - - 0 34,d7c7,,-44,152,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,69,8/2r5/R1p2pk1/P3p1p1/2P5/4KP2/7P/8 w - - 1 35,a6b6,,196,173,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,74,8/7r/PR3pk1/2p1p1p1/2P5/4KP1P/8/8 b - - 0 37,h7a7,,-130,212,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,79,8/r7/P1R2pk1/2p1p1p1/2P5/5P1P/4K3/8 w - - 5 40,e2f2,,246,150,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,81,8/r7/P1R2p2/2p1pkp1/2P5/5P1P/5K2/8 w - - 7 41,f2e1,,227,216,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,82,8/r7/P1R2p2/2p1pkp1/2P5/5P1P/8/4K3 b - - 8 41,a7a8,,-11,205,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,99,r7/PR6/5p2/1Kp1p1p1/2P5/5k1P/8/8 w - - 1 50,b5b6,,339,186,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,105,r7/P7/1K3R2/2p3p1/2P5/4p1kP/8/8 w - - 1 53,f6f5,,410,237,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,107,4r3/P7/1K6/2p2Rp1/2P5/4p1kP/8/8 w - - 3 54,f5g5,,225,161,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,108,4r3/P7/1K6/2p3R1/2P5/4p1kP/8/8 b - - 0 54,g3h2,,-64,303,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,109,4r3/P7/1K6/2p3R1/2P5/4p2P/7k/8 w - - 1 55,g5f5,,367,316,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,112,4r3/P7/1K6/2p3R1/2P5/4p2P/8/6k1 b - - 4 56,g1h2,,-34,295,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,113,4r3/P7/1K6/2p3R1/2P5/4p2P/7k/8 w - - 5 57,g5f5,,329,329,SF depth14 loss
+selfplay_blunder,20261012_201750_game44,116,4r3/P7/1K6/2p3R1/2P5/4p2P/8/6k1 b - - 8 58,g1h2,,0,389,SF depth14 loss
+selfplay_blunder,20261012_201750_game46,25,r1bq1rk1/1p3pp1/2np1n1p/p1p5/2P1pN2/PQ2P3/1P1PBPPP/R1B1K2R w KQ - 2 13,f4d5,,-2,157,SF depth14 loss
+selfplay_blunder,20261012_201750_game46,168,8/8/8/8/2R5/3K4/5k2/8 b - - 12 84,f2f3,,-404,167,SF depth14 loss
+selfplay_blunder,20261012_201750_game47,25,1k2r2r/pppb1pp1/2n2n1p/1N1p4/1b3B2/3P1NP1/PP2PPBP/2R1K2R w K - 4 13,f3d2,,16,219,SF depth14 loss
+selfplay_blunder,20261012_201750_game47,38,1k2r2r/1p1b1p2/p1n2n1p/3N2p1/2Nb4/P2PP1P1/1P3PBP/2R1K2R b K - 0 19,d7e6,,298,153,SF depth14 loss
+selfplay_blunder,20261012_201750_game47,69,3b3r/3P1p2/7p/p5p1/2R5/k3P1P1/3r1P1P/2R3K1 w - - 0 35,c4d4,,-179,194,SF depth14 loss
+selfplay_blunder,20261012_201750_game47,111,8/8/1R5p/4bk1P/5p2/5K2/5P2/2r5 w - - 14 56,b6h6,,-442,177,SF depth14 loss
+selfplay_blunder,20261012_201750_game47,114,8/8/7R/4bk1P/5p2/2r5/4KP2/8 b - - 2 57,c3c2,,679,242,SF depth14 loss
+selfplay_blunder,20261012_201750_game47,126,8/8/8/4b2P/4kp2/8/2KR3r/8 b - - 9 63,h2h5,,659,182,SF depth14 loss
+selfplay_blunder,20261012_201750_game47,141,8/8/8/8/4kb2/5p2/4r3/2K4R w - - 4 71,c1d1,,-795,205,SF depth14 loss
+selfplay_blunder,20261012_201750_game48,34,1rbq2kr/ppp2ppp/5b2/2n2P2/2Np4/3P2P1/PPQ1P1BP/R1B2R1K b - - 2 17,d8e7,,-82,166,SF depth14 loss
+selfplay_blunder,20261012_201750_game48,44,1r4kr/p1pbqppp/1p3b2/1Pn2P2/2NpP3/P2P2P1/2Q3BP/1RB2R1K b - e3 0 22,a7a6,,-196,155,SF depth14 loss
+selfplay_blunder,20261012_201750_game48,64,1r3k1r/2pq2pp/1p6/3B1P2/b2Q1B2/P2n2P1/7P/1R2R2K b - - 0 32,d3f4,,-18,185,SF depth14 loss
+selfplay_blunder,20261012_201750_game48,71,3r1k1r/3q2pp/1p6/2pBQP2/5P2/P7/2b4P/2R1R2K w - - 2 36,c1c2,,306,289,SF depth14 loss
+selfplay_blunder,20261012_201750_game49,36,r3k2r/1p3p2/5n1p/2pqn1p1/p7/P3P2P/1PQPB2P/R1B2RK1 b kq - 0 18,f6d7,,129,158,SF depth14 loss
+selfplay_blunder,20261012_201750_game49,59,r4r2/1p4k1/5p2/2p3pR/p2nP2n/P2P4/1P5P/1RB2B1K w - - 2 30,c1g5,,-200,201,SF depth14 loss
+selfplay_blunder,20261012_201750_game49,117,8/8/8/1p5k/p7/Pn4KP/8/3q4 w - - 0 59,g3f2,,-838,162,SF depth14 loss
+selfplay_blunder,20261012_201750_game50,69,3r3r/5pkp/8/6pq/3p2n1/3P2PP/PQ3PB1/R4R1K w - - 0 35,a1e1,,406,151,SF depth14 loss
+selfplay_blunder,20261012_201750_game50,92,8/5pk1/8/4n1r1/3Q4/3P2qP/P7/5BRK b - - 3 46,g3g1,,-128,313,SF depth14 loss
+selfplay_blunder,20261012_201750_game50,124,8/P2B1p2/8/6kP/8/8/8/6K1 b - - 0 62,g5f4,,-731,269,SF depth14 loss
+selfplay_blunder,20261013_104954_game04,74,5rkr/3QRp2/1p6/2p3qp/p2pB3/P2P2P1/7P/5RK1 b - - 1 37,g5g7,,-593,407,SF depth14 loss
+selfplay_blunder,20261013_104954_game04,75,5rkr/3QRpq1/1p6/2p4p/p2pB3/P2P2P1/7P/5RK1 w - - 2 38,e4d5,,1000,382,SF depth14 loss
+selfplay_blunder,20261013_104954_game04,78,4Rrk1/3Q1pqr/1p6/2pB3p/p2p4/P2P2P1/7P/5RK1 b - - 5 39,g7g6,,-535,465,SF depth14 loss
+selfplay_blunder,20261013_104954_game04,79,4Rrk1/3Q1p1r/1p4q1/2pB3p/p2p4/P2P2P1/7P/5RK1 w - - 6 40,d5e4,,1000,332,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,75,8/2p3k1/3b3p/P2Q4/3P2q1/6B1/5r2/4R1K1 w - - 0 38,d5d6,,0,217,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,89,8/4k3/3p3p/q7/3B4/8/5R2/5K2 w - - 4 45,f1e2,,-161,196,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,90,8/4k3/3p3p/q7/3B4/8/4KR2/8 b - - 5 45,h6h5,,357,194,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,139,8/8/4k3/3p3p/5R1K/8/3q1B2/8 w - - 40 70,f2g3,,-20,342,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,188,8/3k4/8/8/5q2/3p3R/8/4K3 b - - 1 94,f4e4,,792,276,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,199,8/4k3/8/5K2/8/4q3/8/8 w - - 6 100,f5g6,,-528,467,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,202,8/4k3/8/5K2/8/6q1/8/8 b - - 9 101,g3f3,,993,518,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,211,8/3k4/5K2/8/6q1/8/8/8 w - - 18 106,f6e5,,-748,242,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,212,8/3k4/8/4K3/6q1/8/8/8 b - - 19 106,g4h4,,990,541,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,215,8/3k4/8/3K4/5q2/8/8/8 w - - 22 108,d5c5,,-742,247,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,222,8/3k4/8/3K4/8/4q3/8/8 b - - 29 111,d7e7,,995,487,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,223,8/4k3/8/3K4/8/4q3/8/8 w - - 30 112,d5c6,,-508,485,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,224,8/4k3/2K5/8/8/4q3/8/8 b - - 31 112,e3c3,,993,376,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,225,8/4k3/2K5/8/8/2q5/8/8 w - - 32 113,c6d5,,-617,373,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,226,8/4k3/8/3K4/8/2q5/8/8 b - - 33 113,e7d7,,990,560,SF depth14 loss
+selfplay_blunder,20261013_104954_game06,229,8/8/4k3/8/4K3/2q5/8/8 w - - 36 115,e4f4,,-438,555,SF depth14 loss
+selfplay_blunder,20261013_104954_game07,45,r3b1kr/5ppp/p1p5/2qn4/P2p4/1Q1P2P1/1P1B1PBP/R3R1K1 w - - 0 23,a1c1,,549,240,SF depth14 loss
+selfplay_blunder,20261013_104954_game07,55,r5kr/3b1ppp/p1p5/2Rn4/P7/3P2P1/1P1B1PBP/4R1K1 w - - 1 28,a4a5,,463,177,SF depth14 loss
+selfplay_blunder,20261013_104954_game07,133,8/3k4/R7/6p1/3B1pp1/1K4Pr/5P2/8 w - - 2 67,a6a5,,230,191,SF depth14 loss
+selfplay_blunder,20261013_104954_game08,38,3r1rk1/ppq3pp/8/2p2p2/2Q3n1/P1B1P3/1P2KPPP/3R3R b - - 1 19,g8h8,,-37,175,SF depth14 loss
+selfplay_blunder,20261013_104954_game08,115,8/8/5k2/3Q4/7p/7P/6PK/8 w - - 3 58,g2g4,,924,187,SF depth14 loss
+selfplay_blunder,20261013_104954_game08,116,8/8/5k2/3Q4/6Pp/7P/7K/8 b - g3 0 58,h4g3,,-737,263,SF depth14 loss
+selfplay_blunder,20261013_104954_game10,57,8/r1p1qpk1/1p1p1n1p/1P1P2p1/p3r3/PR2P3/1BQ2PPP/1R4K1 w - - 0 29,b2f6,,274,196,SF depth14 loss
+selfplay_blunder,20261013_104954_game10,116,4q3/2p3r1/1p1p1k1p/1P1P2pP/2R5/P2QP3/5PK1/8 b - - 2 58,g5g4,,-280,443,SF depth14 loss
+selfplay_blunder,20261013_104954_game12,50,r6k/1pp3p1/p1n5/5Q2/8/P3q3/1P4PP/3R1N1K b - - 1 25,e3e2,,-178,265,SF depth14 loss
+selfplay_blunder,20261013_104954_game12,51,r6k/1pp3p1/p1n5/5Q2/8/P7/1P2q1PP/3R1N1K w - - 2 26,f5h3,,443,384,SF depth14 loss
+selfplay_blunder,20261013_104954_game12,102,8/8/3k2N1/1pp3P1/3n3K/P7/1P6/8 b - - 6 51,b5b4,,28,202,SF depth14 loss
+selfplay_blunder,20261013_104954_game12,162,8/8/2K5/5k2/8/5Q2/8/8 b - - 4 81,f5e5,,-482,513,SF depth14 loss
+selfplay_blunder,20261013_104954_game12,163,8/8/2K5/4k3/8/5Q2/8/8 w - - 5 82,f3f1,,995,533,SF depth14 loss
+selfplay_blunder,20261013_104954_game12,173,8/8/8/3K4/5Q2/8/8/4k3 w - - 15 87,f4c1,,994,459,SF depth14 loss
+selfplay_blunder,20261013_104954_game12,174,8/8/8/3K4/8/8/8/2Q1k3 b - - 16 87,e1e2,,-535,455,SF depth14 loss
+selfplay_blunder,20261013_104954_game13,42,r4r1k/p1qbbppp/1p1p4/n1pPp3/3P4/P1B1PN1P/1P1Q1PP1/2RB1RK1 b - - 0 21,d7b5,,14,171,SF depth14 loss
+selfplay_blunder,20261013_104954_game13,105,3r2k1/1r3p2/R2p1q1p/2pP1B2/1p2PQ1P/1P4P1/5P2/6K1 w - - 17 53,h4h5,,0,179,SF depth14 loss
+selfplay_blunder,20261013_104954_game13,106,3r2k1/1r3p2/R2p1q1p/2pP1B1P/1p2PQ2/1P4P1/5P2/6K1 b - - 0 53,b7b8,,179,161,SF depth14 loss
+selfplay_blunder,20261013_104954_game13,133,6r1/5pk1/Q2p1q1p/2pP1B1P/1p2P3/1P4P1/5P2/6K1 w - - 19 67,a6a7,,-75,179,SF depth14 loss
+selfplay_blunder,20261013_104954_game13,134,6r1/Q4pk1/3p1q1p/2pP1B1P/1p2P3/1P4P1/5P2/6K1 b - - 20 67,f6b2,,254,179,SF depth14 loss
+selfplay_blunder,20261013_104954_game13,182,3r2k1/5p2/3p1Q1p/2pP1B1P/1p2PPP1/1q6/4K3/8 b - - 1 91,b3a2,,216,157,SF depth14 loss
+selfplay_blunder,20261013_104954_game14,41,r7/1pp2kpp/p4n2/8/Q2p2b1/N2P2P1/PP2qP1P/2R1b1KR w - - 2 21,a4c4,,-638,311,SF depth14 loss
+selfplay_blunder,20261013_104954_game15,31,r2q2kr/1pp2ppp/p7/2bP1b2/Q2N1B2/3n2P1/PP3PBP/R3R1K1 w - - 0 16,f4c7,,319,256,SF depth14 loss
+selfplay_blunder,20261013_104954_game15,32,r2q2kr/1pB2ppp/p7/2bP1b2/Q2N4/3n2P1/PP3PBP/R3R1K1 b - - 0 16,d8c8,,-63,265,SF depth14 loss
+selfplay_blunder,20261013_104954_game15,122,8/6k1/4K3/8/3B3p/5B1P/8/8 b - - 3 61,g7f8,,-583,376,SF depth14 loss
+selfplay_blunder,20261013_104954_game16,47,2b1r1k1/1pp4p/5q2/2r1p3/p1P1Q3/P4NP1/1P5P/2KRR3 w - - 1 24,d1d4,,-71,293,SF depth14 loss
+selfplay_blunder,20261013_104954_game16,55,6k1/1Qp4p/5q2/2r2b2/p1PR4/P5P1/1P2r2P/2K2R2 w - - 2 28,b7a8,,-276,219,SF depth14 loss
+selfplay_blunder,20261013_104954_game18,56,6k1/1p4pp/3pp3/b3p3/4P3/P1nN1P2/4r1PP/R3N1K1 b - - 0 28,d6d5,,319,159,SF depth14 loss
+selfplay_blunder,20261013_104954_game18,84,8/5k2/1p2p1pp/2br2P1/P6P/5N2/8/2R4K b - - 0 42,h6g5,,226,151,SF depth14 loss
+selfplay_blunder,20261013_104954_game19,29,r4rk1/p1pp1ppp/Qp3q2/8/2P1b2P/P3p3/1P1B1PP1/R3KB1R w KQ - 0 15,d2e3,,114,152,SF depth14 loss
+selfplay_blunder,20261013_104954_game20,117,8/7p/3nkp1P/1p2p1p1/1B2K1P1/P4P2/8/8 w - - 8 59,b4d6,,-275,162,SF depth14 loss
+selfplay_blunder,20261013_104954_game21,124,5b2/8/8/4Pk1P/pppB4/8/1P2K3/8 b - - 1 62,a4a3,,317,278,SF depth14 loss
+selfplay_blunder,20261013_104954_game21,139,8/8/3bP1k1/8/7B/p1p5/8/1K6 w - - 0 70,h4f2,,-15,494,SF depth14 loss
+selfplay_blunder,20261013_104954_game21,150,4k3/4P3/7B/8/8/p7/Kbp5/8 b - - 4 75,c2c1r,,616,155,SF depth14 loss
+selfplay_blunder,20261013_104954_game21,151,4k3/4P3/7B/8/8/p7/Kb6/2r5 w - - 0 76,h6c1,,-461,268,SF depth14 loss
+selfplay_blunder,20261013_104954_game22,48,2r3k1/1pr1bpp1/p1qpbn1p/4p3/PPn1P3/1NNR3P/2P2PP1/R1BBQ1K1 b - - 2 24,d6d5,,75,166,SF depth14 loss
+selfplay_blunder,20261013_104954_game22,59,2r3k1/1pr1bpp1/p2q3p/1P6/P1n1b3/1N1R3P/2P2PP1/R1B1Q1K1 w - - 0 30,e1e4,,237,217,SF depth14 loss
+selfplay_blunder,20261013_104954_game23,43,1q3rk1/2r2ppp/np2p3/p2pP3/3P4/P1QB2P1/1P3P1P/R1R3K1 w - - 4 22,d3h7,,200,160,SF depth14 loss
+selfplay_blunder,20261013_104954_game23,101,4k3/R4p2/P3p1p1/4P3/7P/r5P1/3K4/8 w - - 1 51,d2e2,,455,318,SF depth14 loss
+selfplay_blunder,20261013_104954_game23,102,4k3/R4p2/P3p1p1/4P3/7P/r5P1/4K3/8 b - - 2 51,a3a5,,-137,198,SF depth14 loss
+selfplay_blunder,20261013_104954_game23,132,R7/P4K1k/4p2P/4P3/8/8/r7/8 b - - 0 66,a2a6,,-554,176,SF depth14 loss
+selfplay_blunder,20261013_104954_game23,174,R7/P3P2k/7P/1K6/r7/8/8/8 b - - 18 87,a4e4,,-778,222,SF depth14 loss
+selfplay_blunder,20261013_104954_game24,32,2r1k2r/pp2ppb1/3p2p1/P1qPn2p/3pP1b1/N5P1/1PPQ1PBP/R1B1R1K1 b k - 2 16,d4d3,,203,203,SF depth14 loss
+selfplay_blunder,20261013_104954_game25,87,2k5/1p6/p7/5p1q/5Q1P/1P6/1KP5/8 w - - 0 44,f4g5,,14,260,SF depth14 loss
+selfplay_blunder,20261013_104954_game25,88,2k5/1p6/p7/5pQq/7P/1P6/1KP5/8 b - - 1 44,h5g4,,246,274,SF depth14 loss
+selfplay_blunder,20261013_104954_game27,112,3r3k/6p1/1p5p/p4B1P/P1P1PP2/1P2K3/8/8 b - - 2 56,d8d1,,0,184,SF depth14 loss
+selfplay_blunder,20261013_104954_game27,113,7k/6p1/1p5p/p4B1P/P1P1PP2/1P2K3/8/3r4 w - - 3 57,e4e5,,184,234,SF depth14 loss
+selfplay_blunder,20261013_104954_game27,114,7k/6p1/1p5p/p3PB1P/P1P2P2/1P2K3/8/3r4 b - - 0 57,d1h1,,50,244,SF depth14 loss
+selfplay_blunder,20261013_104954_game27,115,7k/6p1/1p5p/p3PB1P/P1P2P2/1P2K3/8/7r w - - 1 58,e3d4,,194,218,SF depth14 loss
+selfplay_blunder,20261013_104954_game27,121,6k1/6p1/1p5p/p2KP3/P1P1BP2/1P5r/8/8 w - - 2 61,d5c6,,194,287,SF depth14 loss
+selfplay_blunder,20261013_104954_game27,133,3k4/6p1/1KP5/pB2P2p/P4P2/2r5/8/8 w - - 1 67,b5f1,,-31,161,SF depth14 loss
+selfplay_blunder,20261013_104954_game27,134,3k4/6p1/1KP5/p3P2p/P4P2/2r5/8/5B2 b - - 2 67,h5h4,,192,178,SF depth14 loss
+selfplay_blunder,20261013_104954_game30,109,8/8/p2pk3/PP5K/4B2P/3p2b1/8/8 w - - 0 55,e4d3,,256,230,SF depth14 loss
+selfplay_blunder,20261013_104954_game31,22,r1b1k2r/pp2ppb1/1qnp1n2/2p4p/1PP1P1p1/2NPB3/P3BPPP/1R1QNRK1 b kq - 0 11,g4g3,,-99,159,SF depth14 loss
+selfplay_blunder,20261013_104954_game31,64,1r2k3/1P2pp2/8/1R5p/3bN3/3P2P1/5PP1/6K1 b - - 6 32,e7e5,,-233,162,SF depth14 loss
+selfplay_blunder,20261013_104954_game32,97,8/1p1k4/2p3R1/3b4/3p4/3r2P1/8/R5K1 w - - 1 49,a1a7,,-79,174,SF depth14 loss
+selfplay_blunder,20261013_104954_game33,77,6k1/5pp1/p6p/1bbP4/2r2B1P/5BP1/5P2/4R1K1 w - - 5 39,e1c1,,-17,185,SF depth14 loss
+selfplay_blunder,20261013_104954_game33,130,8/8/3bk2p/6p1/4bPP1/4B1K1/8/8 b - - 3 65,e4c6,,568,151,SF depth14 loss
+selfplay_blunder,20261013_104954_game33,153,8/4K3/7p/3b4/4k1P1/8/5b2/8 w - - 0 77,e7f6,,-745,191,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,114,R7/2r1qpk1/3Q2p1/4P2p/7P/5PK1/6P1/8 b - - 12 57,g6g5,,0,332,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,117,R7/4rpk1/8/4P1pp/7P/5PK1/6P1/8 w - - 0 59,h4g5,,343,249,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,125,6k1/5p2/7R/6Pp/5P2/6K1/6P1/7r w - - 5 63,f4f5,,282,187,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,126,6k1/5p2/7R/5PPp/8/6K1/6P1/7r b - - 0 63,h1f1,,-95,154,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,129,6k1/5p2/5P1R/6Pp/8/6K1/6P1/7r w - - 1 65,g3f3,,281,246,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,130,6k1/5p2/5P1R/6Pp/8/5K2/6P1/7r b - - 2 65,h1f1,,-35,252,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,141,6k1/5p2/5P2/6PR/8/6P1/6K1/1r6 w - - 1 71,g3g4,,422,373,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,146,6k1/5p2/5P2/6PR/6PK/1r6/8/8 b - - 4 73,b3b4,,-28,491,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,147,6k1/5p2/5P2/6PR/1r4PK/8/8/8 w - - 5 74,h5h6,,519,494,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,166,8/2r3k1/6R1/6PK/8/8/8/8 b - - 10 83,g7f7,,0,420,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,169,8/5k2/6RK/6P1/8/8/2r5/8 w - - 13 85,g6f6,,515,502,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,172,6k1/8/R6K/6P1/8/8/2r5/8 b - - 16 86,c2g2,,0,448,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,240,8/5R2/6K1/8/6k1/8/8/8 b - - 14 120,g4h4,,-568,422,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,249,8/5R2/8/8/5K2/7k/8/8 w - - 23 125,f4f3,,994,563,SF depth14 loss
+selfplay_blunder,20261013_104954_game34,250,8/5R2/8/8/8/5K1k/8/8 b - - 24 125,h3h2,,-431,565,SF depth14 loss
+selfplay_blunder,20261013_104954_game35,53,r5k1/2R2pb1/3p2p1/pp1P1P1p/3pP3/1P1P1B1b/1P1B3P/6K1 w - - 0 27,f3e2,,90,164,SF depth14 loss
+selfplay_blunder,20261013_104954_game35,85,6k1/5R2/3p4/p2P3B/1p1pP2P/1P1b4/1Pr5/7K w - - 2 43,f7e7,,78,403,SF depth14 loss
+selfplay_blunder,20261013_104954_game35,119,5k2/3R4/3K4/p2P4/7q/8/1p6/8 w - - 0 60,d7b7,,-616,184,SF depth14 loss
+selfplay_blunder,20261013_104954_game36,35,r2r2k1/p1p2pp1/1p3nqp/3P4/3P4/1Q1pPP1P/PP5P/R1B2R1K w - - 3 18,b3c4,,-27,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game36,37,2rr2k1/p1p2pp1/1p3nqp/3P4/2QP4/3pPP1P/PP5P/R1B2R1K w - - 5 19,f1d1,,-89,262,SF depth14 loss
+selfplay_blunder,20261013_104954_game36,38,2rr2k1/p1p2pp1/1p3nqp/3P4/2QP4/3pPP1P/PP5P/R1BR3K b - - 6 19,g6h5,,351,151,SF depth14 loss
+selfplay_blunder,20261013_104954_game36,39,2rr2k1/p1p2pp1/1p3n1p/3P3q/2QP4/3pPP1P/PP5P/R1BR3K w - - 7 20,h1g2,,-200,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game37,80,8/6pp/3bk2P/8/R2p1p1B/Pp1K1P2/1Pr2P2/8 b - - 0 40,g7h6,,349,150,SF depth14 loss
+selfplay_blunder,20261013_104954_game37,142,8/8/8/B4k2/5b2/1r5p/8/3K4 b - - 1 71,b3b2,,956,197,SF depth14 loss
+selfplay_blunder,20261013_104954_game38,30,r1b3kr/pp2bppp/1qp1n3/3n4/3pN3/3P1NPB/PPQBPP1P/R1R3K1 b - - 5 15,e6f4,,-64,187,SF depth14 loss
+selfplay_blunder,20261013_104954_game38,75,8/8/1p6/3Rrk1p/8/6P1/5P1P/6K1 w - - 1 38,d5d6,,399,260,SF depth14 loss
+selfplay_blunder,20261013_104954_game38,98,8/8/4k3/1p1r4/1R4KP/5P2/8/8 b - - 6 49,e6d6,,-17,173,SF depth14 loss
+selfplay_blunder,20261013_104954_game38,99,8/8/3k4/1p1r4/1R4KP/5P2/8/8 w - - 7 50,b4b1,,190,159,SF depth14 loss
+selfplay_blunder,20261013_104954_game38,100,8/8/3k4/1p1r4/6KP/5P2/8/1R6 b - - 8 50,d6c5,,-31,387,SF depth14 loss
+selfplay_blunder,20261013_104954_game39,33,2k1rr2/pppb1pp1/2n2n1p/8/3p1BP1/P2P1N1P/1P1KPP2/2R2B1R w - - 0 17,f3d4,,159,359,SF depth14 loss
+selfplay_blunder,20261013_104954_game39,66,2r5/6p1/4k2p/1P3p2/3KB1P1/4B2P/5P2/8 b - - 0 33,c8d8,,-6,322,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,114,8/2Q1k3/8/1P5p/3qP2P/6P1/7K/8 b - - 1 57,e7f6,,-393,247,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,115,8/2Q5/5k2/1P5p/3qP2P/6P1/7K/8 w - - 2 58,c7f4,,640,244,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,118,8/4k3/8/1P4Qp/3qP2P/6P1/7K/8 b - - 5 59,e7e6,,-413,288,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,119,8/8/4k3/1P4Qp/3qP2P/6P1/7K/8 w - - 6 60,g5g6,,701,269,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,121,8/4k3/6Q1/1P5p/3qP2P/6P1/7K/8 w - - 8 61,g6f5,,473,199,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,122,8/4k3/8/1P3Q1p/3qP2P/6P1/7K/8 b - - 9 61,e7d6,,-274,342,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,123,8/8/3k4/1P3Q1p/3qP2P/6P1/7K/8 w - - 10 62,e4e5,,616,194,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,124,8/8/3k4/1P2PQ1p/3q3P/6P1/7K/8 b - - 0 62,d4e5,,-422,312,SF depth14 loss
+selfplay_blunder,20261013_104954_game40,157,8/8/8/1Q6/8/2k5/4K3/8 w - - 11 79,e2f2,,995,483,SF depth14 loss
+selfplay_blunder,20261013_104954_game41,106,8/p1r5/Pp6/1P1R1k2/8/7p/3K2p1/8 b - - 1 53,f5e4,,897,154,SF depth14 loss
+selfplay_blunder,20261013_104954_game41,107,8/p1r5/Pp6/1P1R4/4k3/7p/3K2p1/8 w - - 2 54,d5d8,,-743,257,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,66,8/p1p2Qpk/1p1q3p/8/2P1P3/P6P/3r1PP1/4R1K1 b - - 0 33,d6a3,,-49,181,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,67,8/p1p2Qpk/1p5p/8/2P1P3/q6P/3r1PP1/4R1K1 w - - 0 34,f7c7,,230,203,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,82,8/7k/1Q5p/4P1p1/2q5/7P/5rPK/4R3 b - - 1 41,c4c2,,-25,160,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,85,8/7k/1Q5p/4Pqp1/8/7P/5rP1/4R2K w - - 4 43,b6b7,,240,206,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,91,6k1/5q2/8/4P1pp/2Q5/7P/5rP1/4R2K w - - 2 46,c4d3,,411,236,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,92,6k1/5q2/8/4P1pp/8/3Q3P/5rP1/4R2K b - - 3 46,f7f5,,-175,219,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,93,6k1/8/8/4Pqpp/8/3Q3P/5rP1/4R2K w - - 4 47,d3e3,,394,362,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,98,6k1/8/8/4P1pp/8/4Q2P/6PK/5q2 b - - 1 49,f1f4,,0,392,SF depth14 loss
+selfplay_blunder,20261013_104954_game43,110,8/8/4k1K1/4P3/8/7P/8/8 b - - 2 55,e6e7,,-538,338,SF depth14 loss
+selfplay_blunder,20261013_104954_game45,102,2R2k2/8/6p1/1p5p/8/7P/q1B3PK/8 b - - 5 51,f8e7,,308,155,SF depth14 loss
+selfplay_blunder,20261013_104954_game45,112,8/4k2B/8/3q3p/8/6PP/1p5K/5R2 b - - 0 56,d5e5,,224,198,SF depth14 loss
+selfplay_blunder,20261013_104954_game45,190,8/8/8/7p/3qB2P/1k4P1/1p2R1K1/8 b - - 76 95,d4e4,,182,182,SF depth14 loss
+selfplay_blunder,20261013_104954_game46,106,8/8/1k6/1p1K4/p1p5/8/1P6/3B4 b - - 1 53,c4c3,,0,501,SF depth14 loss
+selfplay_blunder,20261013_104954_game47,33,1r1q1r2/1p1b2bk/p1np3p/2p2pp1/2P5/PQNPP3/1P1NB1PP/R4R1K w - - 0 17,e2h5,,-147,179,SF depth14 loss
+selfplay_blunder,20261013_104954_game47,145,8/4K1k1/3P4/2n5/8/p6b/N7/8 w - - 12 73,e7d8,,-205,196,SF depth14 loss
+selfplay_blunder,20261013_104954_game47,150,8/2K2k2/3Pb3/2n5/8/p7/8/2N5 b - - 17 75,a3a2,,562,353,SF depth14 loss
+selfplay_blunder,20261013_104954_game47,187,8/8/8/3b4/3n4/3k4/8/4K3 w - - 24 94,e1f2,,-370,613,SF depth14 loss
+selfplay_blunder,20261013_104954_game47,188,8/8/8/3b4/3n4/3k4/5K2/8 b - - 25 94,d5f3,,983,793,SF depth14 loss
+selfplay_blunder,20261013_104954_game47,189,8/8/8/8/3n4/3k1b2/5K2/8 w - - 26 95,f2g3,,-190,794,SF depth14 loss
+selfplay_blunder,20261013_104954_game47,254,8/8/8/8/4b3/5n2/5k2/7K b - - 91 127,f3d4,,995,965,SF depth14 loss
+selfplay_blunder,20261013_104954_game48,147,8/8/8/4p1k1/3bP3/1p1K1P2/8/8 w - - 2 74,d3d2,,-737,216,SF depth14 loss
+selfplay_blunder,20261013_104954_game49,51,2r3rk/1p2b1p1/p2pNn1p/4p3/q3P3/2B4P/PPP1QPP1/R2R2K1 w - - 1 26,f2f3,,-65,252,SF depth14 loss
+selfplay_blunder,20261013_104954_game49,81,5rrk/1p6/p2p4/4p2n/4q1P1/2B1b2P/PPP3RK/R2Q4 w - - 0 41,d1d3,,-526,191,SF depth14 loss
+selfplay_blunder,20261013_104954_game50,88,4kb2/7p/8/7R/4PK2/1r5P/8/8 b - - 4 44,e8d7,,191,164,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,95,2r3k1/R7/4p1pp/3p4/3P4/4P1PP/5PK1/8 w - - 0 48,f2f4,,293,217,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,104,5k2/7R/1r2p1p1/3p3p/3P1PP1/4PK1P/8/8 b - - 0 52,f8g8,,-36,194,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,109,5k2/4R3/r3p1p1/3p3p/3P1PP1/4P1KP/8/8 w - - 5 55,e7d7,,211,174,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,116,5k2/1R6/4p1p1/r2p4/3P1PP1/4PK2/8/8 b - - 4 58,a5a8,,-35,185,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,117,r4k2/1R6/4p1p1/3p4/3P1PP1/4PK2/8/8 w - - 5 59,b7c7,,220,185,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,118,r4k2/2R5/4p1p1/3p4/3P1PP1/4PK2/8/8 b - - 6 59,a8b8,,-35,203,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,119,1r3k2/2R5/4p1p1/3p4/3P1PP1/4PK2/8/8 w - - 7 60,c7d7,,238,211,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,120,1r3k2/3R4/4p1p1/3p4/3P1PP1/4PK2/8/8 b - - 8 60,f8g8,,-27,268,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,123,6k1/4R3/1r2p1p1/3p4/3P1PP1/4PK2/8/8 w - - 11 62,e7c7,,365,307,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,124,6k1/2R5/1r2p1p1/3p4/3P1PP1/4PK2/8/8 b - - 12 62,b6b8,,-58,286,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,125,1r4k1/2R5/4p1p1/3p4/3P1PP1/4PK2/8/8 w - - 13 63,g4g5,,344,255,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,128,1r3k2/7R/4p1p1/3p2P1/3P1P2/4PK2/8/8 b - - 2 64,b8e8,,-40,406,SF depth14 loss
+selfplay_blunder,20261013_104954_game51,131,3r1k2/7R/4p1p1/3p2P1/3PPP2/5K2/8/8 w - - 1 66,e4d5,,411,375,SF depth14 loss
+selfplay_blunder,20261013_104954_game52,22,r1bq2kr/1pp2ppp/p1n2n2/2bp4/Q4B2/2NP1NP1/PP2PPBP/2R2RK1 b - - 1 11,c8f5,,-136,150,SF depth14 loss
+selfplay_blunder,20261013_104954_game53,29,r2qk2r/pbppb3/1pn1p3/6pp/Q1PNP3/2PB3P/P4PP1/R1B2RK1 w kq - 2 15,f1d1,,20,162,SF depth14 loss
+selfplay_blunder,20261013_104954_game54,63,r4r1k/1p2bppp/1Pbp4/2q1p3/pRN1P1Q1/P1P4P/B4PP1/3R2K1 w - - 15 32,a2b1,,129,206,SF depth14 loss
+selfplay_blunder,20261013_104954_game54,67,r4r1k/1p2bppp/1Pbp4/2q1p3/pRN1P1Q1/P1P4P/B4PP1/3R2K1 w - - 19 34,a2b1,,68,150,SF depth14 loss
+selfplay_blunder,20261013_104954_game54,81,3rb2k/1p2bpp1/1P5p/r2Pp3/pR6/P1PBN2P/5PP1/3R2K1 w - - 3 41,b4e4,,126,183,SF depth14 loss
+selfplay_blunder,20261013_104954_game55,55,5r2/pp4pk/2p1p2p/8/2r1P3/5BP1/PP4KP/R1B5 w - - 7 28,g3g4,,201,170,SF depth14 loss
+selfplay_blunder,20261013_104954_game55,110,8/6k1/3KP3/p7/7P/1B6/8/8 b - - 0 55,a5a4,,-727,273,SF depth14 loss
+selfplay_blunder,20261013_104954_game55,111,8/6k1/3KP3/8/p6P/1B6/8/8 w - - 0 56,b3d1,,1000,242,SF depth14 loss
+selfplay_blunder,20261013_104954_game56,142,8/8/3b1p2/P2Q1P2/3p4/2k5/4K3/8 b - - 4 71,d6b8,,-764,151,SF depth14 loss
+selfplay_blunder,20261013_104954_game57,68,8/p1p2p2/2k4r/2pR1prP/4P2R/1P6/P4P1P/2K5 b - - 1 34,h6h5,,-7,156,SF depth14 loss
+selfplay_blunder,20261013_104954_game57,83,8/p1p2p2/8/2K5/8/1P5k/P4P1P/8 w - - 1 42,c5c6,,398,367,SF depth14 loss
+selfplay_blunder,20261013_104954_game57,132,8/8/8/P7/6k1/2QK4/q7/8 b - - 20 66,g4h5,,-23,150,SF depth14 loss
+selfplay_blunder,20261013_104954_game58,28,r4rk1/pp2bppp/1q1pb3/2pPp3/Qn2P3/3P1N1P/PP1BBPP1/R3K2R b KQ - 2 14,b4d5,,-44,182,SF depth14 loss
+selfplay_blunder,20261013_104954_game58,41,r3r1k1/1p3ppp/1qb2b2/p1ppp3/P7/2BP3P/1PQNBPP1/R4RK1 w - - 0 21,e2f3,,201,162,SF depth14 loss
+selfplay_blunder,20261013_104954_game58,73,3r2k1/5p1p/2R3p1/pB2p3/P2q1b2/5Q1P/1P1r1PP1/1R4K1 w - - 17 37,g2g3,,-10,472,SF depth14 loss
+selfplay_blunder,20261013_104954_game58,123,8/8/5k2/p6B/P7/4pp2/4R2K/5q2 w - - 0 62,h5f3,,-772,190,SF depth14 loss
+selfplay_blunder,20261013_104954_game59,56,1k1r4/1p4p1/pp2P2p/7b/1P1PR3/P1KP1nP1/7P/2R5 b - - 1 28,h5g6,,0,165,SF depth14 loss
+selfplay_blunder,20261013_104954_game59,66,1k2r3/1p2P1p1/pp5p/7b/1P1PRR2/P1KP1nP1/7P/8 b - - 6 33,f3h2,,-175,170,SF depth14 loss
+selfplay_blunder,20261013_104954_game59,68,1k2rR2/1p2P1p1/pp5p/7b/1P1PR3/P1KP2P1/7n/8 b - - 1 34,b8a7,,-326,189,SF depth14 loss
+selfplay_blunder,20261013_104954_game60,154,8/8/8/5r2/3k4/1K6/8/8 b - - 17 77,f5f2,,989,409,SF depth14 loss
+selfplay_blunder,20261013_104954_game60,155,8/8/8/8/3k4/1K6/5r2/8 w - - 18 78,b3b4,,-580,409,SF depth14 loss
+selfplay_blunder,20261013_104954_game60,156,8/8/8/8/1K1k4/8/5r2/8 b - - 19 78,f2b2,,989,526,SF depth14 loss
+selfplay_blunder,20261013_104954_game60,157,8/8/8/8/1K1k4/8/1r6/8 w - - 20 79,b4a3,,-463,531,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,75,1r6/1b1nkp2/B2p4/R2Pp1pp/N1P1P3/P3P1PP/7K/8 w - - 1 38,a6b7,,246,214,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,124,6r1/4R3/3P2P1/8/8/4k2K/4p3/8 b - - 3 62,e3d2,,-4,198,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,125,6r1/4R3/3P2P1/8/8/7K/3kp3/8 w - - 4 63,g6g7,,202,201,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,128,6r1/6P1/3P4/8/8/7K/3k4/4R3 b - - 0 64,d2e1,,0,209,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,160,8/8/6rk/5K2/4Q3/8/8/8 b - - 17 80,h6h7,,-256,263,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,171,8/6k1/7r/3Q1K2/8/8/8/8 w - - 28 86,d5b7,,552,296,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,172,8/1Q4k1/7r/5K2/8/8/8/8 b - - 29 86,g7f8,,-256,266,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,173,5k2/1Q6/7r/5K2/8/8/8/8 w - - 30 87,b7f3,,522,316,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,174,5k2/8/7r/5K2/8/5Q2/8/8 b - - 31 87,f8g8,,-206,334,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,175,6k1/8/7r/5K2/8/5Q2/8/8 w - - 32 88,f5g5,,540,263,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,176,6k1/8/7r/6K1/8/5Q2/8/8 b - - 33 88,h6h7,,-277,242,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,205,6k1/2Q4r/8/8/6K1/8/8/8 w - - 62 103,c7c8,,1000,387,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,214,Q5k1/7r/8/8/6K1/8/8/8 b - - 71 107,g8g7,,-647,353,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,215,Q7/6kr/8/8/6K1/8/8/8 w - - 72 108,a8d5,,1000,337,SF depth14 loss
+selfplay_blunder,20261013_104954_game61,223,8/3Q4/5k1r/8/6K1/8/8/8 w - - 80 112,d7d2,,618,448,SF depth14 loss
+selfplay_blunder,20261013_104954_game62,104,8/6p1/5p1k/5P2/4P2P/pr6/5K2/3R4 b - - 9 52,h6h5,,217,194,SF depth14 loss
+selfplay_blunder,20261013_104954_game64,26,r1bq3r/pp3k2/2n2bp1/2ppp2p/8/1NNP2P1/PPP2P1P/R1BQR1K1 b - - 1 13,c5c4,,172,198,SF depth14 loss
+selfplay_blunder,20261013_104954_game65,68,6k1/1p2rp1p/6p1/2P2P1q/Pp1p4/4n1P1/1Q5P/4RBK1 b - - 0 34,e3f5,,323,254,SF depth14 loss
+selfplay_blunder,20261013_104954_game65,95,6k1/5p1p/P5p1/1Q6/4q3/3p1nP1/6KP/5B2 w - - 0 48,b5b7,,54,501,SF depth14 loss
+selfplay_blunder,20261013_104954_game65,97,6k1/1Q3p1p/P5p1/8/4q2n/3p2P1/6KP/5B2 w - - 2 49,g2h3,,-495,187,SF depth14 loss
+selfplay_blunder,20261013_104954_game66,39,2br2k1/1pqp1ppp/3r4/4Q3/1PP5/1n1pP3/3P2PP/R1B1KB1R w KQ - 1 20,c1b2,,150,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game66,42,2br2k1/1pqp2pp/3r1p2/8/1PP5/1n1pP1Q1/1B1P2PP/R3KB1R b KQ - 1 21,c7c4,,-41,253,SF depth14 loss
+selfplay_blunder,20261013_104954_game67,32,r7/pkp2p1p/1pp1bp2/8/2P5/2PBP3/P3KPPP/7R b - - 3 16,a8g8,,25,156,SF depth14 loss
+selfplay_blunder,20261013_104954_game67,35,8/pkp2p1p/1pp1bp2/6r1/2P5/2PBP1P1/P3KP1P/7R w - - 1 18,h1b1,,101,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game68,33,1nr2rk1/1pqbbppp/p2p4/3Pp3/8/4BN1P/PPPQBPP1/R1R3K1 w - - 1 17,e2d3,,63,158,SF depth14 loss
+selfplay_blunder,20261013_104954_game68,66,5rk1/6p1/pq1p3p/p2P4/4pr1P/2N2b1R/PPPQ1P1K/1R6 b - - 1 33,f4g4,,579,173,SF depth14 loss
+selfplay_blunder,20261013_104954_game68,89,2r4k/6p1/p2p3p/3P1Q2/4N2P/p4p2/5P1K/2q5 w - - 0 45,e4d2,,-421,241,SF depth14 loss
+selfplay_blunder,20261013_104954_game69,17,r1bqkb1r/pp2pp1p/2np1np1/8/4P3/1NN1B1P1/PPP2P1P/R2QKB1R w KQkq - 2 9,b3d4,,83,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game69,21,r1bqkb1r/p3pp1p/2pp2p1/8/4P1n1/2N1B1P1/PPP2P1P/R2QKB1R w KQkq - 0 11,e3a7,,-79,242,SF depth14 loss
+selfplay_blunder,20261013_104954_game69,22,r1bqkb1r/B3pp1p/2pp2p1/8/4P1n1/2N3P1/PPP2P1P/R2QKB1R b KQkq - 0 11,f8g7,,321,184,SF depth14 loss
+selfplay_blunder,20261013_104954_game69,56,r4rk1/7p/2q1p1p1/4p3/3p4/1Q4PP/PPP5/1K1R1R2 b - - 3 28,c6a6,,134,150,SF depth14 loss
+selfplay_blunder,20261013_104954_game69,73,7k/7p/4p1p1/P3p3/8/2P4r/2K5/4R3 w - - 0 37,e1e5,,429,402,SF depth14 loss
+selfplay_blunder,20261013_104954_game69,76,7k/7p/P3p1p1/4R3/8/2P2r2/2K5/8 b - - 0 38,f3f2,,-56,162,SF depth14 loss
+selfplay_blunder,20261013_104954_game69,77,7k/7p/P3p1p1/4R3/8/2P5/2K2r2/8 w - - 1 39,c2c1,,218,232,SF depth14 loss
+selfplay_blunder,20261013_104954_game70,83,5rk1/5ppp/1R6/1P2p1P1/3rP3/6P1/5P2/5RK1 w - - 1 42,f2f3,,283,185,SF depth14 loss
+selfplay_blunder,20261013_104954_game70,136,6R1/4r3/8/3KPp2/8/7k/8/8 b - - 5 68,e7d7,,0,413,SF depth14 loss
+selfplay_blunder,20261013_104954_game70,182,8/8/8/4K1k1/5R2/8/8/8 b - - 14 91,g5g6,,-462,530,SF depth14 loss
+selfplay_blunder,20261013_104954_game71,34,2r1k2r/pp2pp1p/2np1np1/q7/1P2PP2/2P1B1P1/P1Q4P/1K1R1B1R b k - 0 17,c6b4,,-96,193,SF depth14 loss
+selfplay_blunder,20261013_104954_game71,57,2r3r1/1p2kp1p/2npp1p1/BB6/1P3P2/6P1/7P/1KR4R w - - 6 29,h2h4,,228,162,SF depth14 loss
+selfplay_blunder,20261013_104954_game71,58,2r3r1/1p2kp1p/2npp1p1/BB6/1P3P1P/6P1/8/1KR4R b - - 0 29,h7h5,,-66,201,SF depth14 loss
+selfplay_blunder,20261013_104954_game71,59,2r3r1/1p2kp2/2npp1p1/BB5p/1P3P1P/6P1/8/1KR4R w - - 0 30,h1d1,,267,224,SF depth14 loss
+selfplay_blunder,20261013_104954_game71,62,2r3r1/1p2kp2/3pp1p1/PB5p/5P1P/6P1/8/1KRR4 b - - 0 31,d6d5,,0,268,SF depth14 loss
+selfplay_blunder,20261013_104954_game71,130,8/3k4/4B1R1/2K5/8/8/8/8 b - - 4 65,d7e7,,-604,389,SF depth14 loss
+selfplay_blunder,20261013_104954_game72,38,r4rk1/pbpq2pp/3p4/b1pPpp2/P1P3P1/2P4P/2QNPPB1/3RK2R b K - 0 19,a7a6,,33,176,SF depth14 loss
+selfplay_blunder,20261013_104954_game72,53,1bb3k1/2p3pp/p2p4/P1pPpr2/2P5/2P4P/3NPPB1/4K2R w K - 0 27,e2e4,,208,150,SF depth14 loss
+selfplay_blunder,20261013_104954_game72,135,8/3k4/8/2P5/1NP5/8/3K4/8 w - - 5 68,c5c6,,985,331,SF depth14 loss
+selfplay_blunder,20261013_104954_game72,136,8/3k4/2P5/8/1NP5/8/3K4/8 b - - 0 68,d7c7,,-654,231,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,60,1r1r2k1/5pp1/p3b2p/8/1n2QB2/2R3P1/1q2BP1P/2R3K1 b - - 4 30,b4d5,,247,232,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,73,6k1/2Q2pp1/pr1rbq1p/8/8/6P1/2R1BP1P/2R3K1 w - - 9 37,e2d3,,-130,320,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,74,6k1/2Q2pp1/pr1rbq1p/8/8/3B2P1/2R2P1P/2R3K1 b - - 10 37,g7g6,,450,262,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,86,6k1/2R2p2/1r2b1pp/p7/3rB3/6P1/5P1P/4R1K1 b - - 5 43,d4e4,,274,170,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,103,R7/5pk1/6pp/4P3/6P1/8/p5KP/r7 w - - 2 52,a8a7,,0,171,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,105,5k2/R4p2/6pp/4P3/6P1/8/p5KP/r7 w - - 4 53,h2h4,,-98,154,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,106,5k2/R4p2/6pp/4P3/6PP/8/p5K1/r7 b - - 0 53,f8g8,,252,252,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,107,6k1/R4p2/6pp/4P3/6PP/8/p5K1/r7 w - - 1 54,a7a3,,0,256,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,108,6k1/5p2/6pp/4P3/6PP/R7/p5K1/r7 b - - 2 54,g8g7,,256,256,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,109,8/5pk1/6pp/4P3/6PP/R7/p5K1/r7 w - - 3 55,a3a7,,0,319,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,110,8/R4pk1/6pp/4P3/6PP/8/p5K1/r7 b - - 4 55,g7h8,,319,319,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,117,6k1/R4p2/8/4P2p/7P/8/p5K1/r7 w - - 2 59,g2h2,,0,247,SF depth14 loss
+selfplay_blunder,20261013_104954_game75,120,5k2/R4p2/8/4P2p/7P/8/p5K1/r7 b - - 5 60,f8g7,,464,464,SF depth14 loss
+selfplay_blunder,20261013_104954_game76,25,r2q1r1k/1p2bpp1/p1npbn1p/4p3/4P3/2N1BN1P/PPPQBPP1/R2R2K1 w - - 4 13,f3h4,,46,160,SF depth14 loss
+selfplay_blunder,20261013_104954_game76,56,1r1r4/7k/p3qb1p/3pnpp1/P2Bp3/1PP4P/3QBPP1/1R1R2K1 b - - 2 28,e5g6,,62,159,SF depth14 loss
+selfplay_blunder,20261013_104954_game76,81,8/4n1k1/3r3p/3P2p1/P2RBp2/2r4P/6P1/3R2K1 w - - 5 41,d4b4,,176,152,SF depth14 loss
+selfplay_blunder,20261013_104954_game76,107,5k2/P7/6RR/r2n2p1/5p2/1B5P/3r2P1/6K1 w - - 7 54,g6g5,,620,169,SF depth14 loss
+selfplay_blunder,20261013_104954_game76,136,8/8/8/8/8/3B1R1P/r2k2PK/4R3 b - - 0 68,d2e1,,-798,156,SF depth14 loss
+selfplay_blunder,20261013_104954_game76,143,8/8/8/8/3k4/7P/R5PK/8 w - - 1 72,h3h4,,1000,244,SF depth14 loss
+selfplay_blunder,20261013_104954_game77,47,2b1r1k1/p4ppp/2Q2n2/2Pp4/1r3B2/2qB2P1/P4P1P/R4RK1 w - - 1 24,f4g5,,0,399,SF depth14 loss
+selfplay_blunder,20261013_104954_game77,50,2b1r1k1/p4ppp/2Q2B2/2Pp4/1r6/3q2P1/P4P1P/R4RK1 b - - 0 25,d3e4,,429,413,SF depth14 loss
+selfplay_blunder,20261013_104954_game77,51,2b1r1k1/p4ppp/2Q2B2/2Pp4/1r2q3/6P1/P4P1P/R4RK1 w - - 1 26,f6c3,,-16,390,SF depth14 loss
+selfplay_blunder,20261013_104954_game77,74,4r1k1/p4ppp/8/8/P5P1/5P2/1Q5P/3r1bK1 b - - 0 37,f1e2,,717,200,SF depth14 loss
+selfplay_blunder,20261013_104954_game77,81,4r1k1/pQ3ppp/8/8/P5P1/3r4/4b1KP/8 w - - 2 41,h2h3,,-553,175,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,59,5r1k/1p4p1/2np2qp/p1p1p3/2P3p1/P1NPPrP1/1P1Q1P1P/R4RK1 w - - 12 30,c3d5,,-78,218,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,60,5r1k/1p4p1/2np2qp/p1pNp3/2P3p1/P2PPrP1/1P1Q1P1P/R4RK1 b - - 13 30,h8h7,,296,219,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,70,8/1p3r1k/2np2pp/p1p1p2q/2P3p1/P1NPPrP1/1PQ2P1P/2R2RK1 b - - 5 35,f3f5,,246,274,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,75,5r2/1p1r3k/2np2pp/p1p1p2q/2P1N1p1/P2PP1P1/1PQ2P1P/R4RK1 w - - 10 38,e4c3,,30,179,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,104,2r5/3r3k/R1n4p/1pP2qp1/1P2p1p1/6P1/1Q2NP1P/5RK1 b - - 0 52,f5e6,,168,214,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,108,2r5/3r3k/R1n4p/1pP3p1/1Pq1p1p1/6P1/1Q2NP1P/2R3K1 b - - 4 54,c4b4,,-24,317,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,111,2r5/2r4k/R1n2Q1p/1pP3p1/1q2p1p1/6P1/4NP1P/2R3K1 w - - 2 56,a6b6,,431,440,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,120,2r5/2r3k1/1Rn4p/2P3p1/1p6/4pQP1/3qNP1P/5RK1 b - - 1 60,e3f2,,21,166,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,164,8/R4k2/8/6K1/6P1/8/6r1/8 b - - 4 82,f7e6,,0,423,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,165,8/R7/4k3/6K1/6P1/8/6r1/8 w - - 5 83,a7a6,,423,423,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,166,8/8/R3k3/6K1/6P1/8/6r1/8 b - - 6 83,e6e5,,0,426,SF depth14 loss
+selfplay_blunder,20261013_104954_game78,169,8/8/4k3/R5K1/6P1/8/6r1/8 w - - 9 85,g5h5,,492,492,SF depth14 loss
+selfplay_blunder,20261013_104954_game79,31,r1q1k1r1/p1ppbp2/bp2p3/n3N2p/Q1PPP1p1/P1P1B2P/4BPP1/R4RK1 w q - 0 16,h3g4,,95,174,SF depth14 loss
+selfplay_blunder,20261013_104954_game79,46,2kr3r/p1ppb3/qp2pp2/n7/Q1PPPBp1/P7/4NPP1/1RR3K1 b - - 5 23,h8h4,,103,185,SF depth14 loss
+selfplay_blunder,20261013_104954_game79,55,2k4r/p2pb3/qpp2p2/n1Pp4/Q3P1p1/P5N1/3B1PPr/1RR3K1 w - - 0 28,c5b6,,-26,161,SF depth14 loss
+selfplay_blunder,20261013_104954_game79,99,7r/pr6/3p4/P1k1p3/3p2p1/6N1/3p1PP1/4R1K1 w - - 0 50,g3e4,,-614,156,SF depth14 loss
+selfplay_blunder,20261013_104954_game80,95,8/R1R2pp1/6k1/5r2/7p/2p2P1P/2r3P1/7K w - - 0 48,a7b7,,-63,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game80,96,8/1RR2pp1/6k1/5r2/7p/2p2P1P/2r3P1/7K b - - 1 48,g6h5,,230,181,SF depth14 loss
+selfplay_blunder,20261013_104954_game81,32,rnb1r1k1/pp2qpp1/2p4p/2bP4/8/1QN1P1P1/PP1N2BP/4RRK1 b - - 2 16,c5e3,,46,186,SF depth14 loss
+selfplay_blunder,20261013_104954_game81,35,rnb1rqk1/pp3pp1/2p4p/3P4/8/1QN1b1P1/PP1N2BP/4RR1K w - - 2 18,d2e4,,232,178,SF depth14 loss
+selfplay_blunder,20261013_104954_game81,36,rnb1rqk1/pp3pp1/2p4p/3P4/4N3/1QN1b1P1/PP4BP/4RR1K b - - 3 18,e3d4,,-54,197,SF depth14 loss
+selfplay_blunder,20261013_104954_game83,27,r2q2kr/pp2bpp1/4bn1p/2p1B3/Q2p4/2NP2P1/PP2PPBP/R4RK1 w - - 0 14,g2b7,,-22,155,SF depth14 loss
+selfplay_blunder,20261013_104954_game83,77,1b6/p4p1k/1nb4p/6p1/2PB4/1R1P1PP1/P4K1P/8 w - - 9 39,f2e2,,331,180,SF depth14 loss
+selfplay_blunder,20261013_104954_game83,78,1b6/p4p1k/1nb4p/6p1/2PB4/1R1P1PP1/P3K2P/8 b - - 10 39,b6d7,,-151,165,SF depth14 loss
+selfplay_blunder,20261013_104954_game83,96,8/B3bp1k/b1P4p/6p1/1n1P4/5PP1/P6P/2R3K1 b - - 6 48,b4a2,,-290,177,SF depth14 loss
+selfplay_blunder,20261013_104954_game84,76,3R1N2/6kp/1p6/p7/4rp2/4b2P/2P1b1P1/R6K b - - 0 38,f4f3,,234,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game85,29,2r2r1k/1pq1bpp1/p1npbn1p/4p3/4P3/PPNQBN2/R1P1BPPP/3R2K1 w - - 3 15,d3d2,,-60,183,SF depth14 loss
+selfplay_blunder,20261013_104954_game85,74,5k2/2R1Nn2/3p1p2/4p3/4q2P/8/5PP1/5BK1 b - - 0 37,f6f5,,228,203,SF depth14 loss
+selfplay_blunder,20261013_104954_game86,113,8/r6k/6pp/8/8/4P3/1Q6/1K4q1 w - - 8 57,b2c1,,-785,215,SF depth14 loss
+selfplay_blunder,20261013_104954_game87,92,5R2/1P4pk/7p/5p2/1B3b2/3B4/6PP/7K b - - 1 46,f4b8,,-793,197,SF depth14 loss
+selfplay_blunder,20261013_104954_game88,127,8/8/2k5/p1r3R1/8/8/5K2/8 w - - 0 64,g5g8,,-3,353,SF depth14 loss
+selfplay_blunder,20261013_104954_game88,128,6R1/8/2k5/p1r5/8/8/5K2/8 b - - 1 64,a5a4,,356,334,SF depth14 loss
+selfplay_blunder,20261013_104954_game88,133,R7/8/8/2r5/pk6/4K3/8/8 w - - 4 67,a8b8,,-2,487,SF depth14 loss
+selfplay_blunder,20261013_104954_game88,134,1R6/8/8/2r5/pk6/4K3/8/8 b - - 5 67,c5b5,,489,483,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,54,r5kr/1p3q1p/2pb2pB/p2p1p2/P1nP4/3Q1BP1/1PR1PP1P/R5K1 b - - 9 27,f5f4,,-12,191,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,61,4r1kr/1p3q1p/2pb2pB/p2p4/P1nP1p2/1Q4P1/1PR1PPBP/5RK1 w - - 6 31,g3f4,,370,224,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,63,4r1kr/1p3q1p/2p3pB/p2p4/PbnP1P2/1Q6/1PR1PPBP/5RK1 w - - 1 32,b3h3,,210,172,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,70,4r1kr/1p5p/2p1q1pB/p2p1n2/Pb1P1P2/4P2Q/1PR2PBP/2R3K1 b - - 4 35,b4e7,,-30,293,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,71,4r1kr/1p2b2p/2p1q1pB/p2p1n2/P2P1P2/4P2Q/1PR2PBP/2R3K1 w - - 5 36,c1a1,,323,331,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,72,4r1kr/1p2b2p/2p1q1pB/p2p1n2/P2P1P2/4P2Q/1PR2PBP/R5K1 b - - 6 36,e8a8,,8,207,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,83,7r/1p4kp/2p1q1p1/p2r1nP1/P1BPp3/7Q/1PR2P1P/R5K1 w - - 1 42,a1d1,,206,150,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,86,3r4/1p4kp/2p1q1p1/p2r1nP1/P1BPp3/7Q/1PR2P1P/3R3K b - - 4 43,e6e7,,33,152,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,151,8/8/6R1/P1k5/1n6/5K2/8/8 w - - 7 76,a5a6,,511,214,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,152,8/8/P5R1/2k5/1n6/5K2/8/8 b - - 0 76,b4c6,,-297,198,SF depth14 loss
+selfplay_blunder,20261013_104954_game90,216,8/8/8/8/2R5/3K4/1k6/8 b - - 20 108,b2b3,,-501,493,SF depth14 loss
+selfplay_blunder,20261013_104954_game92,112,8/6pk/7n/3P1p2/2Pq4/4Q1N1/r4P2/2R3K1 b - - 10 56,d4e3,,-61,181,SF depth14 loss
+selfplay_blunder,20261013_104954_game92,116,8/6pk/7n/3P1p2/2P5/r3P3/8/2R2NK1 b - - 2 58,a3a6,,-137,170,SF depth14 loss
+selfplay_blunder,20261013_104954_game94,78,r1r5/3b1p2/3p1k2/1p2p3/1P1PP1pp/8/3R1PPP/1R1B2K1 b - - 0 39,h4h3,,102,210,SF depth14 loss
+selfplay_blunder,20261013_104954_game95,27,r3r1k1/ppp2ppp/2n2n2/q4b2/3p4/P2P1NPP/1PQ1PPB1/R1B1K2R w KQ - 5 14,c1d2,,-34,167,SF depth14 loss
+selfplay_blunder,20261013_104954_game95,130,8/8/5n2/1kp5/6p1/1P1N3p/7K/8 b - - 3 65,c5c4,,511,471,SF depth14 loss
+selfplay_blunder,20261013_104954_game96,75,3k1b2/1p2p3/p2pq3/6Q1/2P1p1P1/1P2Br2/1P3PKP/4R3 w - - 0 38,h2h4,,232,232,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,92,3R4/8/5pk1/1p2r2p/p1b5/6PP/1P1R3K/8 b - - 0 46,e5e2,,-37,218,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,105,8/8/5pk1/1pR4p/p7/5KPP/1P6/5b2 w - - 10 53,f3e3,,233,193,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,106,8/8/5pk1/1pR4p/p7/4K1PP/1P6/5b2 b - - 11 53,f1c4,,-40,187,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,109,8/8/5pk1/1pR4p/p4K2/6PP/1P6/5b2 w - - 14 55,g3g4,,187,168,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,112,8/8/5pk1/1pR5/p5K1/7P/1P6/5b2 b - - 0 56,f1c4,,-32,174,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,113,8/8/5pk1/1pR5/p1b3K1/7P/1P6/8 w - - 1 57,g4f4,,206,157,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,121,8/8/5p1k/1pR4P/p7/4K3/1P6/5b2 w - - 3 61,e3f3,,372,351,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,122,8/8/5p1k/1pR4P/p7/5K2/1P6/5b2 b - - 4 61,f1d3,,-21,325,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,123,8/8/5p1k/1pR4P/p7/3b1K2/1P6/8 w - - 5 62,f3f2,,346,329,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,124,8/8/5p1k/1pR4P/p7/3b4/1P3K2/8 b - - 6 62,d3c4,,-17,269,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,125,8/8/5p1k/1pR4P/p1b5/8/1P3K2/8 w - - 7 63,f2g3,,286,237,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,128,8/8/5p1k/1pR4P/p6K/8/1P2b3/8 b - - 10 64,e2c4,,-23,181,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,208,6k1/4R3/5K2/8/8/5b2/8/8 b - - 51 104,g8f8,,-27,276,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,209,5k2/4R3/5K2/8/8/5b2/8/8 w - - 52 105,e7e5,,303,274,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,210,5k2/8/5K2/4R3/8/5b2/8/8 b - - 53 105,f3c6,,-29,477,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,214,5k2/3b4/5K2/7R/8/8/8/8 b - - 57 107,f8g8,,-625,375,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,215,6k1/3b4/5K2/7R/8/8/8/8 w - - 58 108,h5g5,,1000,389,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,218,5k2/3b2R1/5K2/8/8/8/8/8 b - - 61 109,d7c8,,-581,397,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,221,5k2/2R5/5K2/8/6b1/8/8/8 w - - 64 111,c7c4,,979,344,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,229,2R5/3k4/5K2/8/8/8/8/8 w - - 1 115,c8c4,,984,515,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,241,8/8/2k1K3/8/4R3/8/8/8 w - - 13 121,e4d4,,989,378,SF depth14 loss
+selfplay_blunder,20261013_104954_game97,242,8/8/2k1K3/8/3R4/8/8/8 b - - 14 121,c6c5,,-611,377,SF depth14 loss
+selfplay_blunder,20261013_104954_game99,67,2r1r1k1/1pb2p1p/p6q/P4Q2/1B1p4/4PpP1/1P3K1n/R1RN4 w - - 0 34,b4c5,,-382,282,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,38,r1bqr1k1/1pp2pp1/3p3p/4n3/p1P1PN2/2Q2P2/PP4PP/R1B2RK1 b - - 2 19,g7g5,,-6,179,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,133,3r4/8/4k3/4n3/R7/4B3/PP2K3/8 w - - 9 67,b2b4,,279,176,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,134,3r4/8/4k3/4n3/RP6/4B3/P3K3/8 b - - 0 67,d8b8,,-103,229,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,135,1r6/8/4k3/4n3/RP6/4B3/P3K3/8 w - - 1 68,a2a3,,332,310,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,167,3R1B2/5k2/8/PP6/n7/4K3/1r6/8 w - - 3 84,b5b6,,402,391,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,168,3R1B2/5k2/1P6/P7/n7/4K3/1r6/8 b - - 0 84,b2b1,,-11,356,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,177,1R6/1P3k2/n2B4/P7/8/8/3K4/1r6 w - - 5 89,b8f8,,492,200,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,181,1n3R2/8/3Bk3/P7/8/8/3K4/1r6 w - - 0 91,f8b8,,285,276,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,182,1R6/8/3Bk3/P7/8/8/3K4/1r6 b - - 0 91,b1a1,,-9,432,SF depth14 loss
+selfplay_blunder,20261013_125418_game01,216,1B6/4R3/1k6/8/2K5/8/8/8 b - - 12 108,b6c6,,-649,345,SF depth14 loss
+selfplay_blunder,20261013_125418_game02,43,r4kr1/p2b1p1p/3p2p1/qppP2Q1/4P3/3P1P2/PP2K2P/R4BR1 w - - 2 22,g5g3,,115,155,SF depth14 loss
+selfplay_blunder,20261013_125418_game04,49,r4b2/3b1ppk/rp5p/1p1PB3/1Ppp2P1/PR1P1B1P/5P2/R5K1 w - - 0 25,d3c4,,-67,195,SF depth14 loss
+selfplay_blunder,20261013_125418_game04,115,8/5Pk1/3b2p1/2r4p/1p5P/5P2/5K2/8 w - - 0 58,f7f8q,,-845,155,SF depth14 loss
+selfplay_blunder,20261013_125418_game05,24,r4rk1/pbB2ppp/1pnpp3/8/2PP3P/2n2N2/PP3PP1/R3KB1R b KQ - 0 12,c6b4,,105,470,SF depth14 loss
+selfplay_blunder,20261013_125418_game05,102,Q7/8/5p2/2K4p/3N2k1/8/8/8 b - - 0 51,f6f5,,-696,293,SF depth14 loss
+selfplay_blunder,20261013_125418_game07,60,r2q1kr1/5p2/2RPpQ1p/1p2P1p1/p7/4B3/1P3PPP/2R3K1 b - - 0 30,d8f6,,-709,156,SF depth14 loss
+selfplay_blunder,20261013_125418_game08,31,r2q2kr/1pp2ppp/p7/2bP1b2/Q2N1B2/3n2P1/PP3PBP/R3R1K1 w - - 0 16,f4c7,,323,245,SF depth14 loss
+selfplay_blunder,20261013_125418_game08,32,r2q2kr/1pB2ppp/p7/2bP1b2/Q2N4/3n2P1/PP3PBP/R3R1K1 b - - 0 16,d8c8,,-78,280,SF depth14 loss
+selfplay_blunder,20261013_125418_game09,31,r2q2kr/1pp2ppp/p7/2bP1b2/Q2N1B2/3n2P1/PP3PBP/R3R1K1 w - - 0 16,f4c7,,293,217,SF depth14 loss
+selfplay_blunder,20261013_125418_game09,40,r5kr/1p1b1ppp/p7/2bP4/3N4/3Q2P1/Pq3PBP/1R1R2K1 b - - 1 20,b2a2,,-117,167,SF depth14 loss
+selfplay_blunder,20261013_125418_game09,106,8/5k2/4R2p/5KpP/8/6P1/5P2/8 b - - 6 53,g5g4,,-759,241,SF depth14 loss
+selfplay_blunder,20261013_125418_game10,25,r1bqr1k1/pp3ppp/2pb1n2/8/4p2Q/4PNP1/PPBP1P1P/R1B2RK1 w - - 0 13,f3d4,,-144,275,SF depth14 loss
+selfplay_blunder,20261013_125418_game11,257,6b1/8/3K4/8/3q4/8/8/1k6 w - - 4 129,d6c7,,-707,286,SF depth14 loss
+selfplay_blunder,20261013_125418_game12,117,8/8/5p2/8/2brB1P1/1pk2PK1/7R/8 w - - 5 59,e4f5,,-120,185,SF depth14 loss
+selfplay_blunder,20261013_125418_game12,130,8/8/5pB1/1r6/2b2K2/1k3P2/1p5R/8 b - - 7 65,f6f5,,452,153,SF depth14 loss
+selfplay_blunder,20261013_125418_game12,151,8/5r2/8/4k3/8/5PK1/8/8 w - - 4 76,g3f2,,-530,179,SF depth14 loss
+selfplay_blunder,20261013_125418_game12,162,8/8/8/8/5k2/5P2/4r3/6K1 b - - 15 81,e2b2,,995,454,SF depth14 loss
+selfplay_blunder,20261013_125418_game12,163,8/8/8/8/5k2/5P2/1r6/6K1 w - - 16 82,g1f1,,-541,450,SF depth14 loss
+selfplay_blunder,20261013_125418_game12,166,8/8/8/1r6/5k2/5P2/4K3/8 b - - 19 83,b5e5,,992,544,SF depth14 loss
+selfplay_blunder,20261013_125418_game13,54,4b1k1/1p2rppp/pN1n4/P7/3N4/4P1PP/1n3PB1/R5K1 b - - 0 27,e8b5,,-36,170,SF depth14 loss
+selfplay_blunder,20261013_125418_game13,59,6k1/1p2rppp/1N1n4/Pp6/n7/4P1PP/5PB1/1R4K1 w - - 0 30,b1d1,,353,153,SF depth14 loss
+selfplay_blunder,20261013_125418_game13,97,1R6/2n3p1/2k4p/P4P2/1p4PK/4Pn2/8/8 w - - 2 49,h4h3,,306,263,SF depth14 loss
+selfplay_blunder,20261013_125418_game14,20,r1bq1rk1/ppp1bppp/4nn2/3p4/Q7/2NPBNP1/PP2PP1P/R3KB1R b KQ - 4 10,f8e8,,298,215,SF depth14 loss
+selfplay_blunder,20261013_125418_game15,152,Q7/8/bP6/8/1kp3P1/5p2/5K2/8 b - - 2 76,b4b5,,-829,156,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,26,r1bq3r/pp3k2/2n2bp1/2ppp2p/8/1NNP2P1/PPP2P1P/R1BQR1K1 b - - 1 13,c5c4,,176,184,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,52,r2r4/pR6/5bp1/3k3p/2ppN1P1/5P2/P6P/3R2K1 b - - 1 26,d5e5,,229,154,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,53,r2r4/pR6/5bp1/4k2p/2ppN1P1/5P2/P6P/3R2K1 w - - 2 27,b7c7,,-75,238,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,54,r2r4/p1R5/5bp1/4k2p/2ppN1P1/5P2/P6P/3R2K1 b - - 3 27,d8c8,,313,178,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,72,r7/p2R4/5bP1/8/3pN2k/5P2/P1r4P/7K b - - 2 36,a8h8,,466,183,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,73,7r/p2R4/5bP1/8/3pN2k/5P2/P1r4P/7K w - - 3 37,e4f6,,-283,179,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,75,1r6/p2R4/5NP1/8/3p3k/5P2/P1r4P/7K w - - 1 38,d7h7,,-381,297,SF depth14 loss
+selfplay_blunder,20261013_125418_game16,77,1r6/p6R/5NP1/6k1/3p4/5P2/P1r4P/7K w - - 3 39,f6e4,,-706,289,SF depth14 loss
+selfplay_blunder,20261013_125418_game18,132,8/1p2k3/6P1/5P2/2p5/P1B4K/P7/8 b - - 0 66,b7b5,,-825,173,SF depth14 loss
+selfplay_blunder,20261013_125418_game19,25,r2q2kr/pp1bbppp/5n2/2pp4/2nP4/2N1BNP1/PPQ1PPBP/R3K2R w KQ - 1 13,f3e5,,138,179,SF depth14 loss
+selfplay_blunder,20261013_125418_game20,97,4k3/8/7p/2P3p1/2r2nP1/4p3/7P/1R2B1K1 w - - 2 49,b1b4,,-31,352,SF depth14 loss
+selfplay_blunder,20261013_125418_game20,141,8/8/8/2K1n3/5k2/8/8/6q1 w - - 0 71,c5b5,,-630,363,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,32,r1bqr1k1/pp3ppp/3p4/b1p1p1P1/2P1Bn1P/1Q1P4/PP1NPP2/R2NK2R b KQ - 2 16,c8h3,,56,155,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,60,5rk1/p1n1q1pp/r2p4/N1p1p3/Q1P1P2P/2P1PP1R/P7/1R2K3 b - - 12 30,e7e8,,270,197,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,90,6k1/7p/7R/p1p1p3/2P1P2p/2P1P3/r7/3K4 b - - 1 45,a5a4,,485,269,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,91,6k1/7p/7R/2p1p3/p1P1P2p/2P1P3/r7/3K4 w - - 0 46,h6h5,,-216,298,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,115,8/8/8/2p1p3/2P1k3/p1P1P2R/6rp/K7 w - - 0 58,a1b1,,-829,171,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,116,8/8/8/2p1p3/2P1k3/p1P1P2R/6rp/1K6 b - - 1 58,e4d3,,1000,171,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,117,8/8/8/2p1p3/2P5/p1PkP2R/6rp/1K6 w - - 2 59,b1a1,,-829,171,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,118,8/8/8/2p1p3/2P5/p1PkP2R/6rp/K7 b - - 3 59,d3c4,,1000,222,SF depth14 loss
+selfplay_blunder,20261013_125418_game22,119,8/8/8/2p1p3/2k5/p1P1P2R/6rp/K7 w - - 0 60,h3h7,,-778,213,SF depth14 loss
+selfplay_blunder,20261013_125418_game23,34,r3k2r/pbpqnp1p/3ppb1P/6p1/3PP3/P4NB1/1PQ2PP1/3RKB1R b Kkq - 0 17,e7c6,,-75,234,SF depth14 loss
+selfplay_blunder,20261013_125418_game23,42,2kr3r/pbpq1p1p/2n1pb1P/4P3/4P1p1/P5B1/1P2BPP1/2QRK2R b K - 0 21,d7d1,,-84,188,SF depth14 loss
+selfplay_blunder,20261013_125418_game23,110,8/4B2p/1P3pkP/1r6/8/P5P1/2Q3P1/6K1 b - - 4 55,g6h6,,-779,221,SF depth14 loss
+selfplay_blunder,20261013_125418_game24,54,1k2br2/ppp4p/1b2r1p1/3pNp2/3P1P1P/P2BP1R1/1P2KP2/2R5 b - - 0 27,h7h6,,-76,151,SF depth14 loss
+selfplay_blunder,20261013_125418_game24,56,1k2br2/ppp5/1b2r1pp/3pNp2/P2P1P1P/3BP1R1/1P2KP2/2R5 b - - 0 28,f8f6,,-156,159,SF depth14 loss
+selfplay_blunder,20261013_125418_game25,46,2r1kbr1/1q2pp2/p2pbn2/1p2n2p/3BPR1P/PNN5/1PP1B1P1/3R1Q1K b - - 1 23,e5c4,,144,207,SF depth14 loss
+selfplay_blunder,20261013_125418_game25,47,2r1kbr1/1q2pp2/p2pbn2/1p5p/2nBPR1P/PNN5/1PP1B1P1/3R1Q1K w - - 2 24,d1b1,,63,217,SF depth14 loss
+selfplay_blunder,20261013_125418_game25,66,2r1k2r/3q1pb1/p2p4/1p1Np1B1/4P1pP/PP6/1P4P1/3R1Q1K b - - 5 33,c8c6,,29,152,SF depth14 loss
+selfplay_blunder,20261013_125418_game25,67,4k2r/3q1pb1/p1rp4/1p1Np1B1/4P1pP/PP6/1P4P1/3R1Q1K w - - 6 34,d5b4,,123,248,SF depth14 loss
+selfplay_blunder,20261013_125418_game25,71,4kr2/3q2b1/p1rp1B2/1p2p3/1N2P1pP/PP6/1P4P1/3R1Q1K w - - 1 36,f6g7,,-286,159,SF depth14 loss
+selfplay_blunder,20261013_125418_game26,29,r1bqr1k1/pp3pp1/1npb1n1p/3p2B1/3P4/2N2NP1/PPQ1PPBP/R3R1K1 w - - 0 15,g5h4,,36,216,SF depth14 loss
+selfplay_blunder,20261013_125418_game26,110,8/5pk1/1pp5/p7/P5q1/6P1/5PK1/8 b - - 1 55,g4a4,,917,155,SF depth14 loss
+selfplay_blunder,20261013_125418_game27,17,r2qk2r/pppbbppp/2n2n2/1N1p4/Q2N4/6P1/PP1PPP1P/R1B1KB1R w KQkq - 8 9,d4c6,,-52,242,SF depth14 loss
+selfplay_blunder,20261013_125418_game27,20,r2qk2r/ppp1bppp/2b2n2/QN1p4/8/6P1/PP1PPP1P/R1B1KB1R b KQkq - 1 10,e8g8,,333,206,SF depth14 loss
+selfplay_blunder,20261013_125418_game27,122,8/5p2/2k1r2p/1p2P3/4KPP1/8/1R6/8 b - - 1 61,c6b6,,-12,198,SF depth14 loss
+selfplay_blunder,20261013_125418_game27,166,8/8/8/8/5K2/6Q1/1k6/8 b - - 6 83,b2a2,,-440,164,SF depth14 loss
+selfplay_blunder,20261013_125418_game27,201,8/8/8/8/2Q5/k2K4/8/8 w - - 41 101,c4c6,,997,549,SF depth14 loss
+selfplay_blunder,20261013_125418_game27,202,8/8/2Q5/8/8/k2K4/8/8 b - - 42 101,a3b2,,-448,549,SF depth14 loss
+selfplay_blunder,20261013_125418_game29,51,3r2k1/pppr3p/2b1p1n1/5pnQ/3P2q1/P2BPN1R/1P3PPB/3R1K2 w - - 2 26,h5g5,,73,221,SF depth14 loss
+selfplay_blunder,20261013_125418_game29,131,8/5kn1/2p5/8/p7/P2q4/KP2p3/2R5 w - - 0 66,c1b1,,-776,224,SF depth14 loss
+selfplay_blunder,20261013_125418_game30,92,8/pb4p1/6k1/8/5p2/3R2B1/4r2P/6K1 b - - 1 46,f4g3,,571,162,SF depth14 loss
+selfplay_blunder,20261013_125418_game30,119,8/R7/8/8/4bkp1/8/2r5/3K4 w - - 0 60,a7a3,,-688,233,SF depth14 loss
+selfplay_blunder,20261013_125418_game31,37,r3k3/pp2prb1/2qp3p/5bp1/8/2P2NPP/PP2QPK1/R1B1R3 w - - 2 19,a2a4,,-183,153,SF depth14 loss
+selfplay_blunder,20261013_125418_game31,38,r3k3/pp2prb1/2qp3p/5bp1/P7/2P2NPP/1P2QPK1/R1B1R3 b - - 0 19,e8d8,,336,179,SF depth14 loss
+selfplay_blunder,20261013_125418_game31,49,2rk4/pp2pr2/3p3B/3q1b2/P2P4/6Pp/1P2QP1K/R5R1 w - - 1 25,g3g4,,-133,231,SF depth14 loss
+selfplay_blunder,20261013_125418_game31,55,3k4/pp2pr2/3p4/8/P2Pq1b1/4B2p/1Pr2P1K/R3Q1R1 w - - 2 28,e1a5,,-437,335,SF depth14 loss
+selfplay_blunder,20261013_125418_game31,59,3k4/p3p3/1p1p4/6Q1/P2Pq1b1/4B2p/1Pr2r1K/R5R1 w - - 0 30,e3f2,,-787,205,SF depth14 loss
+selfplay_blunder,20261013_125418_game32,61,4r1k1/p4pp1/8/1R3P1p/Pp4P1/4P3/1r1B3P/Rb2K3 w - - 0 31,g4h5,,-13,176,SF depth14 loss
+selfplay_blunder,20261013_125418_game32,62,4r1k1/p4pp1/8/1R3P1P/Pp6/4P3/1r1B3P/Rb2K3 b - - 0 31,a7a6,,189,184,SF depth14 loss
+selfplay_blunder,20261013_125418_game33,47,r6r/p1qbbpk1/1p1p1n1p/2pPp1p1/P1P1P1P1/2PBBNQP/1R3PK1/R7 w - - 8 24,g2h1,,-65,157,SF depth14 loss
+selfplay_blunder,20261013_125418_game33,65,r2q4/p2b1pk1/3p1b2/p1pP2N1/2P1PQpr/2PB4/1R3PK1/1R6 w - - 2 33,f4d6,,-117,162,SF depth14 loss
+selfplay_blunder,20261013_125418_game33,97,7r/2PR4/3P2k1/R5b1/6p1/5p2/4rP2/5K2 w - - 1 49,a5g5,,-474,526,SF depth14 loss
+selfplay_blunder,20261013_125418_game33,98,7r/2PR4/3P2k1/6R1/6p1/5p2/4rP2/5K2 b - - 0 49,g6g5,,1000,386,SF depth14 loss
+selfplay_blunder,20261013_125418_game34,12,r1bqkb1r/pp1ppp1p/2n2np1/8/3NP3/2N3P1/PPP2P1P/R1BQKB1R b KQkq - 0 6,d8c7,,9,202,SF depth14 loss
+selfplay_blunder,20261013_125418_game35,64,6kr/1R2bpp1/p5p1/2r4n/4P2P/2B2PP1/4B1K1/7R b - - 0 32,e7h4,,-63,206,SF depth14 loss
+selfplay_blunder,20261013_125418_game35,138,8/8/B4K2/4Q3/8/3k4/8/8 b - - 4 69,d3c2,,-770,222,SF depth14 loss
+selfplay_blunder,20261013_125418_game36,43,1r2r2k/2pp2p1/1p1b1p2/pP4p1/2PB4/P1Q1P2b/3P1P1P/R3K3 w Q - 0 22,d4f6,,220,186,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,27,r4rk1/pp2ppbp/2np1np1/q7/4P3/1PN1BPP1/PP1Q3P/1K1R1B1R w - - 3 14,b1a1,,160,169,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,28,r4rk1/pp2ppbp/2np1np1/q7/4P3/1PN1BPP1/PP1Q3P/K2R1B1R b - - 4 14,c6b4,,9,152,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,55,r1r3k1/1p2ppb1/p2p2qp/6nR/4P1P1/1PN1B3/PP4QP/K1R5 w - - 2 28,e4e5,,136,166,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,62,r5k1/1p3pb1/p1rp2q1/6pR/6P1/1PN5/PP1Q3P/K1R5 b - - 1 31,g7f6,,-12,160,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,68,r2b2k1/1p3p2/pN1p2q1/6pR/6P1/1P6/PP5P/K1Q5 b - - 2 34,a8a7,,-262,224,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,69,3b2k1/rp3p2/pN1p2q1/6pR/6P1/1P6/PP5P/K1Q5 w - - 3 35,b6c8,,486,221,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,71,r1Nb2k1/1p3p2/p2p2q1/6pR/6P1/1P6/PP5P/K1Q5 w - - 5 36,c1e1,,299,255,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,74,r1Nb2k1/1p6/p2p2q1/5ppR/6P1/1PQ5/PP5P/K7 b - - 1 37,g6f6,,-34,163,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,75,r1Nb2k1/1p6/p2p1q2/5ppR/6P1/1PQ5/PP5P/K7 w - - 2 38,c8d6,,197,214,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,83,5rk1/1pb5/p2N3R/6p1/2P3p1/1P6/P6P/K7 w - - 1 42,d6b7,,-5,329,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,88,6k1/1N6/p6R/4b1p1/2P3p1/1P6/P1K4P/5r2 b - - 4 44,f1f2,,259,164,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,92,6k1/1N6/p5R1/6p1/2P3p1/1P1K4/P4r1b/8 b - - 1 46,g8h7,,175,157,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,137,8/8/p1k5/4b3/PP6/3K4/8/8 w - - 0 69,d3c4,,31,438,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,138,8/8/p1k5/4b3/PPK5/8/8/8 b - - 1 69,e5a1,,407,438,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,139,8/8/p1k5/8/PPK5/8/8/b7 w - - 2 70,c4b3,,31,446,SF depth14 loss
+selfplay_blunder,20261013_125418_game37,146,8/8/p7/1P1kb3/P7/1K6/8/8 b - - 0 73,a6b5,,636,636,SF depth14 loss
+selfplay_blunder,20261013_125418_game38,83,8/4kB2/pp2p2R/3n4/P7/4PKP1/2r2P1P/8 w - - 2 42,f7e6,,328,249,SF depth14 loss
+selfplay_blunder,20261013_125418_game38,117,r7/4P2P/6B1/6K1/5PP1/6k1/1p6/8 w - - 1 59,g5h6,,738,196,SF depth14 loss
+selfplay_blunder,20261013_125418_game38,130,4K2Q/8/8/8/6k1/8/1pB5/8 b - - 0 65,g4f4,,-785,206,SF depth14 loss
+selfplay_blunder,20261013_125418_game39,227,8/8/8/8/r5kp/6p1/6K1/1R6 w - - 0 114,g2h1,,-702,160,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,37,r5k1/p1q3pp/1p2p3/8/3P3P/4P3/nP1K1QP1/5B1R w - - 0 19,f1a6,,0,201,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,84,1r6/5k2/6p1/1P1PR2p/2K5/8/8/8 b - - 0 42,f7f6,,-42,197,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,85,1r6/8/5kp1/1P1PR2p/2K5/8/8/8 w - - 1 43,e5e2,,239,155,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,90,2r5/8/3P1kp1/1P6/3K3p/8/4R3/8 b - - 0 45,h4h3,,-121,156,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,92,2r5/8/3P1kp1/1P1K4/8/7p/4R3/8 b - - 1 46,c8c1,,-288,155,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,103,8/1K6/1P1k2p1/8/8/8/R7/2r5 w - - 0 52,b7a7,,446,422,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,104,8/K7/1P1k2p1/8/8/8/R7/2r5 b - - 1 52,g6g5,,-24,446,SF depth14 loss
+selfplay_blunder,20261013_125418_game40,107,8/KP6/3k4/6p1/8/8/R7/1r6 w - - 1 54,b7b8q,,460,460,SF depth14 loss
+selfplay_blunder,20261013_125418_game41,79,r2q4/1p3p1k/1P1p1rpb/1Rp4p/p1PpPP1P/P2P2P1/3Q3K/1R1B4 w - - 1 40,b5a5,,174,305,SF depth14 loss
+selfplay_blunder,20261013_125418_game41,87,2q5/1p3p1k/1P1p1rpb/2p4p/Q1PpP2P/P2P2P1/6K1/1R1B4 w - - 1 44,b1b2,,-24,200,SF depth14 loss
+selfplay_blunder,20261013_125418_game41,89,2q5/1p3pk1/1P1p1rpb/2p4p/Q1PpP2P/P2P2P1/1R4K1/3B4 w - - 3 45,a4a7,,-117,173,SF depth14 loss
+selfplay_blunder,20261013_125418_game41,92,2q5/Qp3pk1/1P1p1rp1/2p4p/2PpP2P/P2PbBP1/1R4K1/8 b - - 6 46,g7h7,,435,277,SF depth14 loss
+selfplay_blunder,20261013_125418_game41,93,2q5/Qp3p1k/1P1p1rp1/2p4p/2PpP2P/P2PbBP1/1R4K1/8 w - - 7 47,a7a4,,-158,184,SF depth14 loss
+selfplay_blunder,20261013_125418_game41,114,3q4/1p3pk1/1P1p2p1/2p1P2p/2Pp4/P2P1Q2/3K4/8 b - - 0 57,d8b6,,380,222,SF depth14 loss
+selfplay_blunder,20261013_125418_game41,115,8/1p3pk1/1q1p2p1/2p1P2p/2Pp4/P2P1Q2/3K4/8 w - - 0 58,e5d6,,-158,322,SF depth14 loss
+selfplay_blunder,20261013_125418_game43,121,4k3/R7/7p/P4p2/8/6bP/3r4/7K w - - 0 61,a5a6,,-374,302,SF depth14 loss
+selfplay_blunder,20261013_125418_game43,124,4k3/R7/P6p/5p2/8/6bP/7r/6K1 b - - 2 62,h2a2,,780,374,SF depth14 loss
+selfplay_blunder,20261013_125418_game43,125,4k3/R7/P6p/5p2/8/6bP/r7/6K1 w - - 3 63,g1h1,,-406,340,SF depth14 loss
+selfplay_blunder,20261013_125418_game43,126,4k3/R7/P6p/5p2/8/6bP/r7/7K b - - 4 63,g3f2,,746,364,SF depth14 loss
+selfplay_blunder,20261013_125418_game44,55,6k1/pp3pp1/2r2n1p/B7/8/1P2PP2/P4P1P/3R3K w - - 2 28,a5d8,,188,177,SF depth14 loss
+selfplay_blunder,20261013_125418_game44,189,8/1R3p2/5p2/5P1p/4PK1P/5P2/1p1k4/1r6 w - - 22 95,b7d7,,0,273,SF depth14 loss
+selfplay_blunder,20261013_125418_game44,192,8/1R3p2/5p2/5P1p/4PK1P/5P2/1p6/1r2k3 b - - 25 96,e1e2,,262,262,SF depth14 loss
+selfplay_blunder,20261013_125418_game44,193,8/1R3p2/5p2/5P1p/4PK1P/5P2/1p2k3/1r6 w - - 26 97,b7b3,,0,367,SF depth14 loss
+selfplay_blunder,20261013_125418_game44,207,8/5p2/5p2/5P2/4PK1p/1R3P2/1p4k1/1r6 w - - 2 104,b3e3,,-592,150,SF depth14 loss
+selfplay_blunder,20261013_125418_game44,212,8/5p2/5p2/5P2/4PK1p/5P2/1p3rk1/4R3 b - - 7 106,h4h3,,853,161,SF depth14 loss
+selfplay_blunder,20261013_125418_game44,217,8/5p2/5p2/5P2/4P3/1r5p/1p2K1k1/4R3 w - - 2 109,e2d2,,-714,208,SF depth14 loss
+selfplay_blunder,20261013_125418_game45,38,r1b1r1k1/1p3pp1/3p1q1p/pQpP4/8/P3P3/1P3PPP/R1B1R1K1 b - - 4 19,c8h3,,-8,157,SF depth14 loss
+selfplay_blunder,20261013_125418_game46,81,4rk2/2p2q2/1pbpr3/p6p/P1P5/RPB2pQ1/6PP/1B1R3K w - - 2 41,c3d4,,0,358,SF depth14 loss
+selfplay_blunder,20261013_125418_game46,82,4rk2/2p2q2/1pbpr3/p6p/P1PB4/RP3pQ1/6PP/1B1R3K b - - 3 41,f3g2,,358,343,SF depth14 loss
+selfplay_blunder,20261013_125418_game46,84,4rk2/2p2q2/1pbpr3/p6p/P1PB4/RP4Q1/6pP/1B1R2K1 b - - 1 42,f8e7,,0,211,SF depth14 loss
+selfplay_blunder,20261013_125418_game46,88,4rk2/2p2q2/1pbpr3/p6p/P1PB4/RP4Q1/6pP/1B1R2K1 b - - 5 44,f8e7,,0,204,SF depth14 loss
+selfplay_blunder,20261013_125418_game47,43,r5kr/1pp2p1p/1b2b3/pP2B1p1/Qq1p4/3P1BP1/P4P1P/2RR2K1 w - - 2 22,a4b4,,223,152,SF depth14 loss
+selfplay_blunder,20261013_125418_game47,47,r5kr/1pp2p1p/1b6/1P2B1p1/1p1p4/3P1BP1/b2R1P1P/2R3K1 w - - 0 24,e5c7,,126,156,SF depth14 loss
+selfplay_blunder,20261013_125418_game47,60,7r/1R3pkp/1P2b3/8/3pB1p1/1p1P2P1/1R3PKP/r7 b - - 4 30,a1c1,,164,226,SF depth14 loss
+selfplay_blunder,20261013_125418_game48,96,5r1k/2Q5/5qp1/n3p2p/4P3/2P1B3/6PP/3R3K b - - 2 48,a5b3,,-245,160,SF depth14 loss
+selfplay_blunder,20261013_125418_game48,142,5k2/8/5R2/3KP1p1/6P1/5r2/8/8 b - - 1 71,f3f6,,-714,171,SF depth14 loss
+selfplay_blunder,20261013_125418_game48,155,8/5K1k/5P2/8/6P1/8/8/8 w - - 5 78,f7e6,,984,290,SF depth14 loss
+selfplay_blunder,20261013_125418_game48,158,8/5P2/4K1k1/8/6P1/8/8/8 b - - 0 79,g6g7,,-539,461,SF depth14 loss
+selfplay_blunder,20261013_125418_game48,163,5Q2/4K3/8/6k1/6P1/8/8/8 w - - 1 82,e7e6,,1000,467,SF depth14 loss
+selfplay_blunder,20261013_125418_game48,164,5Q2/8/4K3/6k1/6P1/8/8/8 b - - 2 82,g5h4,,-533,467,SF depth14 loss
+selfplay_blunder,20261013_125418_game49,55,6k1/1p1bnpp1/r1R4p/4p3/p3N3/P3P2P/P4PP1/3B2K1 w - - 0 28,c6c7,,193,150,SF depth14 loss
+selfplay_blunder,20261013_125418_game49,56,6k1/1pRbnpp1/r6p/4p3/p3N3/P3P2P/P4PP1/3B2K1 b - - 1 28,d7f5,,-43,175,SF depth14 loss
+selfplay_blunder,20261013_125418_game49,57,6k1/1pR1npp1/r6p/4pb2/p3N3/P3P2P/P4PP1/3B2K1 w - - 2 29,c7e7,,218,174,SF depth14 loss
+selfplay_blunder,20261013_125418_game50,77,1r6/2R2ppp/1p2k3/p7/8/1P3PP1/7P/6K1 w - - 5 39,g3g4,,-183,186,SF depth14 loss
+selfplay_blunder,20261013_125418_game50,78,1r6/2R2ppp/1p2k3/p7/6P1/1P3P2/7P/6K1 b - - 0 39,b8d8,,369,268,SF depth14 loss
+selfplay_blunder,20261013_125418_game50,79,3r4/2R2ppp/1p2k3/p7/6P1/1P3P2/7P/6K1 w - - 1 40,g1f2,,-101,161,SF depth14 loss
+selfplay_blunder,20261013_125418_game50,84,8/2R2ppp/1p1rk3/p7/6P1/1P3P2/5K1P/8 b - - 6 42,g7g5,,247,178,SF depth14 loss
+selfplay_blunder,20261013_125418_game50,87,8/2R2p1p/1p1r1k2/p5p1/6P1/1P2KP2/7P/8 w - - 2 44,c7c4,,-68,214,SF depth14 loss
+selfplay_blunder,20261013_125418_game50,100,8/5p2/4r1kp/p5p1/R2K2P1/5P2/7P/8 b - - 3 50,e6e2,,172,159,SF depth14 loss
+selfplay_blunder,20261013_125418_game51,17,r2qk2r/pppbbppp/2n2n2/1N1p4/Q2N4/6P1/PP1PPP1P/R1B1KB1R w KQkq - 8 9,d4c6,,-52,242,SF depth14 loss
+selfplay_blunder,20261013_125418_game51,20,r2qk2r/ppp1bppp/2b2n2/QN1p4/8/6P1/PP1PPP1P/R1B1KB1R b KQkq - 1 10,e8g8,,333,206,SF depth14 loss
+selfplay_blunder,20261013_125418_game51,160,3NQ3/5nk1/8/7p/8/5K2/7P/8 b - - 0 80,f7d8,,-848,152,SF depth14 loss
