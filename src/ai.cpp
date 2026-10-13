@@ -18,6 +18,7 @@
 
 #include "opening_book.hpp"
 #include "transposition_table.hpp"
+#include "tune.hpp"
 
 bool g_aiDebugLog = false;
 
@@ -70,22 +71,25 @@ std::string movesStr(const std::vector<Move>& moves) {
 // starting rank, 6 = one step from promoting), middlegame and endgame. A
 // passer is worth far more once pieces come off: fewer pieces are left to
 // blockade it or to stop it while also doing everything else.
-constexpr int kPassedMg[8] = {0, 5, 10, 15, 25, 45, 70, 0};
-constexpr int kPassedEg[8] = {0, 10, 15, 25, 45, 75, 120, 0};
+TUNE_ARR(kPassedMg, 8, {0, 5, 10, 15, 25, 45, 70, 0});
+TUNE_ARR(kPassedEg, 8, {0, 10, 15, 25, 45, 75, 120, 0});
 
 // Penalties per pawn, middlegame and endgame. Doubled: every pawn beyond the
 // first on a file (the rear one blocks the front one and no pawn can defend
 // either). Isolated: no friendly pawn on either adjacent file, so only
 // pieces can ever defend it. Both weigh more in the endgame, where a weak
 // pawn is a long-term target the defender runs out of pieces to protect.
-constexpr int kDoubledMg = 10, kDoubledEg = 25;
-constexpr int kIsolatedMg = 10, kIsolatedEg = 15;
+TUNE_INT(kDoubledMg, 10);
+TUNE_INT(kDoubledEg, 25);
+TUNE_INT(kIsolatedMg, 10);
+TUNE_INT(kIsolatedEg, 15);
 
 // Backward pawn: every friendly pawn on the adjacent files has already
 // advanced past it, so no pawn can ever defend it, and an enemy pawn
 // controls the square in front of it, so it can't safely advance to catch
 // up either (Fruit 2.1's values).
-constexpr int kBackwardMg = 8, kBackwardEg = 10;
+TUNE_INT(kBackwardMg, 8);
+TUNE_INT(kBackwardEg, 10);
 
 uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
 constexpr uint64_t kFileMask = 0xFF;                  // file a; shift by x * 8 for file x
@@ -195,6 +199,13 @@ constexpr size_t kPawnCacheSize = size_t(1) << 13;
 thread_local PawnInfo pawnCache[kPawnCacheSize];
 
 const PawnInfo& probePawns(const Board& board) {
+#ifdef TUNING
+    // The tuner changes the weights the cached scores were computed with.
+    thread_local PawnInfo scratch;
+    computePawnInfo(board, scratch);
+    scratch.key = board.pawnKey();
+    return scratch;
+#endif
     uint64_t key = board.pawnKey();
     PawnInfo& entry = pawnCache[key & (kPawnCacheSize - 1)];
     if (entry.key != key) {
@@ -210,9 +221,9 @@ const PawnInfo& probePawns(const Board& board) {
 // boxed in, tied to defending, or blocked by its own pawns -- invisible to
 // material and piece-square tables, which score a passive piece exactly
 // like an active one on the same square.
-constexpr int kMobilityMg[7] = {0, 0, 4, 5, 2, 1, 0};
-constexpr int kMobilityEg[7] = {0, 0, 4, 5, 4, 2, 0};
-constexpr int kMobilityTypical[7] = {0, 0, 4, 6, 7, 13, 0};
+TUNE_ARR(kMobilityMg, 7, {0, 0, 4, 5, 2, 1, 0});
+TUNE_ARR(kMobilityEg, 7, {0, 0, 4, 5, 4, 2, 0});
+TUNE_ARR(kMobilityTypical, 7, {0, 0, 4, 6, 7, 13, 0});
 
 constexpr int kKnightJumps[8][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}};
 // Rooks slide along the first four, bishops the last four, queens all eight.
@@ -226,25 +237,29 @@ struct KingAttack {
 };
 
 // How dangerous each piece type is as a king attacker, indexed by PieceType.
-constexpr int kKingAttackWeight[7] = {0, 0, 20, 20, 40, 80, 0};
+TUNE_ARR(kKingAttackWeight, 7, {0, 0, 20, 20, 40, 80, 0});
 
 // A rook on a file with no pawns at all, or with only enemy pawns, has a
 // lane into the enemy position (Fruit 2.1's values; same in both phases).
-constexpr int kRookOpenFile = 20;
-constexpr int kRookSemiOpenFile = 10;
+TUNE_INT(kRookOpenFile, 20);
+TUNE_INT(kRookSemiOpenFile, 10);
 
 // A rook or queen on the 7th rank (counted from its own side), when there
 // are still enemy pawns there to attack or the enemy king is cut off on the
 // back rank, middlegame / endgame (Fruit 2.1's values).
-constexpr int kRookOn7thMg = 20, kRookOn7thEg = 40;
-constexpr int kQueenOn7thMg = 10, kQueenOn7thEg = 20;
+TUNE_INT(kRookOn7thMg, 20);
+TUNE_INT(kRookOn7thEg, 40);
+TUNE_INT(kQueenOn7thMg, 10);
+TUNE_INT(kQueenOn7thEg, 20);
 
 // Outpost: a knight or bishop on the 4th-6th rank (counted from its own
 // side), defended by an own pawn, on a square no enemy pawn can ever attack
 // -- it can only be driven off by trading a piece for it. Middlegame /
 // endgame; a knight gains more, having no long-range alternative.
-constexpr int kKnightOutpostMg = 20, kKnightOutpostEg = 10;
-constexpr int kBishopOutpostMg = 10, kBishopOutpostEg = 5;
+TUNE_INT(kKnightOutpostMg, 20);
+TUNE_INT(kKnightOutpostEg, 10);
+TUNE_INT(kBishopOutpostMg, 10);
+TUNE_INT(kBishopOutpostEg, 5);
 
 bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
     int rank = color == Color::White ? y : 7 - y;
@@ -337,10 +352,10 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
 // for enemy rooks and queens, worse still with no enemy pawn in the way
 // either. Middlegame only: with the queens and most pieces gone there's no
 // attack left to shelter from.
-constexpr int kShelterPushedOnce = 10;
-constexpr int kShelterMissing = 25;
-constexpr int kKingFileSemiOpen = 15;
-constexpr int kKingFileOpen = 10; // on top of kKingFileSemiOpen
+TUNE_INT(kShelterPushedOnce, 10);
+TUNE_INT(kShelterMissing, 25);
+TUNE_INT(kKingFileSemiOpen, 15);
+TUNE_INT(kKingFileOpen, 10); // on top of kKingFileSemiOpen
 
 // Shelter penalty for `color`'s king, as a positive number.
 int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
@@ -362,7 +377,7 @@ int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
 // many pieces take part: one piece alone rarely mates, so it counts for
 // nothing, and each extra attacker makes the attack disproportionately more
 // dangerous.
-constexpr int kAttackerScalePercent[8] = {0, 0, 50, 75, 88, 94, 97, 99};
+TUNE_ARR(kAttackerScalePercent, 8, {0, 0, 50, 75, 88, 94, 97, 99});
 
 int kingAttackPenalty(const KingAttack& a) {
     return a.weight * kAttackerScalePercent[std::min(a.attackers, 7)] / 100;
@@ -992,6 +1007,11 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 }
 
 } // namespace
+
+#ifdef TUNING
+// Static evaluation from White's point of view, for tools/tune.cpp.
+int tunerEvaluate(const Board& board) { return evaluate(board, Color::White); }
+#endif
 
 std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen,
                             const std::vector<uint64_t>& history) {

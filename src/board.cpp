@@ -7,6 +7,8 @@
 #include <ostream>
 #include <random>
 
+#include "tune.hpp"
+
 namespace {
 
 const int kBishopDirs[4][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
@@ -34,7 +36,7 @@ constexpr int kMaxPhase = 24; // 4 knights+4 bishops (1 each) + 4 rooks (2 each)
 
 // Standard "simplified evaluation function" piece-square tables (centipawns),
 // written in published order: row 0 = rank 8, row 7 = rank 1, column 0 = file a.
-constexpr int kPawnTable[8][8] = {
+TUNE_ARR2(kPawnTable, 8, 8, {
     { 0,  0,   0,   0,   0,   0,  0,  0},
     {50, 50,  50,  50,  50,  50, 50, 50},
     {10, 10,  20,  30,  30,  20, 10, 10},
@@ -43,8 +45,8 @@ constexpr int kPawnTable[8][8] = {
     { 5, -5, -10,   0,   0, -10, -5,  5},
     { 5, 10,  10, -20, -20,  10, 10,  5},
     { 0,  0,   0,   0,   0,   0,  0,  0},
-};
-constexpr int kKnightTable[8][8] = {
+});
+TUNE_ARR2(kKnightTable, 8, 8, {
     {-50, -40, -30, -30, -30, -30, -40, -50},
     {-40, -20,   0,   0,   0,   0, -20, -40},
     {-30,   0,  10,  15,  15,  10,   0, -30},
@@ -53,8 +55,8 @@ constexpr int kKnightTable[8][8] = {
     {-30,   5,  10,  15,  15,  10,   5, -30},
     {-40, -20,   0,   5,   5,   0, -20, -40},
     {-50, -40, -30, -30, -30, -30, -40, -50},
-};
-constexpr int kBishopTable[8][8] = {
+});
+TUNE_ARR2(kBishopTable, 8, 8, {
     {-20, -10, -10, -10, -10, -10, -10, -20},
     {-10,   0,   0,   0,   0,   0,   0, -10},
     {-10,   0,   5,  10,  10,   5,   0, -10},
@@ -63,8 +65,8 @@ constexpr int kBishopTable[8][8] = {
     {-10,  10,  10,  10,  10,  10,  10, -10},
     {-10,   5,   0,   0,   0,   0,   5, -10},
     {-20, -10, -10, -10, -10, -10, -10, -20},
-};
-constexpr int kRookTable[8][8] = {
+});
+TUNE_ARR2(kRookTable, 8, 8, {
     { 0,  0,  0,  0,  0,  0,  0,  0},
     { 5, 10, 10, 10, 10, 10, 10,  5},
     {-5,  0,  0,  0,  0,  0,  0, -5},
@@ -73,8 +75,8 @@ constexpr int kRookTable[8][8] = {
     {-5,  0,  0,  0,  0,  0,  0, -5},
     {-5,  0,  0,  0,  0,  0,  0, -5},
     { 0,  0,  0,  5,  5,  0,  0,  0},
-};
-constexpr int kQueenTable[8][8] = {
+});
+TUNE_ARR2(kQueenTable, 8, 8, {
     {-20, -10, -10, -5, -5, -10, -10, -20},
     {-10,   0,   0,  0,  0,   0,   0, -10},
     {-10,   0,   5,  5,  5,   5,   0, -10},
@@ -83,8 +85,8 @@ constexpr int kQueenTable[8][8] = {
     {-10,   5,   5,  5,  5,   5,   0, -10},
     {-10,   0,   5,  0,  0,   0,   0, -10},
     {-20, -10, -10, -5, -5, -10, -10, -20},
-};
-constexpr int kKingMidTable[8][8] = {
+});
+TUNE_ARR2(kKingMidTable, 8, 8, {
     {-30, -40, -40, -50, -50, -40, -40, -30},
     {-30, -40, -40, -50, -50, -40, -40, -30},
     {-30, -40, -40, -50, -50, -40, -40, -30},
@@ -93,8 +95,8 @@ constexpr int kKingMidTable[8][8] = {
     {-10, -20, -20, -20, -20, -20, -20, -10},
     {20,   20,   0,   0,   0,   0,  20,  20},
     {20,   30,  10,   0,   0,  10,  30,  20},
-};
-constexpr int kKingEndTable[8][8] = {
+});
+TUNE_ARR2(kKingEndTable, 8, 8, {
     {-50, -40, -30, -20, -20, -30, -40, -50},
     {-30, -20, -10,   0,   0, -10, -20, -30},
     {-30, -10,  20,  30,  30,  20, -10, -30},
@@ -103,7 +105,7 @@ constexpr int kKingEndTable[8][8] = {
     {-30, -10,  20,  30,  30,  20, -10, -30},
     {-30, -30,   0,   0,   0,   0, -30, -30},
     {-50, -30, -30, -30, -30, -30, -30, -50},
-};
+});
 
 // Looks up `table` (published rank-8-first order) for a piece of `color` on
 // (x, y), where y=0 is rank 1 in Board's own coordinate system. Mirrors for
@@ -136,8 +138,8 @@ int kingPst(Color color, int x, int y, double phase) {
 // minor pieces can, so the pair is worth more than two single bishops --
 // most of all in open endgames. Middlegame / endgame values, interpolated by
 // phase like the king's table.
-constexpr int kBishopPairMg = 30;
-constexpr int kBishopPairEg = 50;
+TUNE_INT(kBishopPairMg, 30);
+TUNE_INT(kBishopPairEg, 50);
 
 // Positive = good for White.
 int bishopPairTerm(const int (&bishops)[2], double phase) {
@@ -149,7 +151,7 @@ int bishopPairTerm(const int (&bishops)[2], double phase) {
 // pieces left, what a pawn is worth is how close it is to promoting, not
 // whether it controls the center, which is what kPawnTable (used, halved,
 // in the middlegame) rewards.
-constexpr int kPawnEgByRank[8] = {0, 0, 5, 10, 15, 25, 35, 0};
+TUNE_ARR(kPawnEgByRank, 8, {0, 0, 5, 10, 15, 25, 35, 0});
 
 // How much a pawn's endgame square value differs from its halved
 // middlegame one, positive = good for White.
@@ -252,6 +254,9 @@ int Board::kingTerm() const {
 }
 
 int Board::rawEval() const {
+#ifdef TUNING
+    return rawEvalFromScratch(); // the tuner changes the tables the incremental sums were built with
+#endif
     double phase = gamePhase();
     return nonKingScore + kingTerm() + bishopPairTerm(bishopCount, phase) +
            static_cast<int>(pawnEgShift * (1.0 - phase));
