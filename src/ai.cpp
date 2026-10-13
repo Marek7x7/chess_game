@@ -655,14 +655,6 @@ struct SearchContext {
     // Game history followed by every position on the current search line
     // (root included), for repetition detection.
     std::vector<uint64_t> path;
-    // The static eval at each ply of the current line, kNoEval where none was
-    // computed (PV nodes, nodes in check): "improving" compares a node's
-    // eval with its own side's two plies earlier.
-    static constexpr int kNoEval = INT_MIN;
-    struct EvalStack {
-        int at[kMaxPly];
-        EvalStack() { std::fill(std::begin(at), std::end(at), kNoEval); }
-    } evals;
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
@@ -990,19 +982,13 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // one of them can apply, since it isn't free.
     bool haveStaticEval = !pvNode && !inCheck;
     int staticEval = haveStaticEval ? evaluate(board, color) : 0;
-    bool improving = false;
-    if (ply < kMaxPly) {
-        ctx.evals.at[ply] = haveStaticEval ? staticEval : SearchContext::kNoEval;
-        improving = haveStaticEval && ply >= 2 && ctx.evals.at[ply - 2] != SearchContext::kNoEval &&
-                    staticEval > ctx.evals.at[ply - 2];
-    }
 
     // Reverse futility pruning: if the static eval beats beta by more than
     // the opponent could plausibly win back in the remaining plies, assume
     // the position holds and cut without searching it.
     constexpr int kReverseFutilityMargin = 120; // per remaining ply
     if (haveStaticEval && depth <= 3 && beta < kMateThreshold && beta > -kMateThreshold &&
-        staticEval - kReverseFutilityMargin * (depth - (improving ? 1 : 0)) >= beta)
+        staticEval - kReverseFutilityMargin * depth >= beta)
         return staticEval;
 
     // Null-move pruning: "pass" (give the opponent a free move) and search
@@ -1090,7 +1076,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         if (doLMR) {
             // At least 1 ply, and never so much that the move drops straight
             // into quiescence; a PV node gets one ply less.
-            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) + (improving ? 0 : 1), 1, depth - 2);
+            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0), 1, depth - 2);
         }
 
         // PVS: the first move (typically the TT move / best-ordered guess)
@@ -1174,7 +1160,7 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
     RootSearchResult result;
     result.move = rootMoves.front();
 
-    SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory, {}};
+    SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory};
     ctx.path.push_back(board.hashKey());
     const size_t rootPathSize = ctx.path.size();
     std::mt19937 jitterRng(0x9E3779B9u + static_cast<unsigned>(threadIndex));
