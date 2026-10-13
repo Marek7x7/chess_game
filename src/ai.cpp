@@ -273,15 +273,65 @@ bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
     return (pawns.attacks[side] & squareBit(x, y)) && !(pawns.attackSpan[1 - side] & squareBit(x, y));
 }
 
+// The pieces of one colour pinned against its king by an enemy slider, and the
+// squares each may still move to: along the pin line, up to the pinner.
+struct Pins {
+    uint64_t pinned = 0;
+    int count = 0;
+    int square[8];
+    uint64_t line[8];
+
+    // Where the piece on `sq` may move, as far as the pin goes.
+    uint64_t allowed(int sq) const {
+        for (int i = 0; i < count; i++)
+            if (square[i] == sq) return line[i];
+        return ~uint64_t(0);
+    }
+};
+
+Pins findPins(const Board& board, Color color) {
+    Pins pins;
+    const Color enemy = opponent(color);
+    const int kx = board.kingFile(color), ky = board.kingRank(color);
+    const uint64_t occupied = board.occupancy(), own = board.occupancy(color);
+    const uint64_t queens = board.pieces(enemy, PieceType::Queen);
+    const uint64_t straight = board.pieces(enemy, PieceType::Rook) | queens;
+    const uint64_t diagonal = board.pieces(enemy, PieceType::Bishop) | queens;
+    for (int d = 0; d < 8; d++) {
+        const uint64_t sliders = d < 4 ? straight : diagonal;
+        uint64_t line = 0;
+        int candidate = -1; // the first own piece on the ray
+        for (int nx = kx + kSlideDirs[d][0], ny = ky + kSlideDirs[d][1]; Board::inBounds(nx, ny);
+             nx += kSlideDirs[d][0], ny += kSlideDirs[d][1]) {
+            const uint64_t b = bb::bit(nx, ny);
+            line |= b;
+            if (!(occupied & b)) continue;
+            if (own & b) {
+                if (candidate >= 0) break; // two own pieces in a row: nothing is pinned here
+                candidate = nx * 8 + ny;
+                continue;
+            }
+            if ((sliders & b) && candidate >= 0) {
+                pins.pinned |= uint64_t(1) << candidate;
+                pins.square[pins.count] = candidate;
+                pins.line[pins.count++] = line;
+            }
+            break;
+        }
+    }
+    return pins;
+}
+
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
-// mobility -- every square that's empty or holds an enemy piece, pins and
-// checks aside -- rooks on open files, rooks/queens on the 7th rank, and
-// outposts.
+// mobility -- every square that's empty or holds an enemy piece, checks aside,
+// and for a pinned piece only the squares along its pin -- rooks on open
+// files, rooks/queens on the 7th rank, and outposts.
 // Also fills attacks[c] with the
 // pieces attacking color c's king zone (the squares next to that king).
 int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[2]) {
     int mg = 0, eg = 0;
     const uint64_t occupied = board.occupancy();
+    const Pins pins[2] = {findPins(board, Color::White), findPins(board, Color::Black)};
     for (int side = 0; side < 2; side++) {
         const Color color = side == 0 ? Color::White : Color::Black;
         const Color enemy = opponent(color);
@@ -306,7 +356,9 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
                     default: reach = bb::queenAttacks(sq, occupied); break;
                 }
                 reach &= ~own;
-                const int moves = bb::popcount(reach);
+                // A pinned piece still attacks along every line (the king zone test
+                // below), but can only move along its pin.
+                const int moves = bb::popcount((pins[side].pinned >> sq) & 1 ? reach & pins[side].allowed(sq) : reach);
                 mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
                 eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
                 if (type == PieceType::Rook) {
