@@ -97,7 +97,7 @@ public:
         int prevPhaseUnits;
         int prevKingX[2], prevKingY[2];
         int prevBishopCount[2];
-        int prevPawnEgShift;
+        int prevEgShift;
         int prevHalfmoveCount;
     };
 
@@ -156,7 +156,7 @@ private:
     int phaseUnits;
     int kingX[2], kingY[2]; // [White, Black]
     int bishopCount[2];     // [White, Black], for the bishop-pair bonus
-    int pawnEgShift;        // sum of pawnEgShift() over all pawns, blended in by phase
+    int egShift;            // sum of egShiftFor() over all pieces, blended in by phase
 
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 

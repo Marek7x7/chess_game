@@ -108,6 +108,50 @@ TUNE_ARR2(kKingEndTable, 8, 8, {
     {-90, -75, -38, -30, -43, -37, -65, -90},
 });
 
+// Endgame versions of the knight, bishop, rook and queen tables above, which are the
+// middlegame ones (the king, with its own middlegame and endgame tables, and the pawns, with
+// kPawnEgByRank, already taper); the evaluation blends the two by game phase.
+TUNE_ARR2(kKnightEgTable, 8, 8, {
+    {-124, -34,   7, -14, -20, -35,  -8, -94},
+    {-72, -32,  14,  14,  22,  -3, -34, -54},
+    {-32,  -2,  48,  46,  58,  24,  40, -24},
+    {-15,  -7,  22,  60,  24,  60,  -4,  16},
+    {-42, -14,  30,  22,  35,  22,   5, -16},
+    {-66, -28,   0,  40,  28,   4,  20, -66},
+    {-50, -38, -38, -11,  -7, -16, -34, -32},
+    {-124, -66, -46, -46, -44, -44, -71, -64},
+});
+TUNE_ARR2(kBishopEgTable, 8, 8, {
+    {-34,   4, -11,  -3, -24,   0,   0, -25},
+    {-19,   3,  14,  20,  14,   6, -12,   9},
+    {  4,  34,  18,  14,  14,  18,  14,  34},
+    {  0, -11,  20,  23,   3, -10, -15,  -8},
+    { -4,  -7,  -2,  21,  17,  -3,   0,  -4},
+    { -2,  24,  23,  13,  22,  14,  23,  14},
+    {-26,   9,  10,   0,   5,   0,  36,  22},
+    {-13, -11, -15,   0,  14, -18,  -3, -19},
+});
+TUNE_ARR2(kRookEgTable, 8, 8, {
+    { 21,  37,  38,  40,  14,  44,  34,  38},
+    { 20,  26,  20,  30,  14,  30,  18,  34},
+    { 26,  44,  14,  24,  32,  38,  14,  18},
+    { 14,  14,  14,  18,   8,  14,  22,  16},
+    { -6,  10, -10, -10,  -8, -12,  14, -31},
+    {-19, -14, -18, -17, -21, -26,  -8, -19},
+    {-36, -40,  -6, -27, -28, -21, -33, -72},
+    {-16, -12,  -4,   9,   9,   2, -16, -28},
+});
+TUNE_ARR2(kQueenEgTable, 8, 8, {
+    { -5,   4,  20,  40,  40,  64,  64,  55},
+    {-54, -74, -10, -11, -10,  28,  14,  34},
+    {-38, -12,   2,  31,  64,  80,  74,  64},
+    {-42, -62,  -8,  -6,  43,  36,  31,  29},
+    {-44, -40, -23, -10,   1,   7, -14,  -8},
+    {-50, -38, -14, -10, -10,  -7,   8, -26},
+    {-48, -40, -14, -18,  -4, -12, -44,   4},
+    {-12, -44, -19, -17, -20, -84, -84, -64},
+});
+
 // Looks up `table` (published rank-8-first order) for a piece of `color` on
 // (x, y), where y=0 is rank 1 in Board's own coordinate system. Mirrors for
 // Black so both sides use the same "toward the center / toward the back
@@ -125,6 +169,16 @@ int pstFor(PieceType type, Color color, int x, int y) {
         case PieceType::Bishop: return pst(kBishopTable, color, x, y);
         case PieceType::Rook: return pst(kRookTable, color, x, y);
         case PieceType::Queen: return pst(kQueenTable, color, x, y);
+        default: return 0;
+    }
+}
+
+int pstEgFor(PieceType type, Color color, int x, int y) {
+    switch (type) {
+        case PieceType::Knight: return pst(kKnightEgTable, color, x, y);
+        case PieceType::Bishop: return pst(kBishopEgTable, color, x, y);
+        case PieceType::Rook: return pst(kRookEgTable, color, x, y);
+        case PieceType::Queen: return pst(kQueenEgTable, color, x, y);
         default: return 0;
     }
 }
@@ -154,11 +208,20 @@ int bishopPairTerm(const int (&bishops)[2], double phase) {
 // in the middlegame) rewards.
 TUNE_ARR(kPawnEgByRank, 8, {0, 0, 1, 1, 1, 21, 31, 0});
 
-// How much a pawn's endgame square value differs from its halved
-// middlegame one, positive = good for White.
-int pawnEgShiftFor(Color color, int x, int y) {
-    int rank = color == Color::White ? y : 7 - y;
-    int shift = kPawnEgByRank[rank] - pst(kPawnTable, color, x, y) / 2;
+// How much a piece's endgame square value differs from its halved
+// middlegame one, positive = good for White (0 for the king, which has its own
+// phase-interpolated term).
+int egShiftFor(PieceType type, Color color, int x, int y) {
+    int shift;
+    if (type == PieceType::Pawn) {
+        int rank = color == Color::White ? y : 7 - y;
+        shift = kPawnEgByRank[rank] - pst(kPawnTable, color, x, y) / 2;
+    } else if (type == PieceType::Knight || type == PieceType::Bishop || type == PieceType::Rook ||
+               type == PieceType::Queen) {
+        shift = pstEgFor(type, color, x, y) / 2 - pstFor(type, color, x, y) / 2;
+    } else {
+        return 0;
+    }
     return color == Color::White ? shift : -shift;
 }
 
@@ -269,7 +332,7 @@ void Board::recomputeEval() {
     nonKingScore = 0;
     phaseUnits = 0;
     bishopCount[0] = bishopCount[1] = 0;
-    pawnEgShift = 0;
+    egShift = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
@@ -282,7 +345,7 @@ void Board::recomputeEval() {
             nonKingScore += pieceContribution(p.type, p.color, x, y);
             phaseUnits += phaseValue(p.type);
             if (p.type == PieceType::Bishop) bishopCount[colorIndex(p.color)]++;
-            if (p.type == PieceType::Pawn) pawnEgShift += pawnEgShiftFor(p.color, x, y);
+            egShift += egShiftFor(p.type, p.color, x, y);
         }
     }
 }
@@ -300,7 +363,7 @@ int Board::rawEval() const {
 #endif
     double phase = gamePhase();
     return nonKingScore + kingTerm() + bishopPairTerm(bishopCount, phase) +
-           static_cast<int>(pawnEgShift * (1.0 - phase));
+           static_cast<int>(egShift * (1.0 - phase));
 }
 
 double Board::gamePhase() const { return std::min(1.0, phaseUnits / static_cast<double>(kMaxPhase)); }
@@ -317,7 +380,7 @@ int Board::rawEvalFromScratch() const {
     }
     double phaseFrac = std::min(1.0, phase / static_cast<double>(kMaxPhase));
     int bishops[2] = {0, 0};
-    int pawnShift = 0;
+    int egShiftSum = 0;
     for (int x = 0; x < 8; x++) {
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
@@ -329,10 +392,10 @@ int Board::rawEvalFromScratch() const {
                 score += pieceContribution(p.type, p.color, x, y);
             }
             if (p.type == PieceType::Bishop) bishops[colorIndex(p.color)]++;
-            if (p.type == PieceType::Pawn) pawnShift += pawnEgShiftFor(p.color, x, y);
+            egShiftSum += egShiftFor(p.type, p.color, x, y);
         }
     }
-    return score + bishopPairTerm(bishops, phaseFrac) + static_cast<int>(pawnShift * (1.0 - phaseFrac));
+    return score + bishopPairTerm(bishops, phaseFrac) + static_cast<int>(egShiftSum * (1.0 - phaseFrac));
 }
 
 void Board::recomputeHash() { computeHashes(hash, pawnHash); }
@@ -688,11 +751,11 @@ void Board::makeMove(const Move& m) {
     // are summed incrementally at exactly the points their placement changes.
     auto addEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore += pieceContribution(t, c, x, y);
-        if (t == PieceType::Pawn) pawnEgShift += pawnEgShiftFor(c, x, y);
+        egShift += egShiftFor(t, c, x, y);
     };
     auto removeEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore -= pieceContribution(t, c, x, y);
-        if (t == PieceType::Pawn) pawnEgShift -= pawnEgShiftFor(c, x, y);
+        egShift -= egShiftFor(t, c, x, y);
     };
 
     Piece moving = squares[m.fromX][m.fromY];
@@ -793,7 +856,7 @@ void Board::makeMove(const Move& m, UndoState& undo) {
     undo.prevKingY[1] = kingY[1];
     undo.prevBishopCount[0] = bishopCount[0];
     undo.prevBishopCount[1] = bishopCount[1];
-    undo.prevPawnEgShift = pawnEgShift;
+    undo.prevEgShift = egShift;
     undo.prevHalfmoveCount = halfmoveCount;
     const Piece& moving = squares[m.fromX][m.fromY];
     undo.movedType = moving.type;
@@ -844,7 +907,7 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     kingY[1] = undo.prevKingY[1];
     bishopCount[0] = undo.prevBishopCount[0];
     bishopCount[1] = undo.prevBishopCount[1];
-    pawnEgShift = undo.prevPawnEgShift;
+    egShift = undo.prevEgShift;
     halfmoveCount = undo.prevHalfmoveCount;
     turn = color;
 }
