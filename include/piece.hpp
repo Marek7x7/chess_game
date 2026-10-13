@@ -1,8 +1,10 @@
 #pragma once
 
-enum class Color { White, Black, None };
+#include <cstdint>
 
-enum class PieceType { None, Pawn, Knight, Bishop, Rook, Queen, King };
+enum class Color : uint8_t { White, Black, None };
+
+enum class PieceType : uint8_t { None, Pawn, Knight, Bishop, Rook, Queen, King };
 
 struct Piece {
     PieceType type = PieceType::None;
