@@ -958,16 +958,16 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         }
     }
 
-    // The static eval, for the pruning decisions near the leaves below --
-    // only computed where one of them can apply, since it isn't free.
-    bool haveStaticEval = !pvNode && !inCheck && depth <= 3;
+    // The static eval, for the pruning decisions below -- only computed where
+    // one of them can apply, since it isn't free.
+    bool haveStaticEval = !pvNode && !inCheck;
     int staticEval = haveStaticEval ? evaluate(board, color) : 0;
 
     // Reverse futility pruning: if the static eval beats beta by more than
     // the opponent could plausibly win back in the remaining plies, assume
     // the position holds and cut without searching it.
     constexpr int kReverseFutilityMargin = 120; // per remaining ply
-    if (haveStaticEval && beta < kMateThreshold && beta > -kMateThreshold &&
+    if (haveStaticEval && depth <= 3 && beta < kMateThreshold && beta > -kMateThreshold &&
         staticEval - kReverseFutilityMargin * depth >= beta)
         return staticEval;
 
@@ -995,8 +995,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // `board` again.
     constexpr int kNullMoveMinDepth = 3;
     constexpr int kNullMoveReduction = 2;
-    if (!inCheck && depth >= kNullMoveMinDepth && beta < kMateThreshold && beta > -kMateThreshold &&
-        board.hasNonPawnMaterial(color)) {
+    // Only at a non-PV node whose static eval already reaches beta: where it
+    // doesn't, passing is unlikely to hold the score, and the search it costs is wasted.
+    if (haveStaticEval && staticEval >= beta && depth >= kNullMoveMinDepth && beta < kMateThreshold &&
+        beta > -kMateThreshold && board.hasNonPawnMaterial(color)) {
         Board::NullMoveUndo nu;
         board.makeNullMove(nu);
         int nullScore =
