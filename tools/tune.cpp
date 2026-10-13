@@ -7,7 +7,8 @@
 // Run:   build-tune/chess_tune labels.csv [out.txt] [name,name,...|all] [K] [widen]
 //   labels.csv: header "game,fen,sf_cp_white", one quiet position per row.
 //   out.txt:    one line per weight, "NAME v0 v1 ...", the best-validation weights.
-//   names:      optional comma-separated subset of weights to tune (default: all).
+//   names:      optional comma-separated subset of weights to tune (default: all
+//               except the kMop* mop-up weights, which the data cannot measure).
 //               "all" tunes everything.
 //   K:          optional sigmoid scale in centipawns (default 400 / ln 10).
 //   widen:      optional integer factor on all the bounds below (default 1).
@@ -133,6 +134,9 @@ int main(int argc, char** argv) {
     std::vector<Slot> slots;
     for (const TuneParam& p : tuneRegistry()) {
         if (!only.empty() && !only.count(p.name)) continue;
+        // The mop-up weights drive a bare king to the edge; the labelled positions
+        // (no mate scores) cannot measure that, and fitting them just shrinks them.
+        if (std::string(p.name).rfind("kMop", 0) == 0) continue;
         // Bounds keep a weight near its starting value, so one that the data cannot
         // pin down stays plausible: between half and double (at least +-3), the
         // sign unchanged, and a weight that starts at 0 is an unused slot and
