@@ -659,6 +659,9 @@ struct SearchContext {
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
 
+// History scores stay below the killer moves' (79'000 and 80'000) in moveScore().
+constexpr int kHistoryMax = 60'000;
+
 // Score used to order moves before searching them: TT move first, then
 // captures via MVV-LVA, then promotions, then killer moves, then history.
 int moveScore(const Board& board, const Move& m, const Move& ttMove, const SearchContext& ctx, int ply,
@@ -1097,7 +1100,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                     ctx.killers[ply][1] = ctx.killers[ply][0];
                     ctx.killers[ply][0] = m;
                 }
-                ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY] += depth * depth;
+                {
+                    int& h = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
+                    h = std::min(h + depth * depth, kHistoryMax);
+                }
             }
             break;
         }
