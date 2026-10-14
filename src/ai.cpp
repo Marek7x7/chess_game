@@ -1184,6 +1184,8 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
                                      std::chrono::steady_clock::time_point::max()) {
     RootSearchResult result;
     result.move = rootMoves.front();
+    const auto searchStart = std::chrono::steady_clock::now();
+    int stableDepths = 0; // consecutive completed depths whose best move did not change
 
     SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory};
     std::fill(std::begin(ctx.prevMove), std::end(ctx.prevMove), -1);
@@ -1281,6 +1283,9 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 
         if (!completed) break;
 
+        const bool moveChanged = result.depthReached > 0 && !sameMove(depthBestMove, result.move);
+        const int scoreDrop = result.depthReached > 0 ? result.score - depthBest : 0;
+        stableDepths = moveChanged ? 0 : stableDepths + 1;
         result.move = depthBestMove;
         result.score = depthBest;
         result.depthReached = depth;
@@ -1294,7 +1299,20 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
         // Past the soft limit, the next depth -- typically taking as long as
         // all the previous ones together -- would likely be cut off
         // unfinished and thrown away, so stop here instead.
-        if (std::chrono::steady_clock::now() >= softDeadline) break;
+        if (softDeadline != std::chrono::steady_clock::time_point::max()) {
+            // Spend less when the best move has held for several depths, more
+            // when it just changed or the score fell: those are the moments an
+            // extra depth is most likely to change the move.
+            double scale = 1.0;
+            if (depth >= 6) {
+                if (moveChanged) scale = 1.5;
+                else if (stableDepths >= 3) scale = 0.6;
+                if (scoreDrop > 30) scale *= 1.3;
+            }
+            const auto soft = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                (softDeadline - searchStart) * scale);
+            if (std::chrono::steady_clock::now() >= searchStart + soft) break;
+        }
     }
 
     result.nodes = ctx.nodes;
