@@ -192,6 +192,7 @@ int main(int argc, char** argv) {
 
     for (int step : {16, 8, 4, 2, 1}) {
         for (int sweep = 0; sweep < 40; sweep++) {
+            const double trainBefore = bestTrain;
             int accepted = 0;
             for (Slot& s : slots) {
                 for (int dir : {1, -1}) {
@@ -218,7 +219,9 @@ int main(int argc, char** argv) {
             } else {
                 sinceImprovement++;
             }
-            if (accepted == 0 || sinceImprovement >= 3) break;
+            // Stop a step when its sweeps have stopped paying (a sweep that gains under 2e-6
+            // of training loss), or the validation loss has not improved for three of them.
+            if (accepted == 0 || sinceImprovement >= 3 || trainBefore - bestTrain < 2e-6) break;
         }
         sinceImprovement = 0;
     }
