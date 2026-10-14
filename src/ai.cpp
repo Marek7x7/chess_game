@@ -96,10 +96,10 @@ TUNE_INT(kBackwardEg, 11);
 // Connected pawns, by rank counted from the pawn's own side (middlegame / endgame): a
 // pawn defended by a pawn diagonally behind it, and one with a pawn beside it on the
 // same rank (a phalanx, which can advance together and defend each other).
-TUNE_ARR(kSupportedMg, 8, {0, 0, 4, 6, 10, 16, 24, 0});
-TUNE_ARR(kSupportedEg, 8, {0, 0, 2, 4, 8, 14, 20, 0});
-TUNE_ARR(kPhalanxMg, 8, {0, 2, 4, 6, 10, 14, 20, 0});
-TUNE_ARR(kPhalanxEg, 8, {0, 2, 4, 6, 10, 14, 20, 0});
+TUNE_ARR(kSupportedMg, 8, {0, 0, 9, 1, 10, 25, 72, 0});
+TUNE_ARR(kSupportedEg, 8, {0, 0, 3, 1, 1, 14, 20, 0});
+TUNE_ARR(kPhalanxMg, 8, {0, 1, 4, 11, 23, 42, 60, 0});
+TUNE_ARR(kPhalanxEg, 8, {0, 1, 1, 1, 25, 42, 60, 0});
 
 uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
 constexpr uint64_t kFileMask = 0xFF;                  // file a; shift by x * 8 for file x
@@ -298,8 +298,8 @@ bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
 // A bishop hemmed in by its own pawns: a penalty per own pawn standing on squares of
 // the bishop's colour (those pawns block it, and it cannot defend the other colour's
 // squares), middlegame / endgame.
-TUNE_INT(kBadBishopMg, 2);
-TUNE_INT(kBadBishopEg, 4);
+TUNE_INT(kBadBishopMg, 1);
+TUNE_INT(kBadBishopEg, 3);
 
 constexpr uint64_t parityMask(int parity) {
     uint64_t mask = 0;
@@ -588,8 +588,8 @@ int rookBehindPasser(const Board& board, const PawnInfo& pawns) {
 // piece cannot advance until that piece is driven off, and a blockader on it is
 // well placed: a penalty by the pawn's rank (counted from its own side), middlegame
 // / endgame.
-TUNE_ARR(kBlockedPasserMg, 8, {0, 0, 1, 3, 6, 10, 14, 0});
-TUNE_ARR(kBlockedPasserEg, 8, {0, 0, 2, 6, 12, 20, 30, 0});
+TUNE_ARR(kBlockedPasserMg, 8, {0, 0, 7, 9, 2, 10, 33, 0});
+TUNE_ARR(kBlockedPasserEg, 8, {0, 0, 2, 18, 25, 36, 30, 0});
 
 // Positive = good for White.
 int blockedPassers(const Board& board, const PawnInfo& pawns) {
