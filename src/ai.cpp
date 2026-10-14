@@ -357,6 +357,12 @@ TUNE_ARR(kThreatMinor, 7, {0, 1, 25, 34, 40, 46, 0});
 TUNE_ARR(kThreatRook, 7, {0, 1, 8, 9, 0, 52, 0});
 TUNE_ARR(kHanging, 7, {0, 25, 23, 22, 18, 2, 0}); // attacked by anything, defended by nothing
 
+// Safe checks, indexed by the type of the checking piece: per square from which one of
+// the side's pieces of that type could give check to the enemy king, that is not
+// attacked by the enemy (so the check cannot be met by simply taking the checker) and
+// is not occupied by the side's own piece. Middlegame only.
+TUNE_ARR(kSafeCheck, 7, {0, 0, 12, 10, 16, 20, 0});
+
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece and that no enemy pawn
 // attacks, checks aside, and for a pinned piece only the squares along its pin -- rooks on open
@@ -370,6 +376,7 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
     uint64_t attackedBy[2] = {0, 0};      // every square each side's knights, bishops, rooks, queens attack
     uint64_t attackedByMinor[2] = {0, 0}; // ... its knights and bishops
     uint64_t attackedByRook[2] = {0, 0};  // ... its rooks
+    uint64_t attackedByType[2][7] = {};   // ... each type of its pieces separately
     for (int side = 0; side < 2; side++) {
         const Color color = side == 0 ? Color::White : Color::Black;
         const Color enemy = opponent(color);
@@ -394,6 +401,7 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
                     default: reach = bb::queenAttacks(sq, occupied); break;
                 }
                 attackedBy[side] |= reach;
+                attackedByType[side][t] |= reach;
                 if (type == PieceType::Knight || type == PieceType::Bishop) attackedByMinor[side] |= reach;
                 else if (type == PieceType::Rook) attackedByRook[side] |= reach;
                 reach &= ~own;
@@ -437,6 +445,22 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
                 }
             }
         }
+    }
+
+    // Safe checks against each side's king.
+    for (int side = 0; side < 2; side++) {
+        const Color color = side == 0 ? Color::White : Color::Black;
+        const Color enemy = opponent(color);
+        const int sign = side == 0 ? 1 : -1;
+        const int eksq = board.kingFile(enemy) * 8 + board.kingRank(enemy);
+        const uint64_t defended = attackedBy[1 - side] | pawns.attacks[1 - side] | bb::kingAttacks[eksq];
+        const uint64_t usable = ~board.occupancy(color) & ~defended;
+        const uint64_t diagonalChecks = bb::bishopAttacks(eksq, occupied), straightChecks = bb::rookAttacks(eksq, occupied);
+        const int knightN = bb::popcount(attackedByType[side][2] & bb::knightAttacks[eksq] & usable);
+        const int bishopN = bb::popcount(attackedByType[side][3] & diagonalChecks & usable);
+        const int rookN = bb::popcount(attackedByType[side][4] & straightChecks & usable);
+        const int queenN = bb::popcount(attackedByType[side][5] & (diagonalChecks | straightChecks) & usable);
+        mg += sign * (kSafeCheck[2] * knightN + kSafeCheck[3] * bishopN + kSafeCheck[4] * rookN + kSafeCheck[5] * queenN);
     }
 
     // Threats against each side's pieces.
