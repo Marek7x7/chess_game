@@ -206,7 +206,7 @@ int bishopPairTerm(const int (&bishops)[2], double phase) {
 // pieces left, what a pawn is worth is how close it is to promoting, not
 // whether it controls the center, which is what kPawnTable (used, halved,
 // in the middlegame) rewards.
-TUNE_ARR(kPawnEgByRank, 8, {0, 0, 1, 1, 1, 16, 31, 0});
+TUNE_ARR(kPawnEgByRank, 8, {0, 0, 1, 1, 1, 5, 67, 0});
 
 // How much a piece's endgame square value differs from its halved
 // middlegame one, positive = good for White (0 for the king, which has its own
