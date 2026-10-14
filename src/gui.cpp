@@ -674,6 +674,7 @@ void renderMenuMain(App& app, Button& twoPlayers, Button& vsComputer, Button& cu
     drawButton(r, vsComputer, kButtonBg, kButtonFg, 20);
     drawButton(r, custom, kButtonBg, kButtonFg, 20);
     drawButton(r, botVsBot, kButtonBg, kButtonFg, 20);
+    drawTextCentered(r, kWindowW / 2.0f, static_cast<float>(kWindowH - 34), 14, kHintColor, "FRED MADE BY MAREK");
 }
 
 void renderBotSetup(App& app, Button (&levelBtns)[2][4], Button (&gameCountBtns)[4], Button& startBtn,
@@ -976,7 +977,7 @@ int runGui() {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("Chess", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, kWindowW, kWindowH, SDL_WINDOW_SHOWN);
+    SDL_Window* window = SDL_CreateWindow("Chess", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, kWindowW, kWindowH, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();
@@ -991,6 +992,7 @@ int runGui() {
         return 1;
     }
 
+    SDL_RenderSetLogicalSize(renderer, kWindowW, kWindowH);
     App app;
     app.renderer = renderer;
 
