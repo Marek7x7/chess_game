@@ -603,8 +603,8 @@ int rookBehindPasser(const Board& board, const PawnInfo& pawns) {
 // piece cannot advance until that piece is driven off, and a blockader on it is
 // well placed: a penalty by the pawn's rank (counted from its own side), middlegame
 // / endgame.
-TUNE_ARR(kBlockedPasserMg, 8, {0, 0, 7, 26, 1, 10, 99, 0});
-TUNE_ARR(kBlockedPasserEg, 8, {0, 0, 2, 19, 35, 40, 37, 0});
+TUNE_ARR(kBlockedPasserMg, 8, {0, 0, 16, 24, 1, 3, 94, 0});
+TUNE_ARR(kBlockedPasserEg, 8, {0, 0, 2, 15, 35, 40, 68, 0});
 
 // Positive = good for White.
 int blockedPassers(const Board& board, const PawnInfo& pawns) {
@@ -633,7 +633,7 @@ int blockedPassers(const Board& board, const PawnInfo& pawns) {
 // distance, a passer is worth more the closer its own king is to the square
 // in front of it and the farther the enemy king is, scaled by how far the
 // pawn has advanced (rank counted from its own side).
-TUNE_ARR(kPasserKingEg, 8, {0, 0, 4, 12, 21, 28, 28, 0});
+TUNE_ARR(kPasserKingEg, 8, {0, 0, 2, 12, 21, 29, 33, 0});
 
 // Positive = good for White.
 int passerKingDistance(const Board& board, const PawnInfo& pawns) {
@@ -698,7 +698,7 @@ int mopUp(const Board& board, const PawnInfo& pawns) {
 }
 
 // The side to move gets the first chance to use any advantage, worth a little on top of the rest.
-TUNE_INT(kTempo, 17);
+TUNE_INT(kTempo, 14);
 
 // Opposite-coloured bishops, one each and nothing but pawns besides, is the most drawish of
 // endings: the defender's bishop holds the squares the attacker's cannot reach, so a material
