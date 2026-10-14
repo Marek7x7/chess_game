@@ -703,13 +703,13 @@ TUNE_INT(kTempo, 14);
 // Opposite-coloured bishops, one each and nothing but pawns besides, is the most drawish of
 // endings: the defender's bishop holds the squares the attacker's cannot reach, so a material
 // edge counts for much less. The evaluation is scaled to this percentage there.
-TUNE_INT(kOppositeBishopsScale, 36);
+TUNE_INT(kOppositeBishopsScale, 28);
 
 // Endgame scaling, in percent by how many pawns the side ahead has (0 to 5 or more): with few pieces
 // left a lead without pawns is mostly a draw. With none the other side must not be a bare king (which
 // mop-up handles).
-TUNE_ARR(kPawnsScale, 6, {36, 69, 106, 116, 124, 124});
-TUNE_INT(kScalePhasePercent, 83); // the phase (in percent of the opening's) below which this applies
+TUNE_ARR(kPawnsScale, 6, {31, 65, 99, 115, 124, 126});
+TUNE_INT(kScalePhasePercent, 87); // the phase (in percent of the opening's) below which this applies
 
 bool oppositeColouredBishops(const Board& board) {
     if (board.gamePhase() > 0.09) return false; // two bishops are 2 of 24 phase units; anything more is not this ending
