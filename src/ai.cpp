@@ -982,11 +982,14 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
 
     // Outside check the legality filter is skipped and each move is tested when it is played.
     MoveList candidates;
+    const int ownKingSq = board.kingFile(color) * 8 + board.kingRank(color);
+    uint64_t pinnedMask = 0;
     if (inCheck) {
         candidates = board.legalMoves(color);
         if (candidates.empty()) return -(kMateScore - ply);
     } else {
         candidates = board.pseudoLegal(color, true);
+        pinnedMask = board.pinnedPieces(color);
     }
     orderMoves(board, candidates, ttMove, ctx, ply, color);
 
@@ -1007,9 +1010,12 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
         if (!inCheck && !seeNonNegative(board, m)) continue;
         Board::UndoState undo;
         board.makeMove(m, undo);
-        if (!inCheck && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
-            board.unmakeMove(m, undo);
-            continue;
+        if (!inCheck) {
+            const int from = m.fromX * 8 + m.fromY;
+            if ((from == ownKingSq || m.isEnPassant || ((pinnedMask >> from) & 1)) && board.isInCheck(color)) {
+                board.unmakeMove(m, undo); // illegal: leaves the mover's king attacked
+                continue;
+            }
         }
         ctx.tt.prefetch(board.hashKey());
         int score = -quiescence(board, -beta, -alpha, opponent(color), ply + 1, ctx);
@@ -1151,6 +1157,14 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // testing, and a node that cuts off never reaches most of its moves. In check the full filter
     // leaves the few evasions.
     const bool lazyLegal = !inCheck;
+    // Not in check, only a king move, en passant or a move by a pinned piece can leave the king
+    // attacked, so only those need the test.
+    const int ownKingSq = board.kingFile(color) * 8 + board.kingRank(color);
+    const uint64_t pinnedMask = lazyLegal ? board.pinnedPieces(color) : 0;
+    auto mayBeIllegal = [&](const Move& mv) {
+        const int from = mv.fromX * 8 + mv.fromY;
+        return from == ownKingSq || mv.isEnPassant || ((pinnedMask >> from) & 1);
+    };
     MoveList moves = lazyLegal ? board.pseudoLegal(color, false) : board.legalMoves(color);
     if (!lazyLegal && moves.empty()) return -(kMateScore - ply);
     orderMoves(board, moves, ttMove, ctx, ply, color, true);
@@ -1180,7 +1194,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         }
         Board::UndoState undo;
         board.makeMove(m, undo);
-        if (lazyLegal && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
+        if (lazyLegal && mayBeIllegal(m) && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
             board.unmakeMove(m, undo);
             continue;
         }
