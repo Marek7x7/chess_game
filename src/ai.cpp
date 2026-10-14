@@ -1066,8 +1066,12 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         ctx.tt.prefetch(board.hashKey());
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
 
-        if (futile && moveIndex > 0 && m.captured == PieceType::None && m.promotion == PieceType::None &&
-            !board.isInCheck(opponent(color))) {
+        // Late-move pruning: at shallow depth in a non-PV node, the quiet moves ordered
+        // after the first few are very unlikely to matter.
+        const bool lateQuiet = !pvNode && !inCheck && depth <= 4 && moveIndex >= 3 + depth * depth &&
+                               best > -kMateThreshold;
+        if ((futile || lateQuiet) && moveIndex > 0 && m.captured == PieceType::None &&
+            m.promotion == PieceType::None && !board.isInCheck(opponent(color))) {
             board.unmakeMove(m, undo);
             moveIndex++;
             continue;
