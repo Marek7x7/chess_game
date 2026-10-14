@@ -241,7 +241,7 @@ struct KingAttack {
 };
 
 // How dangerous each piece type is as a king attacker, indexed by PieceType.
-TUNE_ARR(kKingAttackWeight, 7, {0, 0, 40, 25, 63, 76, 0});
+TUNE_ARR(kKingAttackWeight, 7, {0, 0, 32, 33, 36, 80, 0});
 
 // A rook on a file with no pawns at all, or with only enemy pawns, has a
 // lane into the enemy position (Fruit 2.1's values; same in both phases).
@@ -442,7 +442,7 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
 TUNE_INT(kShelterPushedOnce, 2);
 TUNE_INT(kShelterMissing, 4);
 TUNE_INT(kKingFileSemiOpen, 6);
-TUNE_INT(kKingFileOpen, 20); // on top of kKingFileSemiOpen
+TUNE_INT(kKingFileOpen, 37); // on top of kKingFileSemiOpen
 
 // Shelter penalty for `color`'s king, as a positive number.
 int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
@@ -464,7 +464,7 @@ int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
 // many pieces take part: one piece alone rarely mates, so it counts for
 // nothing, and each extra attacker makes the attack disproportionately more
 // dangerous.
-TUNE_ARR(kAttackerScalePercent, 8, {0, 0, 34, 72, 117, 94, 97, 99});
+TUNE_ARR(kAttackerScalePercent, 8, {0, 0, 34, 68, 110, 94, 97, 99});
 
 int kingAttackPenalty(const KingAttack& a) {
     return a.weight * kAttackerScalePercent[std::min(a.attackers, 7)] / 100;
@@ -475,7 +475,7 @@ int kingAttackPenalty(const KingAttack& a) {
 // opposite wings). Penalty per such pawn by how many ranks it stands in front
 // of the king (1 = the next rank); pawns level with or behind the king count
 // for nothing.
-TUNE_ARR(kStormMg, 8, {0, 1, 18, 9, 4, 1, 0, 0});
+TUNE_ARR(kStormMg, 8, {0, 1, 18, 7, 4, 1, 0, 0});
 
 int pawnStormPenalty(const Board& board, const PawnInfo& pawns, Color color) {
     const int kx = board.kingFile(color), ky = board.kingRank(color);
