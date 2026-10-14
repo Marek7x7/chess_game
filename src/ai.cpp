@@ -565,6 +565,36 @@ int rookBehindPasser(const Board& board, const PawnInfo& pawns) {
     return static_cast<int>(mg * phase + eg * (1.0 - phase));
 }
 
+// A passed pawn whose stop square (the square in front of it) is held by an enemy
+// piece cannot advance until that piece is driven off, and a blockader on it is
+// well placed: a penalty by the pawn's rank (counted from its own side), middlegame
+// / endgame.
+TUNE_ARR(kBlockedPasserMg, 8, {0, 0, 1, 3, 6, 10, 14, 0});
+TUNE_ARR(kBlockedPasserEg, 8, {0, 0, 2, 6, 12, 20, 30, 0});
+
+// Positive = good for White.
+int blockedPassers(const Board& board, const PawnInfo& pawns) {
+    int mg = 0, eg = 0;
+    for (int side = 0; side < 2; side++) {
+        const Color enemy = side == 0 ? Color::Black : Color::White;
+        const int sign = side == 0 ? 1 : -1;
+        const int dir = side == 0 ? 1 : -1;
+        uint64_t passers = pawns.passed[side];
+        while (passers) {
+            const int sq = bb::lsb(passers);
+            passers = bb::clearLsb(passers);
+            const int x = sq / 8, y = sq % 8;
+            const int rank = side == 0 ? y : 7 - y;
+            if (board.at(x, y + dir).color == enemy) {
+                mg -= sign * kBlockedPasserMg[rank];
+                eg -= sign * kBlockedPasserEg[rank];
+            }
+        }
+    }
+    const double phase = board.gamePhase();
+    return static_cast<int>(mg * phase + eg * (1.0 - phase));
+}
+
 // King distance to passed pawns, endgame only: per square of Chebyshev
 // distance, a passer is worth more the closer its own king is to the square
 // in front of it and the farther the enemy king is, scaled by how far the
@@ -647,7 +677,7 @@ int evaluate(const Board& board, Color color) {
     KingAttack attacks[2]; // on White's king, on Black's king
     int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
                 pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns) +
-                rookBehindPasser(board, pawns) + passerKingDistance(board, pawns) +
+                rookBehindPasser(board, pawns) + passerKingDistance(board, pawns) + blockedPassers(board, pawns) +
                 (board.sideToMove() == Color::White ? kTempo : -kTempo);
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
