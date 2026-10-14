@@ -781,6 +781,13 @@ struct SearchContext {
     int prevMove[kMaxPly + 1]{};
     // Capture history: how well a capture has done, by [moving piece type][target square][captured type].
     int captureHistory[7][64][7]{};
+    // Continuation history: how well a quiet move did as the reply to the previous move, by
+    // [previous piece type][previous target square][piece type][target square] (flattened).
+    std::vector<int16_t> continuation = std::vector<int16_t>(7 * 64 * 7 * 64, 0);
+
+    int16_t& contHist(int prevPiece, int prevTo, int piece, int to) {
+        return continuation[((prevPiece * 64 + prevTo) * 7 + piece) * 64 + to];
+    }
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
@@ -796,6 +803,11 @@ int encodeMove(const Move& m) { return ((m.fromX * 8 + m.fromY) << 6) | (m.toX *
 constexpr int kHistoryLimit = 16'384;
 
 void updateHistory(int& h, int bonus) { h += bonus - h * std::abs(bonus) / kHistoryLimit; }
+void updateHistory(int16_t& h, int bonus) {
+    int v = h;
+    updateHistory(v, bonus);
+    h = static_cast<int16_t>(v);
+}
 
 bool seeNonNegative(const Board& board, const Move& m); // below
 
@@ -842,7 +854,14 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
     }
     // Quiet checks come right after the killers and the counter-move (only in the main search).
     if (seeOrder && !m.isCastle && givesDirectCheck(board, m, color)) return 77'000;
-    return ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
+    int score = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
+    if (ply > 0 && ctx.prevMove[ply] >= 0) {
+        const int prevTo = ctx.prevMove[ply] & 63;
+        score += const_cast<SearchContext&>(ctx).contHist(static_cast<int>(board.at(prevTo / 8, prevTo % 8).type), prevTo,
+                                                           static_cast<int>(board.at(m.fromX, m.fromY).type),
+                                                           m.toX * 8 + m.toY);
+    }
+    return score;
 }
 
 void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx,
@@ -1340,6 +1359,16 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                 };
                 updateHistory(history(m), bonus);
                 for (int i = 0; i < numTriedQuiets; i++) updateHistory(history(triedQuiets[i]), -bonus);
+                if (ply > 0 && ctx.prevMove[ply] >= 0) {
+                    const int prevTo = ctx.prevMove[ply] & 63;
+                    const int prevPiece = static_cast<int>(board.at(prevTo / 8, prevTo % 8).type);
+                    auto cont = [&](const Move& q) -> int16_t& {
+                        return ctx.contHist(prevPiece, prevTo, static_cast<int>(board.at(q.fromX, q.fromY).type),
+                                            q.toX * 8 + q.toY);
+                    };
+                    updateHistory(cont(m), bonus);
+                    for (int i = 0; i < numTriedQuiets; i++) updateHistory(cont(triedQuiets[i]), -bonus);
+                }
                 if (ply > 0 && ctx.prevMove[ply] >= 0)
                     ctx.counter[colorIdx(color)][ctx.prevMove[ply] >> 6][ctx.prevMove[ply] & 63] =
                         static_cast<uint16_t>(1 + (m.fromX * 8 + m.fromY) * 64 + m.toX * 8 + m.toY);
