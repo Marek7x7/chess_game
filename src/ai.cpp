@@ -73,15 +73,15 @@ std::string movesStr(const std::vector<Move>& moves) {
 // starting rank, 6 = one step from promoting), middlegame and endgame. A
 // passer is worth far more once pieces come off: fewer pieces are left to
 // blockade it or to stop it while also doing everything else.
-TUNE_ARR(kPassedMg, 8, {0, 1, 1, 1, 13, 60, 104, 0});
-TUNE_ARR(kPassedEg, 8, {0, 12, 1, 29, 63, 94, 127, 0});
+TUNE_ARR(kPassedMg, 8, {0, 1, 1, 1, 13, 82, 104, 0});
+TUNE_ARR(kPassedEg, 8, {0, 12, 1, 29, 79, 116, 127, 0});
 
 // Penalties per pawn, middlegame and endgame. Doubled: every pawn beyond the
 // first on a file (the rear one blocks the front one and no pawn can defend
 // either). Isolated: no friendly pawn on either adjacent file, so only
 // pieces can ever defend it. Both weigh more in the endgame, where a weak
 // pawn is a long-term target the defender runs out of pieces to protect.
-TUNE_INT(kDoubledMg, 18);
+TUNE_INT(kDoubledMg, 16);
 TUNE_INT(kDoubledEg, 17);
 TUNE_INT(kIsolatedMg, 14);
 TUNE_INT(kIsolatedEg, 11);
