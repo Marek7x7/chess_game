@@ -263,7 +263,7 @@ struct KingAttack {
 };
 
 // How dangerous each piece type is as a king attacker, indexed by PieceType.
-TUNE_ARR(kKingAttackWeight, 7, {0, 0, 32, 30, 36, 80, 0});
+TUNE_ARR(kKingAttackWeight, 7, {0, 0, 25, 24, 36, 63, 0});
 
 // A rook on a file with no pawns at all, or with only enemy pawns, has a
 // lane into the enemy position (Fruit 2.1's values; same in both phases).
@@ -361,7 +361,7 @@ TUNE_ARR(kHanging, 7, {0, 25, 23, 22, 18, 2, 0}); // attacked by anything, defen
 // the side's pieces of that type could give check to the enemy king, that is not
 // attacked by the enemy (so the check cannot be met by simply taking the checker) and
 // is not occupied by the side's own piece. Middlegame only.
-TUNE_ARR(kSafeCheck, 7, {0, 0, 36, 30, 48, 36, 0});
+TUNE_ARR(kSafeCheck, 7, {0, 0, 54, 28, 49, 40, 0});
 
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece and that no enemy pawn
@@ -498,7 +498,7 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
 TUNE_INT(kShelterPushedOnce, 6);
 TUNE_INT(kShelterMissing, 6);
 TUNE_INT(kKingFileSemiOpen, 4);
-TUNE_INT(kKingFileOpen, 32); // on top of kKingFileSemiOpen
+TUNE_INT(kKingFileOpen, 20); // on top of kKingFileSemiOpen
 
 // Shelter penalty for `color`'s king, as a positive number.
 int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
@@ -520,7 +520,7 @@ int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
 // many pieces take part: one piece alone rarely mates, so it counts for
 // nothing, and each extra attacker makes the attack disproportionately more
 // dangerous.
-TUNE_ARR(kAttackerScalePercent, 8, {0, 0, 34, 68, 110, 94, 97, 99});
+TUNE_ARR(kAttackerScalePercent, 8, {0, 0, 33, 68, 110, 94, 97, 99});
 
 int kingAttackPenalty(const KingAttack& a) {
     return a.weight * kAttackerScalePercent[std::min(a.attackers, 7)] / 100;
@@ -531,7 +531,7 @@ int kingAttackPenalty(const KingAttack& a) {
 // opposite wings). Penalty per such pawn by how many ranks it stands in front
 // of the king (1 = the next rank); pawns level with or behind the king count
 // for nothing.
-TUNE_ARR(kStormMg, 8, {0, 1, 19, 7, 2, 1, 0, 0});
+TUNE_ARR(kStormMg, 8, {0, 1, 19, 3, 2, 1, 0, 0});
 
 int pawnStormPenalty(const Board& board, const PawnInfo& pawns, Color color) {
     const int kx = board.kingFile(color), ky = board.kingRank(color);
