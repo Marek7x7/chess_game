@@ -700,6 +700,19 @@ int mopUp(const Board& board, const PawnInfo& pawns) {
 // The side to move gets the first chance to use any advantage, worth a little on top of the rest.
 TUNE_INT(kTempo, 17);
 
+// Opposite-coloured bishops, one each and nothing but pawns besides, is the most drawish of
+// endings: the defender's bishop holds the squares the attacker's cannot reach, so a material
+// edge counts for much less. The evaluation is scaled to this percentage there.
+TUNE_INT(kOppositeBishopsScale, 36);
+
+bool oppositeColouredBishops(const Board& board) {
+    if (board.gamePhase() > 0.09) return false; // two bishops are 2 of 24 phase units; anything more is not this ending
+    const uint64_t white = board.pieces(Color::White, PieceType::Bishop), black = board.pieces(Color::Black, PieceType::Bishop);
+    if (!white || !black || bb::clearLsb(white) || bb::clearLsb(black)) return false;
+    const int w = bb::lsb(white), b = bb::lsb(black);
+    return (w / 8 + w % 8) % 2 != (b / 8 + b % 8) % 2;
+}
+
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
     const PawnInfo& pawns = probePawns(board);
@@ -713,6 +726,7 @@ int evaluate(const Board& board, Color color) {
                 pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns) +
                 rookBehindPasser(board, pawns) + passerKingDistance(board, pawns) + blockedPassers(board, pawns) +
                 (board.sideToMove() == Color::White ? kTempo : -kTempo);
+    if (oppositeColouredBishops(board)) score = score * kOppositeBishopsScale / 100;
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
