@@ -114,40 +114,53 @@ per change in `STRENGTH_LOG.md`:
 - **Other:** the GUI's human-vs-computer mode passes the game history
   (repetition detection, validated at +55); reported PVs end at a
   threefold.
-- **Done 2026-10-12..14 (autonomous session, rows in `STRENGTH_LOG.md`):**
-  Texel tuning of the eval weights against Stockfish (five rounds, each
-  validation-loss gain shown in the log; +40, +38, +10, +29 and a share of
-  +58/+98 Elo at 5+0.05), material values; speedups with identical search
-  trees (MoveList, sort, legality filter, 1-byte enums, aligned/prefetched
-  TT, bitboard attacks/mobility/pins, 8-byte Move, LTO: 2.6M -> 5.6M nodes/s,
-  +112 and +122 Elo); dead-draw and mop-up endgame fixes; new eval terms
-  (tempo, rook behind passer, passer king distance, pawn storm, pin-aware
-  mobility, threats, connected pawns, blocked passers, bad bishop, endgame
-  piece-square tables); search (null move only where eval >= beta with a
-  depth-scaled reduction, SEE-ordered captures, history with gravity and
-  malus, history LMR, counter-moves, late-move pruning, singular extensions,
-  time management by best-move stability, gradual aspiration windows).
-  Re-checked at 10+0.1 (+408) and with 2 threads (+363) against the start
-  of the session.
-- Tried and not kept (flat or negative; do not retry blindly): contempt,
-  internal iterative reduction + an 'improving' flag, a pawn-count
-  adjustment for knights/rooks, a free-path bonus for passers, an
-  edge-distance rewrite of `isSquareAttacked` (slower).
+- **Done 2026-10-12..15 (autonomous session, rows in `STRENGTH_LOG.md`):**
+  Texel tuning of the eval weights against Stockfish (six rounds; the loop
+  stopped when round 7 found no gain), including material values and the new
+  terms below; speedups with identical search trees (MoveList, sort,
+  legality filter, 1-byte enums, aligned/prefetched TT, bitboards for
+  attacks/mobility/pins/SEE/move generation, 8-byte Move, LTO, windowed
+  repetition scan) and lazy legality checks: 2.6M -> about 6M nodes/s, worth
+  +112, +122 and +31 Elo at 5+0.05; endgame fixes (dead draw scores 0,
+  mop-up toward the edge or the right corner); new eval terms (tempo, rook
+  behind passer, passer king distance, pawn storm, pin-aware mobility, pawn-safe
+  mobility, threats, safe checks, connected pawns, blocked passers, bad
+  bishop, endgame piece-square tables) and endgame scaling (opposite-coloured
+  bishops, and by the pawn count of the side ahead: one of the biggest single
+  loss reductions, -11% validation loss); search (null move only where eval >=
+  beta with a depth-scaled reduction, SEE-ordered captures -- worth 79 Elo,
+  an ablation showed --, history with gravity and malus, history in LMR,
+  counter-moves, late-move pruning, singular extensions, time management by
+  best-move stability, gradual aspiration windows). Re-checked against the
+  start of the session: +578 at 10+0.1 and +573 with 2 threads.
+- Tried and not kept (flat or negative; do not retry blindly): contempt;
+  internal iterative reduction + an 'improving' flag; quiescence without the
+  transposition table (-20); ordering quiet checking moves early (-38);
+  capture history + continuation history (flat); a softer time limit (flat);
+  a pawn-count adjustment for knights/rooks, a free-path bonus for passers,
+  a global eval scale, a rook-ending scale, a queen-less king-attack scale
+  (all screened out by the tuner); an edge-distance rewrite of
+  `isSquareAttacked` (slower); SEE pruning in the main search (more nodes at
+  fixed depth, never matched). Lazy evaluation in quiescence and the history
+  term in LMR tested neutral by ablation and stay.
 - Checked and left as is: the GUI keeps a fixed time per move -- with no
   clock known to the engine, using the whole budget is strongest; the
   endgame depth bonus in `findBestMove()` only matters when the depth cap
   binds (EASY/MEDIUM/HARD), which is where it's meant to.
 
 Ideas for next time, not started:
-1. Further tuning rounds give ~1-2% validation loss each now; the next
-   step up needs new evaluation terms (king safety beyond safe checks,
-   passed-pawn detail, endgame scaling for drawish material) -- screen a
-   term by tuning only its weights and comparing the validation loss.
-2. Speed: bitboard pseudo-legal move generation (keeping the move order so
-   the bench signature stays identical), lazy legality checks, a static-eval
-   cache; the Elo per speedup is steep at fast time controls.
+1. The evaluation is the bottleneck still (the tuner's validation loss no
+   longer moves with weights alone): new terms found by screening are what
+   paid off (endgame scaling, safe checks). Candidates: a better king-safety
+   model, space, unstoppable passers (needs mate-free labels), more endgame
+   scaling cases (rook endings, pawns on one wing).
+2. Speed keeps paying at fast time controls (about 2 Elo per 1% at
+   5+0.05): the remaining profile is evaluation (~30%), move ordering with
+   SEE (~14%) and pseudo-legal generation (~11%).
 3. The GUI's presets cap the depth (HARD = 10), so the engine's added
    speed does not make HARD stronger; EXPERT and clock games benefit.
-4. Search ablations: the bundles above were accepted whole, so the parts
-   that contribute nothing (SEE-ordered captures, history in LMR) are
-   unknown.
+4. The bundles above were accepted whole, so which parts of the search
+   changes carry the gain is partly unknown (singular extensions, LMP,
+   counter-moves, null-move conditions); ablate them with -3/1 SPRTs.
+5. Scratch space: keep a long session's logs out of a small /tmp (the SPRT
+   stdout is hundreds of MB; filter it as in the session's scripts).
