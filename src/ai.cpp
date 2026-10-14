@@ -659,8 +659,14 @@ struct SearchContext {
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
 
-// History scores stay below the killer moves' (79'000 and 80'000) in moveScore().
-constexpr int kHistoryMax = 60'000;
+// History scores stay within +-kHistoryLimit, far below the killer moves' (79'000
+// and 80'000) in moveScore(). A move that causes a cutoff gets a bonus and the
+// quiet moves tried before it a malus; each update pulls the score back toward
+// zero in proportion to its size (history gravity), so old results fade and the
+// score can never run past the limit.
+constexpr int kHistoryLimit = 16'384;
+
+void updateHistory(int& h, int bonus) { h += bonus - h * std::abs(bonus) / kHistoryLimit; }
 
 bool seeNonNegative(const Board& board, const Move& m); // below
 
@@ -1037,6 +1043,8 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     Move bestMove = moves.front();
     int best = INT_MIN;
     int moveIndex = 0;
+    Move triedQuiets[64]; // quiet moves searched without a cutoff, for the history malus
+    int numTriedQuiets = 0;
     ctx.path.push_back(key); // popped below; a TimeUp unwind leaves it, see searchWindow
     for (const Move& m : moves) {
         Board::UndoState undo;
@@ -1106,13 +1114,17 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                     ctx.killers[ply][1] = ctx.killers[ply][0];
                     ctx.killers[ply][0] = m;
                 }
-                {
-                    int& h = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
-                    h = std::min(h + depth * depth, kHistoryMax);
-                }
+                const int bonus = std::min(depth * depth * 4, 1600);
+                auto history = [&](const Move& q) -> int& {
+                    return ctx.history[colorIdx(color)][q.fromX][q.fromY][q.toX][q.toY];
+                };
+                updateHistory(history(m), bonus);
+                for (int i = 0; i < numTriedQuiets; i++) updateHistory(history(triedQuiets[i]), -bonus);
             }
             break;
         }
+        if (m.captured == PieceType::None && m.promotion == PieceType::None && numTriedQuiets < 64)
+            triedQuiets[numTriedQuiets++] = m;
     }
     ctx.path.pop_back();
 
