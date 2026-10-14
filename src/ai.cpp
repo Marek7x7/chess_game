@@ -655,9 +655,18 @@ struct SearchContext {
     // Game history followed by every position on the current search line
     // (root included), for repetition detection.
     std::vector<uint64_t> path;
+    // The move that answered each earlier move best (a quiet one that caused a
+    // cutoff): counter[color][from][to of the previous move], 0 = none, else
+    // 1 + (from * 64 + to) of the reply. prevMove[ply] is the move that led to
+    // the node at that ply (-1: none, as at the root or after a null move).
+    uint16_t counter[2][64][64]{};
+    int prevMove[kMaxPly + 1]{};
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
+
+// A move as (from square) << 6 | (to square), squares numbered x * 8 + y.
+int encodeMove(const Move& m) { return ((m.fromX * 8 + m.fromY) << 6) | (m.toX * 8 + m.toY); }
 
 // History scores stay within +-kHistoryLimit, far below the killer moves' (79'000
 // and 80'000) in moveScore(). A move that causes a cutoff gets a bonus and the
@@ -686,6 +695,10 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
     if (ply < kMaxPly) {
         if (sameMove(m, ctx.killers[ply][0])) return 80'000;
         if (sameMove(m, ctx.killers[ply][1])) return 79'000;
+        if (ply > 0 && ctx.prevMove[ply] >= 0 &&
+            ctx.counter[colorIdx(color)][ctx.prevMove[ply] >> 6][ctx.prevMove[ply] & 63] ==
+                1 + (m.fromX * 8 + m.fromY) * 64 + m.toX * 8 + m.toY)
+            return 78'000;
     }
     return ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
 }
@@ -1016,6 +1029,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         beta > -kMateThreshold && board.hasNonPawnMaterial(color)) {
         Board::NullMoveUndo nu;
         board.makeNullMove(nu);
+        if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = -1;
         int nullScore =
             -negamax(board, depth - 1 - nullMoveReduction, ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
         board.unmakeNullMove(nu);
@@ -1050,6 +1064,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         Board::UndoState undo;
         board.makeMove(m, undo);
         ctx.tt.prefetch(board.hashKey());
+        if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
 
         if (futile && moveIndex > 0 && m.captured == PieceType::None && m.promotion == PieceType::None &&
             !board.isInCheck(opponent(color))) {
@@ -1122,6 +1137,9 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                 };
                 updateHistory(history(m), bonus);
                 for (int i = 0; i < numTriedQuiets; i++) updateHistory(history(triedQuiets[i]), -bonus);
+                if (ply > 0 && ctx.prevMove[ply] >= 0)
+                    ctx.counter[colorIdx(color)][ctx.prevMove[ply] >> 6][ctx.prevMove[ply] & 63] =
+                        static_cast<uint16_t>(1 + (m.fromX * 8 + m.fromY) * 64 + m.toX * 8 + m.toY);
             }
             break;
         }
@@ -1164,6 +1182,7 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
     result.move = rootMoves.front();
 
     SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory};
+    std::fill(std::begin(ctx.prevMove), std::end(ctx.prevMove), -1);
     ctx.path.push_back(board.hashKey());
     const size_t rootPathSize = ctx.path.size();
     std::mt19937 jitterRng(0x9E3779B9u + static_cast<unsigned>(threadIndex));
@@ -1202,6 +1221,7 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
                 for (const Move& m : moves) {
                     Board::UndoState undo;
                     board.makeMove(m, undo);
+                    ctx.prevMove[1] = encodeMove(m);
                     // PVS, as in negamax: the first move gets the full window;
                     // the rest a null window that only shows they're no
                     // better, re-searched in full when one might be.
