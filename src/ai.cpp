@@ -361,7 +361,7 @@ TUNE_ARR(kHanging, 7, {0, 25, 23, 22, 18, 2, 0}); // attacked by anything, defen
 // the side's pieces of that type could give check to the enemy king, that is not
 // attacked by the enemy (so the check cannot be met by simply taking the checker) and
 // is not occupied by the side's own piece. Middlegame only.
-TUNE_ARR(kSafeCheck, 7, {0, 0, 12, 10, 16, 20, 0});
+TUNE_ARR(kSafeCheck, 7, {0, 0, 36, 30, 48, 36, 0});
 
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
 // mobility -- every square that's empty or holds an enemy piece and that no enemy pawn
