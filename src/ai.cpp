@@ -93,6 +93,14 @@ TUNE_INT(kIsolatedEg, 11);
 TUNE_INT(kBackwardMg, 10);
 TUNE_INT(kBackwardEg, 11);
 
+// Connected pawns, by rank counted from the pawn's own side (middlegame / endgame): a
+// pawn defended by a pawn diagonally behind it, and one with a pawn beside it on the
+// same rank (a phalanx, which can advance together and defend each other).
+TUNE_ARR(kSupportedMg, 8, {0, 0, 4, 6, 10, 16, 24, 0});
+TUNE_ARR(kSupportedEg, 8, {0, 0, 2, 4, 8, 14, 20, 0});
+TUNE_ARR(kPhalanxMg, 8, {0, 2, 4, 6, 10, 14, 20, 0});
+TUNE_ARR(kPhalanxEg, 8, {0, 2, 4, 6, 10, 14, 20, 0});
+
 uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
 constexpr uint64_t kFileMask = 0xFF;                  // file a; shift by x * 8 for file x
 constexpr uint64_t kRankMask = 0x0101010101010101ULL; // rank 1; shift by y for rank y
@@ -168,6 +176,20 @@ void computePawnInfo(const Board& board, PawnInfo& info) {
             if (hasNeighbour && !neighbourLevelOrBehind && stopControlled) {
                 mg -= (white ? 1 : -1) * kBackwardMg;
                 eg -= (white ? 1 : -1) * kBackwardEg;
+            }
+
+            // Connected: supported by a pawn behind it, or side by side with one.
+            {
+                const int own = white ? 1 : -1;
+                const int rank = white ? y : 7 - y;
+                if (pawnAt(x - 1, y - dir, p.color) || pawnAt(x + 1, y - dir, p.color)) {
+                    mg += own * kSupportedMg[rank];
+                    eg += own * kSupportedEg[rank];
+                }
+                if (pawnAt(x - 1, y, p.color) || pawnAt(x + 1, y, p.color)) {
+                    mg += own * kPhalanxMg[rank];
+                    eg += own * kPhalanxEg[rank];
+                }
             }
 
             bool passed = true;
