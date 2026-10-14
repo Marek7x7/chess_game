@@ -247,9 +247,9 @@ const PawnInfo& probePawns(const Board& board) {
 // boxed in, tied to defending, or blocked by its own pawns -- invisible to
 // material and piece-square tables, which score a passive piece exactly
 // like an active one on the same square.
-TUNE_ARR(kMobilityMg, 7, {0, 0, 5, 6, 5, 1, 0});
-TUNE_ARR(kMobilityEg, 7, {0, 0, 3, 5, 1, 5, 0});
-TUNE_ARR(kMobilityTypical, 7, {0, 0, 6, 6, 26, 46, 0});
+TUNE_ARR(kMobilityMg, 7, {0, 0, 6, 6, 5, 2, 0});
+TUNE_ARR(kMobilityEg, 7, {0, 0, 3, 3, 1, 5, 0});
+TUNE_ARR(kMobilityTypical, 7, {0, 0, 6, 6, 32, 41, 0});
 
 constexpr int kKnightJumps[8][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2}, {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}};
 // Rooks slide along the first four, bishops the last four, queens all eight.
