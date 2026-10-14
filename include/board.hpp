@@ -76,6 +76,13 @@ public:
     // them, without paying the legality check for every quiet move.
     MoveList legalNoisyMoves(Color color) const;
 
+    // legalMoves() / legalNoisyMoves() before the legality filter, same order: outside check
+    // the extra moves are the few that leave the king attacked (a pinned piece leaving its
+    // line, a king stepping onto an attacked square). A caller that tests each move it
+    // actually plays (makeMove, then isInCheck of the mover) skips the filter for the
+    // moves it never reaches. In check, use legalMoves(): nearly every move is illegal then.
+    MoveList pseudoLegal(Color color, bool noisyOnly) const { return pseudoLegalMoves(color, noisyOnly); }
+
     bool isSquareAttacked(int x, int y, Color byColor) const;
     bool isInCheck(Color color) const;
 

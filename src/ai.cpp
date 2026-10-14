@@ -980,12 +980,13 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
         if (standPat > alpha) alpha = standPat;
     }
 
+    // Outside check the legality filter is skipped and each move is tested when it is played.
     MoveList candidates;
     if (inCheck) {
         candidates = board.legalMoves(color);
         if (candidates.empty()) return -(kMateScore - ply);
     } else {
-        candidates = board.legalNoisyMoves(color);
+        candidates = board.pseudoLegal(color, true);
     }
     orderMoves(board, candidates, ttMove, ctx, ply, color);
 
@@ -1006,6 +1007,10 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
         if (!inCheck && !seeNonNegative(board, m)) continue;
         Board::UndoState undo;
         board.makeMove(m, undo);
+        if (!inCheck && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
+            board.unmakeMove(m, undo);
+            continue;
+        }
         ctx.tt.prefetch(board.hashKey());
         int score = -quiescence(board, -beta, -alpha, opponent(color), ply + 1, ctx);
         board.unmakeMove(m, undo);
@@ -1142,11 +1147,12 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         else if (sBeta >= beta) return sBeta;
     }
 
-    MoveList moves = board.legalMoves(color);
-    if (moves.empty()) {
-        if (inCheck) return -(kMateScore - ply);
-        return 0; // stalemate
-    }
+    // Outside check the legality filter is skipped: only a move that is actually searched needs
+    // testing, and a node that cuts off never reaches most of its moves. In check the full filter
+    // leaves the few evasions.
+    const bool lazyLegal = !inCheck;
+    MoveList moves = lazyLegal ? board.pseudoLegal(color, false) : board.legalMoves(color);
+    if (!lazyLegal && moves.empty()) return -(kMateScore - ply);
     orderMoves(board, moves, ttMove, ctx, ply, color, true);
 
     constexpr int kLmrStartIndex = 4; // first 4 moves (index 0-3) always searched at full depth
@@ -1163,13 +1169,22 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     Move bestMove = moves.front();
     int best = INT_MIN;
     int moveIndex = 0;
+    bool anyLegal = false; // some legal move exists (a lazily generated list may hold only illegal ones)
     Move triedQuiets[64]; // quiet moves searched without a cutoff, for the history malus
     int numTriedQuiets = 0;
     ctx.path.push_back(key); // popped below; a TimeUp unwind leaves it, see searchWindow
     for (const Move& m : moves) {
-        if (excluded && sameMove(m, *excluded)) continue;
+        if (excluded && sameMove(m, *excluded)) {
+            anyLegal = true; // the excluded move is legal by construction
+            continue;
+        }
         Board::UndoState undo;
         board.makeMove(m, undo);
+        if (lazyLegal && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
+            board.unmakeMove(m, undo);
+            continue;
+        }
+        anyLegal = true;
         ctx.tt.prefetch(board.hashKey());
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
         const int extension = singularExtension && sameMove(m, ttMove) ? 1 : 0;
@@ -1261,6 +1276,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             triedQuiets[numTriedQuiets++] = m;
     }
     ctx.path.pop_back();
+    if (!anyLegal) return inCheck ? -(kMateScore - ply) : 0; // checkmate or stalemate
 
     TTFlag flag = best <= origAlpha ? TTFlag::UpperBound : (best >= beta ? TTFlag::LowerBound : TTFlag::Exact);
     if (!excluded) ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true);
