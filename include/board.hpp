@@ -83,6 +83,10 @@ public:
     // moves it never reaches. In check, use legalMoves(): nearly every move is illegal then.
     MoveList pseudoLegal(Color color, bool noisyOnly) const { return pseudoLegalMoves(color, noisyOnly); }
 
+    // Bit x * 8 + y of every piece of `color` pinned against its king by an enemy slider: moving it
+    // off the pin line leaves the king attacked. (Meaningful when the king is not in check.)
+    uint64_t pinnedPieces(Color color) const;
+
     bool isSquareAttacked(int x, int y, Color byColor) const;
     bool isInCheck(Color color) const;
 

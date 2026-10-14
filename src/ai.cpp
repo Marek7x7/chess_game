@@ -332,8 +332,8 @@ Pins findPins(const Board& board, Color color) {
     const uint64_t occupied = board.occupancy(), own = board.occupancy(color);
     const uint64_t queens = board.pieces(enemy, PieceType::Queen);
     // Enemy sliders on one of the king's lines (blockers ignored), then the pieces between.
-    uint64_t pinners = ((board.pieces(enemy, PieceType::Rook) | queens) & bb::rookAttacks(ksq, 0)) |
-                       ((board.pieces(enemy, PieceType::Bishop) | queens) & bb::bishopAttacks(ksq, 0));
+    uint64_t pinners = ((board.pieces(enemy, PieceType::Rook) | queens) & bb::rookRays[ksq]) |
+                       ((board.pieces(enemy, PieceType::Bishop) | queens) & bb::bishopRays[ksq]);
     while (pinners) {
         const int sq = bb::lsb(pinners);
         pinners = bb::clearLsb(pinners);

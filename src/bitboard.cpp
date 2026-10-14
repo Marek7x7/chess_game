@@ -9,6 +9,7 @@ uint64_t knightAttacks[64];
 uint64_t kingAttacks[64];
 uint64_t pawnAttacks[2][64];
 uint64_t between[64][64];
+uint64_t rookRays[64], bishopRays[64];
 SliderTable rookTable, bishopTable;
 
 namespace {
@@ -98,6 +99,10 @@ struct Tables {
         }
         buildSliderTable(rookTable, rook, rookStorage);
         buildSliderTable(bishopTable, bishop, bishopStorage);
+        for (int sq = 0; sq < 64; sq++) {
+            rookRays[sq] = rookAttacks(sq, 0);
+            bishopRays[sq] = bishopAttacks(sq, 0);
+        }
     }
 };
 

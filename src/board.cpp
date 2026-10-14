@@ -657,6 +657,25 @@ bool Board::isSquareAttacked(int x, int y, Color byColor) const {
     return false;
 }
 
+uint64_t Board::pinnedPieces(Color color) const {
+    const int c = colorIndex(color), e = 1 - c;
+    const int ksq = kingX[c] * 8 + kingY[c];
+    const uint64_t occupied = occBB[0] | occBB[1];
+    const uint64_t queens = pieceBB[e][static_cast<int>(PieceType::Queen)];
+    // Enemy sliders on one of the king's lines (blockers ignored); a pin is exactly one own piece
+    // on the squares between king and slider.
+    uint64_t pinners = ((pieceBB[e][static_cast<int>(PieceType::Rook)] | queens) & bb::rookRays[ksq]) |
+                       ((pieceBB[e][static_cast<int>(PieceType::Bishop)] | queens) & bb::bishopRays[ksq]);
+    uint64_t pinned = 0;
+    while (pinners) {
+        const int sq = bb::lsb(pinners);
+        pinners = bb::clearLsb(pinners);
+        const uint64_t blockers = bb::between[ksq][sq] & occupied;
+        if (blockers && !bb::clearLsb(blockers) && (blockers & occBB[c])) pinned |= blockers;
+    }
+    return pinned;
+}
+
 bool Board::isInCheck(Color color) const {
     // kingX/kingY are already tracked incrementally by makeMove() (for the
     // king's PST term -- see kingTerm()), so the king's square is known for
@@ -697,26 +716,7 @@ MoveList Board::filterLegal(const MoveList& pseudo, Color color) const {
     const int ci = colorIndex(color);
     const int kx = kingX[ci], ky = kingY[ci];
     const bool inCheckNow = isSquareAttacked(kx, ky, opponent(color));
-    uint64_t pinned = 0; // bit x * 8 + y: an own piece pinned against the king
-    if (!inCheckNow) {
-        for (const auto& dir : kQueenDirs) {
-            const bool diagonal = dir[0] != 0 && dir[1] != 0;
-            int px = -1, py = -1; // the first own piece along the ray
-            for (int nx = kx + dir[0], ny = ky + dir[1]; inBounds(nx, ny); nx += dir[0], ny += dir[1]) {
-                const Piece& p = squares[nx][ny];
-                if (p.isEmpty()) continue;
-                if (p.color == color) {
-                    if (px >= 0) break; // two own pieces in a row: nothing is pinned on this ray
-                    px = nx;
-                    py = ny;
-                    continue;
-                }
-                bool slides = p.type == PieceType::Queen || p.type == (diagonal ? PieceType::Bishop : PieceType::Rook);
-                if (slides && px >= 0) pinned |= uint64_t(1) << (px * 8 + py);
-                break;
-            }
-        }
-    }
+    const uint64_t pinned = inCheckNow ? 0 : pinnedPieces(color); // bit x * 8 + y: an own piece pinned against the king
 
     MoveList result;
     for (const Move& m : pseudo) {
