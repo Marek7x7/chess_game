@@ -797,6 +797,24 @@ void updateHistory(int& h, int bonus) { h += bonus - h * std::abs(bonus) / kHist
 
 bool seeNonNegative(const Board& board, const Move& m); // below
 
+// Does the quiet move `m` (not castling, not en passant) attack the enemy king from its target square?
+// Direct checks only: a discovered check is not seen.
+bool givesDirectCheck(const Board& board, const Move& m, Color color) {
+    const Piece mover = board.at(m.fromX, m.fromY);
+    const int to = m.toX * 8 + m.toY;
+    const Color enemy = opponent(color);
+    const uint64_t king = uint64_t(1) << (board.kingFile(enemy) * 8 + board.kingRank(enemy));
+    const uint64_t occupied = (board.occupancy() & ~(uint64_t(1) << (m.fromX * 8 + m.fromY))) | (uint64_t(1) << to);
+    switch (mover.type) {
+        case PieceType::Pawn: return bb::pawnAttacks[color == Color::White ? 0 : 1][to] & king;
+        case PieceType::Knight: return bb::knightAttacks[to] & king;
+        case PieceType::Bishop: return bb::bishopAttacks(to, occupied) & king;
+        case PieceType::Rook: return bb::rookAttacks(to, occupied) & king;
+        case PieceType::Queen: return bb::queenAttacks(to, occupied) & king;
+        default: return false;
+    }
+}
+
 // Score used to order moves before searching them: TT move first, then
 // captures via MVV-LVA, then promotions, then killer moves, then history.
 // With `seeOrder`, a capture that loses material once the exchange plays out
@@ -818,6 +836,8 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
                 1 + (m.fromX * 8 + m.fromY) * 64 + m.toX * 8 + m.toY)
             return 78'000;
     }
+    // Quiet checks come right after the killers and the counter-move (only in the main search).
+    if (seeOrder && !m.isCastle && givesDirectCheck(board, m, color)) return 77'000;
     return ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
 }
 
