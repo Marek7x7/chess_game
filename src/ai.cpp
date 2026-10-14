@@ -328,31 +328,20 @@ struct Pins {
 Pins findPins(const Board& board, Color color) {
     Pins pins;
     const Color enemy = opponent(color);
-    const int kx = board.kingFile(color), ky = board.kingRank(color);
+    const int ksq = board.kingFile(color) * 8 + board.kingRank(color);
     const uint64_t occupied = board.occupancy(), own = board.occupancy(color);
     const uint64_t queens = board.pieces(enemy, PieceType::Queen);
-    const uint64_t straight = board.pieces(enemy, PieceType::Rook) | queens;
-    const uint64_t diagonal = board.pieces(enemy, PieceType::Bishop) | queens;
-    for (int d = 0; d < 8; d++) {
-        const uint64_t sliders = d < 4 ? straight : diagonal;
-        uint64_t line = 0;
-        int candidate = -1; // the first own piece on the ray
-        for (int nx = kx + kSlideDirs[d][0], ny = ky + kSlideDirs[d][1]; Board::inBounds(nx, ny);
-             nx += kSlideDirs[d][0], ny += kSlideDirs[d][1]) {
-            const uint64_t b = bb::bit(nx, ny);
-            line |= b;
-            if (!(occupied & b)) continue;
-            if (own & b) {
-                if (candidate >= 0) break; // two own pieces in a row: nothing is pinned here
-                candidate = nx * 8 + ny;
-                continue;
-            }
-            if ((sliders & b) && candidate >= 0) {
-                pins.pinned |= uint64_t(1) << candidate;
-                pins.square[pins.count] = candidate;
-                pins.line[pins.count++] = line;
-            }
-            break;
+    // Enemy sliders on one of the king's lines (blockers ignored), then the pieces between.
+    uint64_t pinners = ((board.pieces(enemy, PieceType::Rook) | queens) & bb::rookAttacks(ksq, 0)) |
+                       ((board.pieces(enemy, PieceType::Bishop) | queens) & bb::bishopAttacks(ksq, 0));
+    while (pinners) {
+        const int sq = bb::lsb(pinners);
+        pinners = bb::clearLsb(pinners);
+        const uint64_t blockers = bb::between[ksq][sq] & occupied;
+        if (blockers && !bb::clearLsb(blockers) && (blockers & own)) { // exactly one piece, and it is ours
+            pins.pinned |= blockers;
+            pins.square[pins.count] = bb::lsb(blockers);
+            pins.line[pins.count++] = bb::between[ksq][sq] | (uint64_t(1) << sq);
         }
     }
     return pins;

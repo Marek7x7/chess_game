@@ -20,6 +20,7 @@ inline uint64_t clearLsb(uint64_t b) { return b & (b - 1); }
 extern uint64_t knightAttacks[64];
 extern uint64_t kingAttacks[64];
 extern uint64_t pawnAttacks[2][64]; // [color][sq]: squares a pawn of that color standing on sq attacks
+extern uint64_t between[64][64];   // the squares strictly between two squares on one line (else 0)
 
 struct SliderTable {
     uint64_t mask[64];   // squares whose occupancy changes the attack set

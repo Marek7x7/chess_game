@@ -1,5 +1,6 @@
 #include "bitboard.hpp"
 
+#include <cstdlib>
 #include <vector>
 
 namespace bb {
@@ -7,6 +8,7 @@ namespace bb {
 uint64_t knightAttacks[64];
 uint64_t kingAttacks[64];
 uint64_t pawnAttacks[2][64];
+uint64_t between[64][64];
 SliderTable rookTable, bishopTable;
 
 namespace {
@@ -81,6 +83,17 @@ struct Tables {
                 for (int dx : {-1, 1})
                     if (onBoard(x + dx, y + dir)) p |= bit(x + dx, y + dir);
                 pawnAttacks[color][sq] = p;
+            }
+        }
+        for (int a = 0; a < 64; a++) {
+            for (int b = 0; b < 64; b++) {
+                const int ax = a / 8, ay = a % 8, bx = b / 8, by = b % 8;
+                const int dx = bx - ax, dy = by - ay;
+                if (a == b || !(dx == 0 || dy == 0 || std::abs(dx) == std::abs(dy))) continue;
+                const int stepX = (dx > 0) - (dx < 0), stepY = (dy > 0) - (dy < 0);
+                uint64_t squares = 0;
+                for (int x = ax + stepX, y = ay + stepY; x != bx || y != by; x += stepX, y += stepY) squares |= bit(x, y);
+                between[a][b] = squares;
             }
         }
         buildSliderTable(rookTable, rook, rookStorage);
