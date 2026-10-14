@@ -12,11 +12,25 @@ proven by a match test before it is kept.**
 - No argument opens the GUI. Headless modes: `--uci`, `--bench [d]`,
   `--perft [d]`, `--perft-suite [d]`, `--verify-eval [d]`, `--verify-book`,
   `--replay <pgn> [white|black|both]`, `--selfplay <games> [levelA] [levelB]`.
-- Where things are: static eval = `Board::rawEval()` (incremental material,
-  piece-square tables, king table, bishop pair) + `pawnStructure()` +
-  `mobility()` in `src/ai.cpp`'s `evaluate()`. Search = `negamax()`,
+- Where things are: static eval = `evaluate()` in `src/ai.cpp`:
+  `Board::rawEval()` (incremental material and piece-square tables, with
+  separate endgame tables, king table, bishop pair) + the cached pawn
+  structure (`computePawnInfo()`) + `pieceTerms()` (bitboard mobility,
+  pins, threats, safe checks, rooks, outposts) + `kingSafety()` + passed-pawn
+  terms + mop-up + tempo; a dead draw scores 0. Every weight is declared with
+  a `TUNE_` macro (`include/tune.hpp`). Search = `negamax()`,
   `quiescence()`, `searchRootFull()`, `findBestMove()` in `src/ai.cpp`.
+  `Board` keeps bitboards next to `squares[][]`, written only by
+  `setSquare()`; `src/bitboard.cpp` holds the attack tables.
   UCI = `src/uci.cpp`. Bot matches = `src/match.cpp`.
+- Tuning: `cmake -S . -B build-tune -DCMAKE_BUILD_TYPE=Release && cmake --build
+  build-tune --target chess_tune` builds `tools/tune.cpp` (Texel-style fit of
+  every `TUNE_` weight to Stockfish evaluations; see its header comment for
+  `--symmetry` and `--evals`). `tools/analysis/` (README.md) has the Stockfish
+  scripts for labelling positions and grading moves, and
+  `tools/test_positions.csv` is the fixed decision-replay set. Tuning data =
+  quiet positions from fresh self-play (fastchess 3+0.03), labelled with
+  Stockfish depth 12.
 - Real games vs chess.com bots: `game1.pgn`-`game6.pgn` at the repo root
   (gitignored). Engine is White in 1/2/5/6, Black in 3/4; games 3-6 are vs
   Komodo25 (3200). Re-check the headers before relying on this mapping.
@@ -100,17 +114,40 @@ per change in `STRENGTH_LOG.md`:
 - **Other:** the GUI's human-vs-computer mode passes the game history
   (repetition detection, validated at +55); reported PVs end at a
   threefold.
+- **Done 2026-10-12..14 (autonomous session, rows in `STRENGTH_LOG.md`):**
+  Texel tuning of the eval weights against Stockfish (five rounds, each
+  validation-loss gain shown in the log; +40, +38, +10, +29 and a share of
+  +58/+98 Elo at 5+0.05), material values; speedups with identical search
+  trees (MoveList, sort, legality filter, 1-byte enums, aligned/prefetched
+  TT, bitboard attacks/mobility/pins, 8-byte Move, LTO: 2.6M -> 5.6M nodes/s,
+  +112 and +122 Elo); dead-draw and mop-up endgame fixes; new eval terms
+  (tempo, rook behind passer, passer king distance, pawn storm, pin-aware
+  mobility, threats, connected pawns, blocked passers, bad bishop, endgame
+  piece-square tables); search (null move only where eval >= beta with a
+  depth-scaled reduction, SEE-ordered captures, history with gravity and
+  malus, history LMR, counter-moves, late-move pruning, singular extensions,
+  time management by best-move stability, gradual aspiration windows).
+  Re-checked at 10+0.1 (+408) and with 2 threads (+363) against the start
+  of the session.
+- Tried and not kept (flat or negative; do not retry blindly): contempt,
+  internal iterative reduction + an 'improving' flag, a pawn-count
+  adjustment for knights/rooks, a free-path bonus for passers, an
+  edge-distance rewrite of `isSquareAttacked` (slower).
 - Checked and left as is: the GUI keeps a fixed time per move -- with no
   clock known to the engine, using the whole budget is strongest; the
   endgame depth bonus in `findBestMove()` only matters when the depth cap
   binds (EASY/MEDIUM/HARD), which is where it's meant to.
 
 Ideas for next time, not started:
-1. Tune the eval weights -- all hand-picked or Fruit 2.1's (e.g. Texel
-   tuning on positions from self-play games).
-2. Pin-aware mobility: pinned or tied-up pieces are still the engine's
-   biggest misjudgement against Stockfish.
-3. More search refinements: history-based reduction adjustments,
-   counter-move heuristic, an "improving" flag for the pruning margins.
-4. Re-check the big fast-TC gains at a longer time control (e.g. 10+0.1):
-   pruning gains in particular shrink as the time control grows.
+1. Further tuning rounds give ~1-2% validation loss each now; the next
+   step up needs new evaluation terms (king safety beyond safe checks,
+   passed-pawn detail, endgame scaling for drawish material) -- screen a
+   term by tuning only its weights and comparing the validation loss.
+2. Speed: bitboard pseudo-legal move generation (keeping the move order so
+   the bench signature stays identical), lazy legality checks, a static-eval
+   cache; the Elo per speedup is steep at fast time controls.
+3. The GUI's presets cap the depth (HARD = 10), so the engine's added
+   speed does not make HARD stronger; EXPERT and clock games benefit.
+4. Search ablations: the bundles above were accepted whole, so the parts
+   that contribute nothing (SEE-ordered captures, history in LMR) are
+   unknown.
