@@ -515,7 +515,7 @@ bool hasMatingMaterial(const Board& board, Color color) {
 // behind it keeps supporting (or attacking) the pawn all the way to the
 // queening square. Middlegame / endgame.
 TUNE_INT(kRookBehindPasserMg, 1);
-TUNE_INT(kRookBehindPasserEg, 28);
+TUNE_INT(kRookBehindPasserEg, 35);
 
 // Positive = good for White.
 int rookBehindPasser(const Board& board, const PawnInfo& pawns) {
@@ -547,7 +547,7 @@ int rookBehindPasser(const Board& board, const PawnInfo& pawns) {
 // distance, a passer is worth more the closer its own king is to the square
 // in front of it and the farther the enemy king is, scaled by how far the
 // pawn has advanced (rank counted from its own side).
-TUNE_ARR(kPasserKingEg, 8, {0, 0, 4, 8, 9, 12, 15, 0});
+TUNE_ARR(kPasserKingEg, 8, {0, 0, 4, 14, 24, 29, 28, 0});
 
 // Positive = good for White.
 int passerKingDistance(const Board& board, const PawnInfo& pawns) {
