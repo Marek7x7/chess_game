@@ -1039,7 +1039,15 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // is scored as a draw: repeating once more is always available to the
     // side it suits, so the true value is at best a draw either way.
     uint64_t key = board.hashKey();
-    if (std::find(ctx.path.begin(), ctx.path.end(), key) != ctx.path.end()) return 0;
+    // Only the plies since the last capture or pawn move can hold the same position (the
+    // fifty-move clock counts them), so scan back no further than that instead of the whole
+    // game history.
+    {
+        const size_t window = std::min(ctx.path.size(), static_cast<size_t>(board.halfmoveClock()));
+        const uint64_t* last = ctx.path.data() + ctx.path.size();
+        for (size_t i = 1; i <= window; i++)
+            if (last[-static_cast<std::ptrdiff_t>(i)] == key) return 0;
+    }
     // Fifty-move rule: 100 plies without a capture or pawn move is a draw.
     if (board.halfmoveClock() >= 100) return 0;
 
