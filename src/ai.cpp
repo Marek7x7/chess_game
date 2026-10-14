@@ -665,7 +665,7 @@ int passerKingDistance(const Board& board, const PawnInfo& pawns) {
 // evaluation rewards. Positive = good for White.
 TUNE_INT(kMopEdge, 20);   // per step the bare king is nearer the board's edge
 TUNE_INT(kMopKing, 15);   // per step the two kings are nearer each other
-TUNE_INT(kMopCorner, 60); // bishop and knight: per step nearer the right corner
+TUNE_INT(kMopCorner, 120); // bishop and knight: per step nearer the right corner
 
 int mopUp(const Board& board, const PawnInfo& pawns) {
     for (int side = 0; side < 2; side++) {
