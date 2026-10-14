@@ -295,6 +295,20 @@ bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
     return (pawns.attacks[side] & squareBit(x, y)) && !(pawns.attackSpan[1 - side] & squareBit(x, y));
 }
 
+// A bishop hemmed in by its own pawns: a penalty per own pawn standing on squares of
+// the bishop's colour (those pawns block it, and it cannot defend the other colour's
+// squares), middlegame / endgame.
+TUNE_INT(kBadBishopMg, 2);
+TUNE_INT(kBadBishopEg, 4);
+
+constexpr uint64_t parityMask(int parity) {
+    uint64_t mask = 0;
+    for (int sq = 0; sq < 64; sq++)
+        if ((sq / 8 + sq % 8) % 2 == parity) mask |= uint64_t(1) << sq;
+    return mask;
+}
+constexpr uint64_t kSquaresOfParity[2] = {parityMask(0), parityMask(1)};
+
 // The pieces of one colour pinned against its king by an enemy slider, and the
 // squares each may still move to: along the pin line, up to the pinner.
 struct Pins {
@@ -399,6 +413,11 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
                 const int moves = bb::popcount((pins[side].pinned >> sq) & 1 ? reach & pins[side].allowed(sq) : reach);
                 mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
                 eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
+                if (type == PieceType::Bishop) {
+                    const int blockers = bb::popcount(pawns.pawns[side] & kSquaresOfParity[(x + y) % 2]);
+                    mg -= sign * kBadBishopMg * blockers;
+                    eg -= sign * kBadBishopEg * blockers;
+                }
                 if (type == PieceType::Rook) {
                     int bonus = fileHasPawn(pawns, side, x)       ? 0
                                 : fileHasPawn(pawns, 1 - side, x) ? kRookSemiOpenFile
