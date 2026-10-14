@@ -197,8 +197,8 @@ private:
     // noisyOnly: generate only what legalNoisyMoves() returns.
     MoveList pseudoLegalMoves(Color color, bool noisyOnly) const;
     MoveList filterLegal(const MoveList& pseudo, Color color) const;
-    void addSlidingMoves(MoveList& moves, int x, int y, Color color,
-                         const int dirs[][2], int numDirs, bool noisyOnly) const;
+    // firstDir/numDirs index bb::rays: bishop directions 0-3, rook directions 4-7.
+    void addSlidingMoves(MoveList& moves, int x, int y, Color color, int firstDir, int numDirs, bool noisyOnly) const;
     void addPawnMoves(MoveList& moves, int x, int y, Color color, bool noisyOnly) const;
     void addKingMoves(MoveList& moves, int x, int y, Color color, bool noisyOnly) const;
 };

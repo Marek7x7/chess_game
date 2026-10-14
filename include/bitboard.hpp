@@ -23,6 +23,16 @@ extern uint64_t pawnAttacks[2][64]; // [color][sq]: squares a pawn of that color
 extern uint64_t between[64][64];   // the squares strictly between two squares on one line (else 0)
 extern uint64_t rookRays[64], bishopRays[64]; // the attack sets of a rook / bishop on an empty board
 
+// Move generation order. rays[d][sq]: the squares from sq outward in direction d, d in the order
+// (1,1) (1,-1) (-1,1) (-1,-1) (1,0) (-1,0) (0,1) (0,-1) (bishop directions, then rook directions);
+// walking a ray goes up in square number when rayDelta[d] > 0 and down when it is negative.
+extern uint64_t rays[8][64];
+constexpr int rayDelta[8] = {9, 7, -7, -9, 8, -8, 1, -1};
+// The knight's target squares from sq in the order (1,2) (2,1) (2,-1) (1,-2) (-1,-2) (-2,-1) (-2,1)
+// (-1,2), -1 where off the board.
+extern int8_t knightOrdered[64][8];
+inline int msb(uint64_t b) { return 63 - __builtin_clzll(b); } // b != 0
+
 struct SliderTable {
     uint64_t mask[64];   // squares whose occupancy changes the attack set
     uint32_t offset[64]; // start of the square's block in `attacks`

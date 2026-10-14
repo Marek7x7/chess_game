@@ -505,22 +505,32 @@ Board Board::fromFEN(const std::string& fen) {
     return board;
 }
 
-void Board::addSlidingMoves(MoveList& moves, int x, int y, Color color,
-                             const int dirs[][2], int numDirs, bool noisyOnly) const {
-    for (int d = 0; d < numDirs; d++) {
-        int nx = x + dirs[d][0];
-        int ny = y + dirs[d][1];
-        while (inBounds(nx, ny)) {
-            const Piece& target = squares[nx][ny];
-            if (target.isEmpty()) {
-                if (!noisyOnly) moves.push_back({x, y, nx, ny});
-            } else {
-                if (target.color != color) moves.push_back({x, y, nx, ny, PieceType::None, false, false, target.type});
-                break;
-            }
-            nx += dirs[d][0];
-            ny += dirs[d][1];
+void Board::addSlidingMoves(MoveList& moves, int x, int y, Color color, int firstDir, int numDirs,
+                             bool noisyOnly) const {
+    const int sq = x * 8 + y;
+    const uint64_t occupied = occBB[0] | occBB[1];
+    const uint64_t enemy = occBB[1 - colorIndex(color)];
+    auto addCapture = [&](int t) {
+        moves.push_back({x, y, t / 8, t % 8, PieceType::None, false, false, squares[t / 8][t % 8].type});
+    };
+    for (int d = firstDir; d < firstDir + numDirs; d++) {
+        const uint64_t ray = bb::rays[d][sq];
+        const uint64_t blockers = ray & occupied;
+        const bool up = bb::rayDelta[d] > 0; // walking outward raises the square number
+        int blocker = -1;
+        uint64_t quiet = ray;
+        if (blockers) {
+            blocker = up ? bb::lsb(blockers) : bb::msb(blockers);
+            quiet = ray & ~bb::rays[d][blocker] & ~(uint64_t(1) << blocker); // the empty squares before it
         }
+        if (!noisyOnly) {
+            while (quiet) { // nearest first, as the walk visits them
+                const int t = up ? bb::lsb(quiet) : bb::msb(quiet);
+                quiet &= ~(uint64_t(1) << t);
+                moves.push_back({x, y, t / 8, t % 8});
+            }
+        }
+        if (blocker >= 0 && ((enemy >> blocker) & 1)) addCapture(blocker);
     }
 }
 
@@ -604,39 +614,37 @@ void Board::addKingMoves(MoveList& moves, int x, int y, Color color, bool noisyO
 
 MoveList Board::pseudoLegalMoves(Color color, bool noisyOnly) const {
     MoveList moves;
-    for (int x = 0; x < 8; x++) {
-        for (int y = 0; y < 8; y++) {
-            const Piece& p = squares[x][y];
-            if (p.color != color) continue;
-            switch (p.type) {
-                case PieceType::Pawn:
-                    addPawnMoves(moves, x, y, color, noisyOnly);
-                    break;
-                case PieceType::Knight:
-                    for (auto& off : kKnightOffsets) {
-                        int nx = x + off[0], ny = y + off[1];
-                        if (!inBounds(nx, ny)) continue;
-                        const Piece& target = squares[nx][ny];
-                        if (noisyOnly ? !target.isEmpty() && target.color != color
-                                      : target.isEmpty() || target.color != color)
-                            moves.push_back({x, y, nx, ny, PieceType::None, false, false, target.type});
-                    }
-                    break;
-                case PieceType::Bishop:
-                    addSlidingMoves(moves, x, y, color, kBishopDirs, 4, noisyOnly);
-                    break;
-                case PieceType::Rook:
-                    addSlidingMoves(moves, x, y, color, kRookDirs, 4, noisyOnly);
-                    break;
-                case PieceType::Queen:
-                    addSlidingMoves(moves, x, y, color, kQueenDirs, 8, noisyOnly);
-                    break;
-                case PieceType::King:
-                    addKingMoves(moves, x, y, color, noisyOnly);
-                    break;
-                default:
-                    break;
-            }
+    const uint64_t own = occBB[colorIndex(color)], enemy = occBB[1 - colorIndex(color)];
+    // The pieces in square-number order (file by file, rank by rank), as the old square scan visited them.
+    for (uint64_t pieces = own; pieces; pieces = bb::clearLsb(pieces)) {
+        const int sq = bb::lsb(pieces);
+        const int x = sq / 8, y = sq % 8;
+        switch (squares[x][y].type) {
+            case PieceType::Pawn:
+                addPawnMoves(moves, x, y, color, noisyOnly);
+                break;
+            case PieceType::Knight:
+                for (int i = 0; i < 8; i++) {
+                    const int t = bb::knightOrdered[sq][i];
+                    if (t < 0) continue;
+                    if (noisyOnly ? ((enemy >> t) & 1) : !((own >> t) & 1))
+                        moves.push_back({x, y, t / 8, t % 8, PieceType::None, false, false, squares[t / 8][t % 8].type});
+                }
+                break;
+            case PieceType::Bishop:
+                addSlidingMoves(moves, x, y, color, 0, 4, noisyOnly);
+                break;
+            case PieceType::Rook:
+                addSlidingMoves(moves, x, y, color, 4, 4, noisyOnly);
+                break;
+            case PieceType::Queen:
+                addSlidingMoves(moves, x, y, color, 0, 8, noisyOnly);
+                break;
+            case PieceType::King:
+                addKingMoves(moves, x, y, color, noisyOnly);
+                break;
+            default:
+                break;
         }
     }
     return moves;

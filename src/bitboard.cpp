@@ -10,6 +10,8 @@ uint64_t kingAttacks[64];
 uint64_t pawnAttacks[2][64];
 uint64_t between[64][64];
 uint64_t rookRays[64], bishopRays[64];
+uint64_t rays[8][64];
+int8_t knightOrdered[64][8];
 SliderTable rookTable, bishopTable;
 
 namespace {
@@ -96,6 +98,21 @@ struct Tables {
                 for (int x = ax + stepX, y = ay + stepY; x != bx || y != by; x += stepX, y += stepY) squares |= bit(x, y);
                 between[a][b] = squares;
             }
+        }
+        static const int queenDirs[8][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int sq = 0; sq < 64; sq++) {
+            const int x = sq / 8, y = sq % 8;
+            for (int d = 0; d < 8; d++) {
+                uint64_t ray = 0;
+                for (int nx = x + queenDirs[d][0], ny = y + queenDirs[d][1]; onBoard(nx, ny);
+                     nx += queenDirs[d][0], ny += queenDirs[d][1])
+                    ray |= bit(nx, ny);
+                rays[d][sq] = ray;
+            }
+            for (int i = 0; i < 8; i++)
+                knightOrdered[sq][i] = onBoard(x + knight[i][0], y + knight[i][1])
+                                           ? static_cast<int8_t>((x + knight[i][0]) * 8 + y + knight[i][1])
+                                           : int8_t(-1);
         }
         buildSliderTable(rookTable, rook, rookStorage);
         buildSliderTable(bishopTable, bishop, bishopStorage);
