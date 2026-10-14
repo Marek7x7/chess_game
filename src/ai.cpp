@@ -816,52 +816,30 @@ void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const S
 // The least valuable piece of `color` attacking (tx, ty), treating every
 // square in `removed` as empty -- so once a piece has captured (and is
 // removed from its origin), a slider lined up behind it joins in, which is
-// how x-ray recaptures come out of this without special-casing.
+// how x-ray recaptures come out of this without special-casing. Piece types
+// are tried from pawn up to king (the king last: it can only be a last resort).
 bool leastValuableAttacker(const Board& board, int tx, int ty, Color color, uint64_t removed, int& ax, int& ay) {
-    int bestValue = INT_MAX;
-    auto consider = [&](int x, int y) {
-        int value = pieceValue(board.at(x, y).type);
-        if (board.at(x, y).type == PieceType::King) value = 100'000; // only ever the last resort
-        if (value < bestValue) {
-            bestValue = value;
-            ax = x;
-            ay = y;
-        }
+    const int sq = tx * 8 + ty;
+    const uint64_t occupied = board.occupancy() & ~removed;
+    const uint64_t diagonal = bb::bishopAttacks(sq, occupied);
+    const uint64_t straight = bb::rookAttacks(sq, occupied);
+    const uint64_t attackers[6] = {
+        bb::pawnAttacks[color == Color::White ? 1 : 0][sq] & board.pieces(color, PieceType::Pawn),
+        bb::knightAttacks[sq] & board.pieces(color, PieceType::Knight),
+        diagonal & board.pieces(color, PieceType::Bishop),
+        straight & board.pieces(color, PieceType::Rook),
+        (diagonal | straight) & board.pieces(color, PieceType::Queen),
+        bb::kingAttacks[sq] & board.pieces(color, PieceType::King),
     };
-    auto isAttacker = [&](int x, int y, PieceType type) {
-        Piece p = board.at(x, y);
-        return p.color == color && p.type == type && !(removed & squareBit(x, y));
-    };
-
-    int pawnY = ty - (color == Color::White ? 1 : -1); // where a pawn capturing onto (tx, ty) stands
-    for (int dx : {-1, 1}) {
-        if (Board::inBounds(tx + dx, pawnY) && isAttacker(tx + dx, pawnY, PieceType::Pawn)) consider(tx + dx, pawnY);
+    for (uint64_t found : attackers) {
+        found &= ~removed;
+        if (!found) continue;
+        const int from = bb::lsb(found);
+        ax = from / 8;
+        ay = from % 8;
+        return true;
     }
-    for (const auto& jump : kKnightJumps) {
-        int x = tx + jump[0], y = ty + jump[1];
-        if (Board::inBounds(x, y) && isAttacker(x, y, PieceType::Knight)) consider(x, y);
-    }
-    for (int d = 0; d < 8; d++) {
-        bool diagonal = d >= 4; // kSlideDirs: rook directions first, then bishop directions
-        int x = tx + kSlideDirs[d][0], y = ty + kSlideDirs[d][1];
-        while (Board::inBounds(x, y)) {
-            Piece p = board.at(x, y);
-            if (!p.isEmpty() && !(removed & squareBit(x, y))) {
-                bool slides = p.type == PieceType::Queen || p.type == (diagonal ? PieceType::Bishop : PieceType::Rook);
-                if (p.color == color && slides) consider(x, y);
-                break;
-            }
-            x += kSlideDirs[d][0];
-            y += kSlideDirs[d][1];
-        }
-    }
-    for (int dx = -1; dx <= 1; dx++) {
-        for (int dy = -1; dy <= 1; dy++) {
-            int x = tx + dx, y = ty + dy;
-            if ((dx || dy) && Board::inBounds(x, y) && isAttacker(x, y, PieceType::King)) consider(x, y);
-        }
-    }
-    return bestValue != INT_MAX;
+    return false;
 }
 
 // Material gained by `m` (a capture or promotion) once the exchange on its
