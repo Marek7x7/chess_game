@@ -840,7 +840,7 @@ int fromTT(int score, int ply) {
 }
 
 int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, SearchContext& ctx,
-            int extensionsLeft);
+            int extensionsLeft, const Move* excluded = nullptr);
 
 // Late-move reduction: how many plies less a late, quiet move gets searched
 // with. Grows with the remaining depth and with how late the move comes in
@@ -944,7 +944,7 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
 // forcing sequence. `extensionsLeft` bounds the total extensions per line so
 // a long forced-check sequence can't blow up recursion depth or search time.
 int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, SearchContext& ctx,
-            int extensionsLeft) {
+            int extensionsLeft, const Move* excluded) {
     ctx.nodes++;
     checkTime(ctx);
 
@@ -975,9 +975,15 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     bool pvNode = beta - alpha > 1; // searched with an open window: its exact score matters
     Move ttMove{};
     TTEntry ttEntry;
+    bool haveTTMove = false;
     if (ctx.tt.probe(key, ttEntry)) {
-        if (ttEntry.hasMove) ttMove = ttEntry.best;
-        if (ttEntry.depth >= depth) {
+        if (ttEntry.hasMove) {
+            ttMove = ttEntry.best;
+            haveTTMove = true;
+        }
+        // (A singular-extension search excludes a move, so a stored result for the whole
+        // position says nothing about it.)
+        if (!excluded && ttEntry.depth >= depth) {
             int score = fromTT(ttEntry.score, ply);
             if (ttEntry.flag == TTFlag::Exact) return score;
             if (ttEntry.flag == TTFlag::LowerBound) alpha = std::max(alpha, score);
@@ -1036,6 +1042,20 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         if (nullScore >= beta) return beta;
     }
 
+    // Singular extension: if the stored best move is the only one that holds its
+    // score -- every other move, searched shallower against a bound just below it,
+    // fails low -- it deserves an extra ply; and if the others fail high even so,
+    // the node can be cut right away.
+    constexpr int kSingularMinDepth = 8;
+    int singularExtension = 0;
+    if (!excluded && !inCheck && haveTTMove && depth >= kSingularMinDepth && ttEntry.depth >= depth - 3 &&
+        ttEntry.flag != TTFlag::UpperBound && std::abs(fromTT(ttEntry.score, ply)) < kMateThreshold) {
+        const int sBeta = fromTT(ttEntry.score, ply) - 2 * depth;
+        const int s = negamax(board, (depth - 1) / 2, ply, sBeta - 1, sBeta, color, ctx, extensionsLeft, &ttMove);
+        if (s < sBeta) singularExtension = 1;
+        else if (sBeta >= beta) return sBeta;
+    }
+
     MoveList moves = board.legalMoves(color);
     if (moves.empty()) {
         if (inCheck) return -(kMateScore - ply);
@@ -1061,10 +1081,12 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     int numTriedQuiets = 0;
     ctx.path.push_back(key); // popped below; a TimeUp unwind leaves it, see searchWindow
     for (const Move& m : moves) {
+        if (excluded && sameMove(m, *excluded)) continue;
         Board::UndoState undo;
         board.makeMove(m, undo);
         ctx.tt.prefetch(board.hashKey());
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
+        const int extension = singularExtension && sameMove(m, ttMove) ? 1 : 0;
 
         // Late-move pruning: at shallow depth in a non-PV node, the quiet moves ordered
         // after the first few are very unlikely to matter.
@@ -1111,15 +1133,17 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         // either re-search.
         int score;
         if (moveIndex == 0) {
-            score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
+            score = -negamax(board, depth - 1 + extension, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
         } else {
-            score = -negamax(board, depth - 1 - reduction, ply + 1, -alpha - 1, -alpha, opponent(color), ctx,
+            score = -negamax(board, depth - 1 - reduction + extension, ply + 1, -alpha - 1, -alpha, opponent(color), ctx,
                               extensionsLeft);
             if (reduction > 0 && score > alpha) {
-                score = -negamax(board, depth - 1, ply + 1, -alpha - 1, -alpha, opponent(color), ctx, extensionsLeft);
+                score = -negamax(board, depth - 1 + extension, ply + 1, -alpha - 1, -alpha, opponent(color), ctx,
+                                  extensionsLeft);
             }
             if (score > alpha && score < beta) {
-                score = -negamax(board, depth - 1, ply + 1, -beta, -alpha, opponent(color), ctx, extensionsLeft);
+                score = -negamax(board, depth - 1 + extension, ply + 1, -beta, -alpha, opponent(color), ctx,
+                                  extensionsLeft);
             }
         }
         board.unmakeMove(m, undo);
@@ -1153,7 +1177,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     ctx.path.pop_back();
 
     TTFlag flag = best <= origAlpha ? TTFlag::UpperBound : (best >= beta ? TTFlag::LowerBound : TTFlag::Exact);
-    ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true);
+    if (!excluded) ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true);
     return best;
 }
 
