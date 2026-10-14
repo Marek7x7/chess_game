@@ -1361,19 +1361,24 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
         // re-search of the same depth, guaranteeing a correct result --
         // this is a pure search-order optimization, never a source of
         // incorrect scores.
-        constexpr int kAspirationMargin = 50;
-        int alpha = INT_MIN + 1, beta = INT_MAX - 1;
+        constexpr int kInfinity = INT_MAX - 1;
+        int delta = 25; // grows by half each time the score lands outside the window
+        int alpha = -kInfinity, beta = kInfinity;
         if (result.depthReached > 0) {
-            long long lo = static_cast<long long>(result.score) - kAspirationMargin;
-            long long hi = static_cast<long long>(result.score) + kAspirationMargin;
-            alpha = static_cast<int>(std::max<long long>(INT_MIN + 1, lo));
-            beta = static_cast<int>(std::min<long long>(INT_MAX - 1, hi));
+            alpha = std::max(-kInfinity, result.score - delta);
+            beta = std::min(kInfinity, result.score + delta);
         }
 
         auto [completed, depthBest, depthBestMove] = searchWindow(alpha, beta);
-        if (completed && (depthBest <= alpha || depthBest >= beta) &&
-            !(alpha == INT_MIN + 1 && beta == INT_MAX - 1)) {
-            std::tie(completed, depthBest, depthBestMove) = searchWindow(INT_MIN + 1, INT_MAX - 1);
+        // A score outside the window only bounds the true one: widen that side (the
+        // first fail high or low) and search the depth again, falling back to a full
+        // window once the margin is large.
+        while (completed && (depthBest <= alpha || depthBest >= beta) && !(alpha == -kInfinity && beta == kInfinity)) {
+            if (depthBest <= alpha) alpha = std::max(-kInfinity, depthBest - delta);
+            else beta = std::min(kInfinity, depthBest + delta);
+            delta += delta / 2;
+            if (delta > 400) alpha = -kInfinity, beta = kInfinity;
+            std::tie(completed, depthBest, depthBestMove) = searchWindow(alpha, beta);
         }
 
         if (!completed) break;
