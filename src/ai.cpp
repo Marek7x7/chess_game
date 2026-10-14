@@ -705,10 +705,11 @@ TUNE_INT(kTempo, 17);
 // edge counts for much less. The evaluation is scaled to this percentage there.
 TUNE_INT(kOppositeBishopsScale, 36);
 
-// Other drawish endings, in percent by how many pawns the side ahead has (0, 1, 2, 3 or more): with
-// few pieces left (phase below 0.35) a lead without pawns is mostly a draw. With none the other side
-// must not be a bare king (which mop-up handles).
-TUNE_ARR(kPawnsScale, 4, {36, 69, 106, 124});
+// Endgame scaling, in percent by how many pawns the side ahead has (0 to 5 or more): with few pieces
+// left a lead without pawns is mostly a draw. With none the other side must not be a bare king (which
+// mop-up handles).
+TUNE_ARR(kPawnsScale, 6, {36, 69, 106, 116, 124, 124});
+TUNE_INT(kScalePhasePercent, 83); // the phase (in percent of the opening's) below which this applies
 
 bool oppositeColouredBishops(const Board& board) {
     if (board.gamePhase() > 0.09) return false; // two bishops are 2 of 24 phase units; anything more is not this ending
@@ -733,7 +734,7 @@ int evaluate(const Board& board, Color color) {
                 (board.sideToMove() == Color::White ? kTempo : -kTempo);
     if (oppositeColouredBishops(board)) {
         score = score * kOppositeBishopsScale / 100;
-    } else if (phase < 0.35 && score != 0) {
+    } else if (phase * 100 < kScalePhasePercent && score != 0) {
         // Few pieces left: a side ahead with no pawn (or just one) usually cannot win.
         const int strong = score > 0 ? 0 : 1;
         const Color strongColor = strong == 0 ? Color::White : Color::Black;
@@ -742,7 +743,7 @@ int evaluate(const Board& board, Color color) {
                                 board.pieces(opponent(strongColor), PieceType::Bishop) |
                                 board.pieces(opponent(strongColor), PieceType::Rook) |
                                 board.pieces(opponent(strongColor), PieceType::Queen));
-        if (strongPawns > 0 || !weakBare) score = score * kPawnsScale[std::min(strongPawns, 3)] / 100;
+        if (strongPawns > 0 || !weakBare) score = score * kPawnsScale[std::min(strongPawns, 5)] / 100;
     }
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
