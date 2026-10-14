@@ -3,6 +3,7 @@
 //
 // Build: cmake --build build-tune --target chess_tune   (a -DTUNING build, where
 // every TUNE_INT / TUNE_ARR weight is a registered mutable variable).
+// Diff:  build-tune/chess_tune --evals labels.csv   (every static evaluation, for comparing builds)
 // Check: build-tune/chess_tune --symmetry pairs.csv   (static eval of a position and its mirror)
 // Run:   build-tune/chess_tune labels.csv [out.txt] [name,name,...|all] [K] [widen]
 //   labels.csv: header "game,fen,sf_cp_white", one quiet position per row.
@@ -97,8 +98,23 @@ int checkSymmetry(const char* path) {
     return bad == 0 ? 0 : 1;
 }
 
+// --evals positions.csv: prints "fen,static evaluation (White's point of view)" per row, for
+// diffing two builds position by position when an evaluation refactor must change nothing.
+int printEvals(const char* path) {
+    std::ifstream in(path);
+    std::string line;
+    std::getline(in, line); // header
+    while (std::getline(in, line)) {
+        std::vector<std::string> f = split(line, ',');
+        if (f.size() < 2) continue;
+        std::printf("%s,%d\n", f[1].c_str(), tunerEvaluate(Board::fromFEN(f[1])));
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
     if (argc > 2 && std::string(argv[1]) == "--symmetry") return checkSymmetry(argv[2]);
+    if (argc > 2 && std::string(argv[1]) == "--evals") return printEvals(argv[2]);
     if (argc < 2) {
         std::fprintf(stderr, "usage: %s labels.csv [out.txt] [name,name,...]\n", argv[0]);
         return 1;
