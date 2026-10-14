@@ -953,6 +953,12 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
     bool inCheck = board.isInCheck(color);
     int standPat = 0;
     if (!inCheck) {
+        // Lazy evaluation: when material and piece-square values alone are already this far
+        // above beta, the positional terms (rarely worth that much) cannot bring the score
+        // back under it, so skip them.
+        constexpr int kLazyMargin = 400;
+        const int quick = color == Color::White ? board.rawEval() : -board.rawEval();
+        if (quick - kLazyMargin >= beta) return quick;
         standPat = evaluate(board, color);
         if (standPat >= beta) return standPat;
         if (standPat > alpha) alpha = standPat;
