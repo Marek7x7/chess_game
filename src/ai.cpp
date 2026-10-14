@@ -705,6 +705,11 @@ TUNE_INT(kTempo, 17);
 // edge counts for much less. The evaluation is scaled to this percentage there.
 TUNE_INT(kOppositeBishopsScale, 36);
 
+// Other drawish endings, in percent: with few pieces left (phase below 0.35), the side ahead has no
+// pawn and the other side is not a bare king (which mop-up handles), or has just one pawn.
+TUNE_INT(kNoPawnsScale, 36);
+TUNE_INT(kOnePawnScale, 69);
+
 bool oppositeColouredBishops(const Board& board) {
     if (board.gamePhase() > 0.09) return false; // two bishops are 2 of 24 phase units; anything more is not this ending
     const uint64_t white = board.pieces(Color::White, PieceType::Bishop), black = board.pieces(Color::Black, PieceType::Bishop);
@@ -726,7 +731,20 @@ int evaluate(const Board& board, Color color) {
                 pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns) +
                 rookBehindPasser(board, pawns) + passerKingDistance(board, pawns) + blockedPassers(board, pawns) +
                 (board.sideToMove() == Color::White ? kTempo : -kTempo);
-    if (oppositeColouredBishops(board)) score = score * kOppositeBishopsScale / 100;
+    if (oppositeColouredBishops(board)) {
+        score = score * kOppositeBishopsScale / 100;
+    } else if (phase < 0.35 && score != 0) {
+        // Few pieces left: a side ahead with no pawn (or just one) usually cannot win.
+        const int strong = score > 0 ? 0 : 1;
+        const Color strongColor = strong == 0 ? Color::White : Color::Black;
+        const int strongPawns = bb::popcount(pawns.pawns[strong]);
+        const bool weakBare = !(pawns.pawns[1 - strong] | board.pieces(opponent(strongColor), PieceType::Knight) |
+                                board.pieces(opponent(strongColor), PieceType::Bishop) |
+                                board.pieces(opponent(strongColor), PieceType::Rook) |
+                                board.pieces(opponent(strongColor), PieceType::Queen));
+        if (strongPawns == 0 && !weakBare) score = score * kNoPawnsScale / 100;
+        else if (strongPawns == 1) score = score * kOnePawnScale / 100;
+    }
     return (color == Color::White) ? score : -score; // score: positive = good for White
 }
 
