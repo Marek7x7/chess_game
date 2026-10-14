@@ -267,8 +267,8 @@ TUNE_ARR(kKingAttackWeight, 7, {0, 0, 32, 30, 36, 80, 0});
 
 // A rook on a file with no pawns at all, or with only enemy pawns, has a
 // lane into the enemy position (Fruit 2.1's values; same in both phases).
-TUNE_INT(kRookOpenFile, 20);
-TUNE_INT(kRookSemiOpenFile, 16);
+TUNE_INT(kRookOpenFile, 18);
+TUNE_INT(kRookSemiOpenFile, 13);
 
 // A rook or queen on the 7th rank (counted from its own side), when there
 // are still enemy pawns there to attack or the enemy king is cut off on the
@@ -299,7 +299,7 @@ bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
 // the bishop's colour (those pawns block it, and it cannot defend the other colour's
 // squares), middlegame / endgame.
 TUNE_INT(kBadBishopMg, 1);
-TUNE_INT(kBadBishopEg, 3);
+TUNE_INT(kBadBishopEg, 9);
 
 constexpr uint64_t parityMask(int parity) {
     uint64_t mask = 0;
