@@ -779,15 +779,6 @@ struct SearchContext {
     // the node at that ply (-1: none, as at the root or after a null move).
     uint16_t counter[2][64][64]{};
     int prevMove[kMaxPly + 1]{};
-    // Capture history: how well a capture has done, by [moving piece type][target square][captured type].
-    int captureHistory[7][64][7]{};
-    // Continuation history: how well a quiet move did as the reply to the previous move, by
-    // [previous piece type][previous target square][piece type][target square] (flattened).
-    std::vector<int16_t> continuation = std::vector<int16_t>(7 * 64 * 7 * 64, 0);
-
-    int16_t& contHist(int prevPiece, int prevTo, int piece, int to) {
-        return continuation[((prevPiece * 64 + prevTo) * 7 + piece) * 64 + to];
-    }
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
@@ -803,11 +794,6 @@ int encodeMove(const Move& m) { return ((m.fromX * 8 + m.fromY) << 6) | (m.toX *
 constexpr int kHistoryLimit = 16'384;
 
 void updateHistory(int& h, int bonus) { h += bonus - h * std::abs(bonus) / kHistoryLimit; }
-void updateHistory(int16_t& h, int bonus) {
-    int v = h;
-    updateHistory(v, bonus);
-    h = static_cast<int16_t>(v);
-}
 
 bool seeNonNegative(const Board& board, const Move& m); // below
 
@@ -820,10 +806,8 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
     if (sameMove(m, ttMove)) return 1'000'000;
     if (m.captured != PieceType::None) {
         const int mvvLva = pieceValue(m.captured) * 10 - pieceValue(board.at(m.fromX, m.fromY).type);
-        const int hist = ctx.captureHistory[static_cast<int>(board.at(m.fromX, m.fromY).type)][m.toX * 8 + m.toY]
-                                           [static_cast<int>(m.captured)] / 8;
-        if (seeOrder && m.promotion == PieceType::None && !seeNonNegative(board, m)) return -50'000 + mvvLva + hist;
-        return 100'000 + mvvLva + hist;
+        if (seeOrder && m.promotion == PieceType::None && !seeNonNegative(board, m)) return -50'000 + mvvLva;
+        return 100'000 + mvvLva;
     }
     if (m.promotion == PieceType::Queen) return 90'000;
     if (ply < kMaxPly) {
@@ -834,14 +818,7 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
                 1 + (m.fromX * 8 + m.fromY) * 64 + m.toX * 8 + m.toY)
             return 78'000;
     }
-    int score = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
-    if (ply > 0 && ctx.prevMove[ply] >= 0) {
-        const int prevTo = ctx.prevMove[ply] & 63;
-        score += const_cast<SearchContext&>(ctx).contHist(static_cast<int>(board.at(prevTo / 8, prevTo % 8).type), prevTo,
-                                                           static_cast<int>(board.at(m.fromX, m.fromY).type),
-                                                           m.toX * 8 + m.toY);
-    }
-    return score;
+    return ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
 }
 
 void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx,
@@ -1234,8 +1211,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     bool anyLegal = false; // some legal move exists (a lazily generated list may hold only illegal ones)
     Move triedQuiets[64]; // quiet moves searched without a cutoff, for the history malus
     int numTriedQuiets = 0;
-    Move triedCaptures[32]; // likewise for captures
-    int numTriedCaptures = 0;
     ctx.path.push_back(key); // popped below; a TimeUp unwind leaves it, see searchWindow
     for (const Move& m : moves) {
         if (excluded && sameMove(m, *excluded)) {
@@ -1319,15 +1294,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         }
         if (best > alpha) alpha = best;
         if (alpha >= beta) {
-            if (m.captured != PieceType::None) {
-                const int bonus = std::min(depth * depth * 4, 1600);
-                auto capHist = [&](const Move& q) -> int& {
-                    return ctx.captureHistory[static_cast<int>(board.at(q.fromX, q.fromY).type)][q.toX * 8 + q.toY]
-                                             [static_cast<int>(q.captured)];
-                };
-                updateHistory(capHist(m), bonus);
-                for (int i = 0; i < numTriedCaptures; i++) updateHistory(capHist(triedCaptures[i]), -bonus);
-            }
             if (m.captured == PieceType::None && ply < kMaxPly) {
                 if (!sameMove(m, ctx.killers[ply][0])) {
                     ctx.killers[ply][1] = ctx.killers[ply][0];
@@ -1339,16 +1305,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                 };
                 updateHistory(history(m), bonus);
                 for (int i = 0; i < numTriedQuiets; i++) updateHistory(history(triedQuiets[i]), -bonus);
-                if (ply > 0 && ctx.prevMove[ply] >= 0) {
-                    const int prevTo = ctx.prevMove[ply] & 63;
-                    const int prevPiece = static_cast<int>(board.at(prevTo / 8, prevTo % 8).type);
-                    auto cont = [&](const Move& q) -> int16_t& {
-                        return ctx.contHist(prevPiece, prevTo, static_cast<int>(board.at(q.fromX, q.fromY).type),
-                                            q.toX * 8 + q.toY);
-                    };
-                    updateHistory(cont(m), bonus);
-                    for (int i = 0; i < numTriedQuiets; i++) updateHistory(cont(triedQuiets[i]), -bonus);
-                }
                 if (ply > 0 && ctx.prevMove[ply] >= 0)
                     ctx.counter[colorIdx(color)][ctx.prevMove[ply] >> 6][ctx.prevMove[ply] & 63] =
                         static_cast<uint16_t>(1 + (m.fromX * 8 + m.fromY) * 64 + m.toX * 8 + m.toY);
@@ -1357,8 +1313,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         }
         if (m.captured == PieceType::None && m.promotion == PieceType::None && numTriedQuiets < 64)
             triedQuiets[numTriedQuiets++] = m;
-        else if (m.captured != PieceType::None && numTriedCaptures < 32)
-            triedCaptures[numTriedCaptures++] = m;
     }
     ctx.path.pop_back();
     if (!anyLegal) return inCheck ? -(kMateScore - ply) : 0; // checkmate or stalemate
