@@ -73,33 +73,33 @@ std::string movesStr(const std::vector<Move>& moves) {
 // starting rank, 6 = one step from promoting), middlegame and endgame. A
 // passer is worth far more once pieces come off: fewer pieces are left to
 // blockade it or to stop it while also doing everything else.
-TUNE_ARR(kPassedMg, 8, {0, 1, 1, 1, 13, 82, 104, 0});
-TUNE_ARR(kPassedEg, 8, {0, 12, 1, 29, 79, 116, 127, 0});
+TUNE_ARR(kPassedMg, 8, {0, 1, 1, 1, 18, 78, 168, 0});
+TUNE_ARR(kPassedEg, 8, {0, 11, 1, 29, 79, 116, 134, 0});
 
 // Penalties per pawn, middlegame and endgame. Doubled: every pawn beyond the
 // first on a file (the rear one blocks the front one and no pawn can defend
 // either). Isolated: no friendly pawn on either adjacent file, so only
 // pieces can ever defend it. Both weigh more in the endgame, where a weak
 // pawn is a long-term target the defender runs out of pieces to protect.
-TUNE_INT(kDoubledMg, 16);
+TUNE_INT(kDoubledMg, 12);
 TUNE_INT(kDoubledEg, 17);
-TUNE_INT(kIsolatedMg, 14);
-TUNE_INT(kIsolatedEg, 11);
+TUNE_INT(kIsolatedMg, 10);
+TUNE_INT(kIsolatedEg, 10);
 
 // Backward pawn: every friendly pawn on the adjacent files has already
 // advanced past it, so no pawn can ever defend it, and an enemy pawn
 // controls the square in front of it, so it can't safely advance to catch
 // up either (Fruit 2.1's values).
-TUNE_INT(kBackwardMg, 10);
+TUNE_INT(kBackwardMg, 8);
 TUNE_INT(kBackwardEg, 11);
 
 // Connected pawns, by rank counted from the pawn's own side (middlegame / endgame): a
 // pawn defended by a pawn diagonally behind it, and one with a pawn beside it on the
 // same rank (a phalanx, which can advance together and defend each other).
-TUNE_ARR(kSupportedMg, 8, {0, 0, 9, 1, 10, 25, 72, 0});
+TUNE_ARR(kSupportedMg, 8, {0, 0, 14, 7, 24, 40, 197, 0});
 TUNE_ARR(kSupportedEg, 8, {0, 0, 3, 1, 1, 14, 20, 0});
-TUNE_ARR(kPhalanxMg, 8, {0, 1, 4, 11, 23, 42, 60, 0});
-TUNE_ARR(kPhalanxEg, 8, {0, 1, 1, 1, 25, 42, 60, 0});
+TUNE_ARR(kPhalanxMg, 8, {0, 1, 4, 15, 23, 42, 60, 0});
+TUNE_ARR(kPhalanxEg, 8, {0, 1, 1, 1, 25, 42, 152, 0});
 
 uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
 constexpr uint64_t kFileMask = 0xFF;                  // file a; shift by x * 8 for file x
