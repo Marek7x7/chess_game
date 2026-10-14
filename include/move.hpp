@@ -1,18 +1,34 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 #include "piece.hpp"
 
+// One byte per field (8 bytes in all): move lists are built, sorted, copied and
+// stored millions of times a second.
 struct Move {
-    int fromX, fromY;
-    int toX, toY;
+    int8_t fromX = 0, fromY = 0;
+    int8_t toX = 0, toY = 0;
     PieceType promotion = PieceType::None;
     bool isCastle = false;
     bool isEnPassant = false;
     PieceType captured = PieceType::None;
+
+    Move() = default;
+    Move(int fx, int fy, int tx, int ty, PieceType promo = PieceType::None, bool castle = false,
+         bool enPassant = false, PieceType capturedType = PieceType::None)
+        : fromX(static_cast<int8_t>(fx)),
+          fromY(static_cast<int8_t>(fy)),
+          toX(static_cast<int8_t>(tx)),
+          toY(static_cast<int8_t>(ty)),
+          promotion(promo),
+          isCastle(castle),
+          isEnPassant(enPassant),
+          captured(capturedType) {}
 };
+static_assert(sizeof(Move) == 8, "Move is meant to fit in 8 bytes");
 
 inline bool sameMove(const Move& a, const Move& b) {
     return a.fromX == b.fromX && a.fromY == b.fromY && a.toX == b.toX && a.toY == b.toY &&
