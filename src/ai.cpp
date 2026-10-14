@@ -358,8 +358,8 @@ TUNE_ARR(kThreatRook, 7, {0, 1, 8, 9, 0, 52, 0});
 TUNE_ARR(kHanging, 7, {0, 25, 23, 22, 18, 2, 0}); // attacked by anything, defended by nothing
 
 // Positive = good for White. Terms for each knight, bishop, rook and queen:
-// mobility -- every square that's empty or holds an enemy piece, checks aside,
-// and for a pinned piece only the squares along its pin -- rooks on open
+// mobility -- every square that's empty or holds an enemy piece and that no enemy pawn
+// attacks, checks aside, and for a pinned piece only the squares along its pin -- rooks on open
 // files, rooks/queens on the 7th rank, and outposts.
 // Also fills attacks[c] with the
 // pieces attacking color c's king zone (the squares next to that king).
@@ -398,8 +398,10 @@ int pieceTerms(const Board& board, const PawnInfo& pawns, KingAttack (&attacks)[
                 else if (type == PieceType::Rook) attackedByRook[side] |= reach;
                 reach &= ~own;
                 // A pinned piece still attacks along every line (the king zone test
-                // below), but can only move along its pin.
-                const int moves = bb::popcount((pins[side].pinned >> sq) & 1 ? reach & pins[side].allowed(sq) : reach);
+                // below), but can only move along its pin; and a square an enemy pawn
+                // attacks is no use to it, so it does not count as mobility.
+                const uint64_t mobile = reach & ~pawns.attacks[1 - side];
+                const int moves = bb::popcount((pins[side].pinned >> sq) & 1 ? mobile & pins[side].allowed(sq) : mobile);
                 mg += sign * (moves - kMobilityTypical[t]) * kMobilityMg[t];
                 eg += sign * (moves - kMobilityTypical[t]) * kMobilityEg[t];
                 if (type == PieceType::Bishop) {
