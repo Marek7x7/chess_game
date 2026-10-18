@@ -52,6 +52,13 @@ target_include_directories(chess PRIVATE include)
 # Link SDL2 portably
 target_link_libraries(chess PRIVATE SDL2::SDL2)
 
+# Search-constant tuning build (tools/spsa.py): the same engine with every
+# SEARCH_PARAM exposed as a UCI spin option. cmake --build <dir> --target chess_spsa
+add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES})
+target_include_directories(chess_spsa PRIVATE include)
+target_compile_definitions(chess_spsa PRIVATE SPSA)
+target_link_libraries(chess_spsa PRIVATE SDL2::SDL2)
+
 # Texel tuner for the evaluation weights (tools/tune.cpp). Not part of the
 # default build: cmake --build <dir> --target chess_tune. Compiled with
 # -DTUNING so every TUNE_ weight is a registered, mutable variable.

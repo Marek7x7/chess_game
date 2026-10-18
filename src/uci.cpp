@@ -1,3 +1,4 @@
+#include "search_params.hpp"
 #include "uci.hpp"
 
 #include <algorithm>
@@ -109,6 +110,10 @@ int runUci() {
                         std::max(1, hwThreads * 4));
             std::printf("option name OwnBook type check default false\n");
             std::printf("option name Move Overhead type spin default %d min 0 max 5000\n", moveOverheadMs);
+#ifdef SPSA
+            for (const SearchParam& sp : searchParamRegistry())
+                std::printf("option name %s type spin default %d min %d max %d\n", sp.name, sp.def, sp.lo, sp.hi);
+#endif
             std::printf("uciok\n");
             std::fflush(stdout);
         } else if (cmd == "isready") {
@@ -150,6 +155,10 @@ int runUci() {
             } else if (name == "Move Overhead") {
                 moveOverheadMs = std::max(0, std::atoi(value.c_str()));
             }
+#ifdef SPSA
+            for (const SearchParam& sp : searchParamRegistry())
+                if (name == sp.name) *sp.value = std::clamp(std::atoi(value.c_str()), sp.lo, sp.hi);
+#endif
             // Unrecognized option names are silently ignored, per UCI convention.
         } else if (cmd == "ucinewgame") {
             joinSearch();

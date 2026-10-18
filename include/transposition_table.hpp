@@ -9,6 +9,9 @@
 
 enum class TTFlag : uint8_t { Exact, LowerBound, UpperBound };
 
+// "No static eval stored" (the cached eval fits 14 bits, so only |eval| <= 8190 is kept).
+constexpr int kTTNoEval = INT32_MIN;
+
 // What probe() hands back: an unpacked copy of one stored entry. `best`
 // carries only the squares and the promotion piece -- all that sameMove()
 // compares -- not the capture/castling/en-passant details, so a caller that
@@ -20,6 +23,7 @@ struct TTEntry {
     TTFlag flag = TTFlag::Exact;
     Move best{};
     bool hasMove = false;
+    int eval = kTTNoEval; // the position's static eval for the side to move, if it was cached
 };
 
 // Fixed-size hash table of search results, keyed by Zobrist hash. Shared by
@@ -38,15 +42,20 @@ class TranspositionTable {
 public:
     explicit TranspositionTable(size_t sizePowerOfTwo); // total slots (two per bucket), at least 2
 
+    // Distinct for every table ever constructed: lets state that lives beside the
+    // table (see ai.cpp) tell a new game's table from the previous one's.
+    uint64_t instanceId() const { return id; }
+
     bool probe(uint64_t key, TTEntry& out) const;
-    void store(uint64_t key, int depth, int score, TTFlag flag, const Move& best, bool hasMove);
+    void store(uint64_t key, int depth, int score, TTFlag flag, const Move& best, bool hasMove,
+               int eval = kTTNoEval);
 
     // Starts loading a key's bucket into the cache, for a probe a little later.
     void prefetch(uint64_t key) const { __builtin_prefetch(&table[key & bucketMask]); }
 
     // Marks the start of a new search (call before its threads start):
     // entries stored before it become the first to be replaced.
-    void newSearch() { generation = (generation + 1) & 63; }
+    void newSearch() { generation = (generation + 1) & 15; }
 
     // Bytes per entry, for sizing a table to a memory budget.
     static constexpr size_t kEntryBytes = 16;
@@ -61,9 +70,14 @@ private:
     // Cache-line aligned: a bucket is 32 bytes, so with only the allocator's
     // 16-byte alignment half the buckets would straddle two cache lines.
     struct FreeDeleter {
+#ifdef _WIN32
+        void operator()(void* p) const { _aligned_free(p); } // memory from _aligned_malloc
+#else
         void operator()(void* p) const { std::free(p); }
+#endif
     };
     std::unique_ptr<Slot[], FreeDeleter> table;
     size_t bucketMask; // slot index of a key's bucket = key & bucketMask (always even)
     uint64_t generation = 0;
+    uint64_t id = 0;
 };

@@ -1,6 +1,7 @@
 #include "ai.hpp"
 
 #include <algorithm>
+#include <memory>
 #include <array>
 #include <chrono>
 #include <climits>
@@ -19,6 +20,7 @@
 
 #include "bitboard.hpp"
 #include "opening_book.hpp"
+#include "search_params.hpp"
 #include "transposition_table.hpp"
 #include "tune.hpp"
 
@@ -915,6 +917,67 @@ bool seeNonNegative(const Board& board, const Move& m) {
     return see(board, m) >= 0;
 }
 
+// Hands out a node's moves best-first without sorting them all: most nodes cut off after
+// a move or two, so picking the best remaining move each time costs less than a full
+// sort, and a capture's exchange (SEE) is only worked out when the capture comes up,
+// rather than for every capture at move generation. A capture that loses material is
+// demoted behind the quiet moves at that point, so the order is moveScore()'s, with
+// seeOrder, throughout.
+class MovePicker {
+public:
+    static constexpr int kSeeUnknown = INT_MIN;
+
+    MovePicker(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx, int ply, Color color)
+        : board_(board), moves_(moves), n_(static_cast<int>(moves.size())) {
+        for (int i = 0; i < n_; i++) {
+            scores_[i] = moveScore(board, moves[i], ttMove, ctx, ply, color, false);
+            see_[i] = kSeeUnknown;
+            // Only a capture scored by MVV-LVA (not the TT move) has its exchange still to check.
+            unchecked_[i] = scores_[i] >= 100'000 && scores_[i] < 1'000'000 && moves[i].promotion == PieceType::None;
+        }
+    }
+
+    // The next move, or null when none is left. The pointer stays valid until the next call.
+    const Move* next() {
+        while (next_ < n_) {
+            int bestIdx = next_;
+            for (int i = next_ + 1; i < n_; i++)
+                if (scores_[i] > scores_[bestIdx]) bestIdx = i;
+            if (unchecked_[bestIdx]) {
+                unchecked_[bestIdx] = false;
+                const Move& m = moves_[bestIdx];
+                if (pieceValue(m.captured) < pieceValue(board_.at(m.fromX, m.fromY).type)) {
+                    see_[bestIdx] = see(board_, m);
+                    if (see_[bestIdx] < 0) {
+                        scores_[bestIdx] -= 150'000; // 100'000 + mvvLva -> -50'000 + mvvLva
+                        continue;
+                    }
+                }
+            }
+            std::swap(moves_[bestIdx], moves_[next_]);
+            std::swap(scores_[bestIdx], scores_[next_]);
+            std::swap(see_[bestIdx], see_[next_]);
+            std::swap(unchecked_[bestIdx], unchecked_[next_]);
+            lastSee_ = see_[next_];
+            return &moves_[next_++];
+        }
+        return nullptr;
+    }
+
+    // The exchange value worked out for the move last returned, or kSeeUnknown.
+    int lastSee() const { return lastSee_; }
+
+private:
+    const Board& board_;
+    MoveList& moves_;
+    int n_;
+    int next_ = 0;
+    int lastSee_ = kSeeUnknown;
+    int scores_[MoveList::kCapacity];
+    int see_[MoveList::kCapacity];
+    bool unchecked_[MoveList::kCapacity];
+};
+
 void checkTime(SearchContext& ctx) {
     if ((ctx.nodes & 0xFFF) != 0) return;
     if (std::chrono::steady_clock::now() >= ctx.deadline) throw TimeUp{};
@@ -946,7 +1009,7 @@ int lmrReduction(int depth, int moveNumber) {
     static const auto table = [] {
         std::array<std::array<int, 64>, 64> t{};
         for (int d = 1; d < 64; d++)
-            for (int m = 1; m < 64; m++) t[d][m] = static_cast<int>(0.75 + std::log(d) * std::log(m) / 2.25);
+            for (int m = 1; m < 64; m++) t[d][m] = static_cast<int>(spLmrBase / 100.0 + std::log(d) * std::log(m) / (spLmrDiv / 100.0));
         return t;
     }();
     return table[std::min(depth, 63)][std::min(moveNumber, 63)];
@@ -988,10 +1051,10 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
         // Lazy evaluation: when material and piece-square values alone are already this far
         // above beta, the positional terms (rarely worth that much) cannot bring the score
         // back under it, so skip them.
-        constexpr int kLazyMargin = 400;
+        const int kLazyMargin = spLazyMargin;
         const int quick = color == Color::White ? board.rawEval() : -board.rawEval();
         if (quick - kLazyMargin >= beta) return quick;
-        standPat = evaluate(board, color);
+        standPat = ttEntry.eval != kTTNoEval ? ttEntry.eval : evaluate(board, color);
         if (standPat >= beta) return standPat;
         if (standPat > alpha) alpha = standPat;
     }
@@ -1016,7 +1079,7 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
     int best = inCheck ? INT_MIN : standPat;
     // Delta pruning margin: the most a capture is assumed to swing the
     // positional part of the eval, on top of the captured piece's value.
-    constexpr int kDeltaMargin = 200;
+    const int kDeltaMargin = spDeltaMargin;
     for (const Move& m : candidates) {
         // Delta pruning: even winning the captured piece for free can't lift
         // the score to alpha, so this capture can't matter.
@@ -1050,7 +1113,7 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
     if (inCheck && !anyLegal) return -(kMateScore - ply); // checkmate
 
     TTFlag flag = best <= origAlpha ? TTFlag::UpperBound : (best >= beta ? TTFlag::LowerBound : TTFlag::Exact);
-    ctx.tt.store(key, 0, toTT(best, ply), flag, bestMove, haveBestMove);
+    ctx.tt.store(key, 0, toTT(best, ply), flag, bestMove, haveBestMove, inCheck ? kTTNoEval : standPat);
     return best;
 }
 
@@ -1120,13 +1183,13 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // The static eval, for the pruning decisions below -- only computed where
     // one of them can apply, since it isn't free.
     bool haveStaticEval = !pvNode && !inCheck;
-    int staticEval = haveStaticEval ? evaluate(board, color) : 0;
+    int staticEval = haveStaticEval ? (ttEntry.eval != kTTNoEval ? ttEntry.eval : evaluate(board, color)) : 0;
 
     // Reverse futility pruning: if the static eval beats beta by more than
     // the opponent could plausibly win back in the remaining plies, assume
     // the position holds and cut without searching it.
-    constexpr int kReverseFutilityMargin = 120; // per remaining ply
-    if (haveStaticEval && depth <= 3 && beta < kMateThreshold && beta > -kMateThreshold &&
+    const int kReverseFutilityMargin = spRfpMargin; // per remaining ply
+    if (haveStaticEval && depth <= spRfpMaxDepth && beta < kMateThreshold && beta > -kMateThreshold &&
         staticEval - kReverseFutilityMargin * depth >= beta)
         return staticEval;
 
@@ -1152,8 +1215,8 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // existing invariant as every other make/unmake in this function: the
     // unwind only ever stops at searchRootFull's catch, which never reads
     // `board` again.
-    constexpr int kNullMoveMinDepth = 3;
-    const int nullMoveReduction = 3 + depth / 6; // deeper nodes can afford to cut deeper
+    const int kNullMoveMinDepth = spNullMinDepth;
+    const int nullMoveReduction = spNullBase + depth / spNullDiv; // deeper nodes can afford to cut deeper
     // Only at a non-PV node whose static eval already reaches beta: where it
     // doesn't, passing is unlikely to hold the score, and the search it costs is wasted.
     if (haveStaticEval && staticEval >= beta && depth >= kNullMoveMinDepth && beta < kMateThreshold &&
@@ -1171,11 +1234,11 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // score -- every other move, searched shallower against a bound just below it,
     // fails low -- it deserves an extra ply; and if the others fail high even so,
     // the node can be cut right away.
-    constexpr int kSingularMinDepth = 8;
+    const int kSingularMinDepth = spSingularMinDepth;
     int singularExtension = 0;
-    if (!excluded && !inCheck && haveTTMove && depth >= kSingularMinDepth && ttEntry.depth >= depth - 3 &&
+    if (!excluded && !inCheck && haveTTMove && depth >= kSingularMinDepth && ttEntry.depth >= depth - spSingularDepthGap &&
         ttEntry.flag != TTFlag::UpperBound && std::abs(fromTT(ttEntry.score, ply)) < kMateThreshold) {
-        const int sBeta = fromTT(ttEntry.score, ply) - 2 * depth;
+        const int sBeta = fromTT(ttEntry.score, ply) - spSingularMargin * depth;
         const int s = negamax(board, (depth - 1) / 2, ply, sBeta - 1, sBeta, color, ctx, extensionsLeft, &ttMove);
         if (s < sBeta) singularExtension = 1;
         else if (sBeta >= beta) return sBeta;
@@ -1192,29 +1255,40 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         return from == ownKingSq || mv.isEnPassant || ((pinnedMask >> from) & 1);
     };
     MoveList moves = board.pseudoLegal(color, false);
-    orderMoves(board, moves, ttMove, ctx, ply, color, true);
+    MovePicker picker(board, moves, ttMove, ctx, ply, color);
 
-    constexpr int kLmrStartIndex = 4; // first 4 moves (index 0-3) always searched at full depth
-    constexpr int kLmrMinDepth = 3;
+    const int kLmrStartIndex = spLmrStart; // first 4 moves (index 0-3) always searched at full depth
+    const int kLmrMinDepth = spLmrMinDepth;
 
     // Futility pruning: this close to the leaves, a quiet move is assumed to
     // move the eval by at most kFutilityMargin[depth]. If even that can't
     // lift the static eval to alpha, every quiet, non-checking move after
     // the first is skipped. Not at PV nodes, in check, or near mate scores.
-    constexpr int kFutilityMargin[3] = {0, 150, 300};
+    const int kFutilityMargin[3] = {0, spFutMargin1, spFutMargin2};
     bool futile = haveStaticEval && depth <= 2 && alpha > -kMateThreshold && alpha < kMateThreshold &&
                   staticEval + kFutilityMargin[depth] <= alpha;
 
-    Move bestMove = moves.front();
+    Move bestMove = moves.front(); // (the first generated; overwritten by the first move searched)
     int best = INT_MIN;
     int moveIndex = 0;
     bool anyLegal = false; // some legal move exists (a lazily generated list may hold only illegal ones)
     Move triedQuiets[64]; // quiet moves searched without a cutoff, for the history malus
     int numTriedQuiets = 0;
     ctx.path.push_back(key); // popped below; a TimeUp unwind leaves it, see searchWindow
-    for (const Move& m : moves) {
+    while (const Move* picked = picker.next()) {
+        const Move& m = *picked;
         if (excluded && sameMove(m, *excluded)) {
             anyLegal = true; // the excluded move is legal by construction
+            continue;
+        }
+        // SEE pruning: at shallow depth in a non-PV node, a capture that loses more
+        // than spSeePruneMargin cp per remaining ply is skipped (a legal move was
+        // already searched, since moveIndex > 0 and best is not a mate score).
+        if (!pvNode && !inCheck && moveIndex > 0 && depth <= spSeePruneDepth && best > -kMateThreshold &&
+            m.captured != PieceType::None && m.promotion == PieceType::None &&
+            (picker.lastSee() != MovePicker::kSeeUnknown ? picker.lastSee() : see(board, m)) <
+                -spSeePruneMargin * depth) {
+            moveIndex++;
             continue;
         }
         Board::UndoState undo;
@@ -1230,7 +1304,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
 
         // Late-move pruning: at shallow depth in a non-PV node, the quiet moves ordered
         // after the first few are very unlikely to matter.
-        const bool lateQuiet = !pvNode && !inCheck && depth <= 4 && moveIndex >= 3 + depth * depth &&
+        const bool lateQuiet = !pvNode && !inCheck && depth <= spLmpMaxDepth && moveIndex >= spLmpBase + depth * depth &&
                                best > -kMateThreshold;
         if ((futile || lateQuiet) && moveIndex > 0 && m.captured == PieceType::None &&
             m.promotion == PieceType::None && !board.isInCheck(opponent(color))) {
@@ -1256,7 +1330,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             // into quiescence; a PV node gets one ply less.
             // A move with a good history reduces less, one with a bad history more.
             const int h = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
-            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) - h / 6000, 1, depth - 2);
+            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) - h / spLmrHistDiv, 1, depth - 2);
         }
 
         // PVS: the first move (typically the TT move / best-ordered guess)
@@ -1299,7 +1373,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                     ctx.killers[ply][1] = ctx.killers[ply][0];
                     ctx.killers[ply][0] = m;
                 }
-                const int bonus = std::min(depth * depth * 4, 1600);
+                const int bonus = std::min(depth * depth * spHistBonus, spHistCap);
                 auto history = [&](const Move& q) -> int& {
                     return ctx.history[colorIdx(color)][q.fromX][q.fromY][q.toX][q.toY];
                 };
@@ -1318,7 +1392,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     if (!anyLegal) return inCheck ? -(kMateScore - ply) : 0; // checkmate or stalemate
 
     TTFlag flag = best <= origAlpha ? TTFlag::UpperBound : (best >= beta ? TTFlag::LowerBound : TTFlag::Exact);
-    if (!excluded) ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true);
+    if (!excluded) ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true, haveStaticEval ? staticEval : kTTNoEval);
     return best;
 }
 
@@ -1340,13 +1414,24 @@ struct RootSearchResult {
 // TT/killer/history-driven ordering as the deterministic baseline. Jitter
 // only ever reorders candidates — it never removes one from consideration
 // at any depth — so every thread's search remains fully sound.
+// The history and counter-move tables a search thread ends with, kept for its next search
+// (halved on the way back in) so a move starts with what the last one learned. One per
+// thread; they belong to one game, so a new transposition table (ucinewgame) drops them.
+struct PersistedHeuristics {
+    int history[2][8][8][8][8]{};
+    uint16_t counter[2][64][64]{};
+};
+std::vector<std::unique_ptr<PersistedHeuristics>> g_persisted;
+uint64_t g_persistedOwner = 0;
+
 RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<Move>& rootMoves, int maxDepth,
                                  std::chrono::steady_clock::time_point deadline, TranspositionTable& tt,
                                  size_t threadIndex, const std::atomic<bool>* stopFlag = nullptr,
                                  const std::function<void(const SearchProgress&)>& onDepthComplete = {},
                                  const std::vector<uint64_t>& gameHistory = {},
                                  std::chrono::steady_clock::time_point softDeadline =
-                                     std::chrono::steady_clock::time_point::max()) {
+                                     std::chrono::steady_clock::time_point::max(),
+                                 PersistedHeuristics* persisted = nullptr) {
     RootSearchResult result;
     result.move = rootMoves.front();
     const auto searchStart = std::chrono::steady_clock::now();
@@ -1354,6 +1439,12 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 
     SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory};
     std::fill(std::begin(ctx.prevMove), std::end(ctx.prevMove), -1);
+    if (persisted) {
+        std::memcpy(ctx.counter, persisted->counter, sizeof(ctx.counter));
+        int* hist = &ctx.history[0][0][0][0][0];
+        const int* old = &persisted->history[0][0][0][0][0];
+        for (size_t i = 0; i < sizeof(ctx.history) / sizeof(int); i++) hist[i] = old[i] / 2;
+    }
     ctx.path.push_back(board.hashKey());
     const size_t rootPathSize = ctx.path.size();
     std::mt19937 jitterRng(0x9E3779B9u + static_cast<unsigned>(threadIndex));
@@ -1432,7 +1523,7 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
         // this is a pure search-order optimization, never a source of
         // incorrect scores.
         constexpr int kInfinity = INT_MAX - 1;
-        int delta = 25; // grows by half each time the score lands outside the window
+        int delta = spAspiration; // grows by half each time the score lands outside the window
         int alpha = -kInfinity, beta = kInfinity;
         if (result.depthReached > 0) {
             alpha = std::max(-kInfinity, result.score - delta);
@@ -1486,6 +1577,10 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
     }
 
     result.nodes = ctx.nodes;
+    if (persisted) {
+        std::memcpy(persisted->counter, ctx.counter, sizeof(ctx.counter));
+        std::memcpy(persisted->history, ctx.history, sizeof(ctx.history));
+    }
     return result;
 }
 
@@ -1677,6 +1772,12 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         std::fprintf(stderr, "[ai] numThreads=%zu rootMoves: %s\n", numThreads, movesStr(rootMoves).c_str());
     }
 
+    if (g_persistedOwner != tt.instanceId()) {
+        g_persisted.clear();
+        g_persistedOwner = tt.instanceId();
+    }
+    while (g_persisted.size() < numThreads) g_persisted.push_back(std::make_unique<PersistedHeuristics>());
+
     std::vector<std::future<RootSearchResult>> futures;
     futures.reserve(numThreads);
     for (size_t t = 0; t < numThreads; t++) {
@@ -1695,9 +1796,9 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         futures.push_back(std::async(
             std::launch::async,
             [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, softDeadline, &tt, t, stopFlag, progressCb,
-             &gameHistory = options.gameHistory]() mutable {
+             &gameHistory = options.gameHistory, persisted = g_persisted[t].get()]() mutable {
                 return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t, stopFlag,
-                                       progressCb, gameHistory, softDeadline);
+                                       progressCb, gameHistory, softDeadline, persisted);
             }));
     }
 
