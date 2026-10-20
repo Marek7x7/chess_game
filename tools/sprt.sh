@@ -10,6 +10,9 @@
 #     nproc/2 - 1) and THREADS (each engine's Threads option, default 1);
 #     NEW_CMAKE_ARGS / BASE_CMAKE_ARGS (extra cmake arguments for building
 #     each side, e.g. -DCHESS_PGO=ON, so a build-flag change can be tested);
+#     NEW_OPTIONS / BASE_OPTIONS (extra fastchess engine arguments for each side,
+#     e.g. "option.EvalFile=nets/b.nnue": the same binary against itself with two
+#     different networks);
 #     SEED (fastchess -srand, to replay the same opening order).
 #   Units: elo0/elo1 are NORMALIZED Elo (fastchess's default SPRT model, pinned
 #     below as model=normalized). That is not the logistic "Elo" fastchess prints
@@ -76,8 +79,8 @@ PGN="$WORK/games-$(date +%Y%m%d-%H%M%S).pgn"
 
 echo "Running SPRT: tc=$TC elo0=$ELO0 elo1=$ELO1 openings=$OPENINGS concurrency=$CONCURRENCY threads=$THREADS"
 "$FASTCHESS" \
-    -engine cmd="$WORK/new.bin"  args="--uci" name=new  option.Threads="$THREADS" option.Hash=64 option.OwnBook=false \
-    -engine cmd="$WORK/base.bin" args="--uci" name=base option.Threads="$THREADS" option.Hash=64 option.OwnBook=false \
+    -engine cmd="$WORK/new.bin"  args="--uci" name=new  option.Threads="$THREADS" option.Hash=64 option.OwnBook=false ${NEW_OPTIONS:-} \
+    -engine cmd="$WORK/base.bin" args="--uci" name=base option.Threads="$THREADS" option.Hash=64 option.OwnBook=false ${BASE_OPTIONS:-} \
     -each tc="$TC" \
     -openings file="$OPENINGS" format=pgn order=random \
     -sprt elo0="$ELO0" elo1="$ELO1" alpha=0.05 beta=0.05 model=normalized \
