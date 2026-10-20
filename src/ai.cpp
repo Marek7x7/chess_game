@@ -666,11 +666,11 @@ TUNE_INT(kMopEdge, 20);   // per step the bare king is nearer the board's edge
 TUNE_INT(kMopKing, 15);   // per step the two kings are nearer each other
 TUNE_INT(kMopCorner, 120); // bishop and knight: per step nearer the right corner
 
-int mopUp(const Board& board, const PawnInfo& pawns) {
+int mopUp(const Board& board) {
     for (int side = 0; side < 2; side++) {
         const Color winner = side == 0 ? Color::White : Color::Black;
         const Color loser = opponent(winner);
-        if (pawns.pawns[1 - side]) continue;
+        if (board.pieces(loser, PieceType::Pawn)) continue;
         if (board.pieces(loser, PieceType::Knight) | board.pieces(loser, PieceType::Bishop) |
             board.pieces(loser, PieceType::Rook) | board.pieces(loser, PieceType::Queen))
             continue;
@@ -728,7 +728,7 @@ int evaluate(const Board& board, Color color) {
     double phase = board.gamePhase();
     KingAttack attacks[2]; // on White's king, on Black's king
     int score = board.rawEval() + static_cast<int>(pawns.mg * phase + pawns.eg * (1.0 - phase)) +
-                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board, pawns) +
+                pieceTerms(board, pawns, attacks) + kingSafety(board, pawns, attacks) + mopUp(board) +
                 rookBehindPasser(board, pawns) + passerKingDistance(board, pawns) + blockedPassers(board, pawns) +
                 (board.sideToMove() == Color::White ? kTempo : -kTempo);
     if (oppositeColouredBishops(board)) {
@@ -1683,7 +1683,8 @@ BenchResult benchSearch(const Board& board, Color color, int depth) {
     // searchRootFull() (below) is outside Step 3's scope and still takes a
     // std::vector<Move>&, so convert once here at the root (not a hot path).
     MoveList rootMoveList = board.legalMoves(color);
-    std::vector<Move> rootMoves(rootMoveList.begin(), rootMoveList.end());
+    std::vector<Move> rootMoves;
+    for (const Move& m : rootMoveList) rootMoves.push_back(m);
     BenchResult result;
     if (rootMoves.empty()) return result;
 
@@ -1746,7 +1747,8 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     // searchRootFull() is outside Step 3's scope and still takes a
     // std::vector<Move>&, so convert once here at the root (not a hot path).
     MoveList rootMoveList = board.legalMoves(aiColor);
-    std::vector<Move> rootMoves(rootMoveList.begin(), rootMoveList.end());
+    std::vector<Move> rootMoves;
+    for (const Move& m : rootMoveList) rootMoves.push_back(m);
     if (rootMoves.empty()) return Move{}; // checkmate or stalemate: the caller should not have asked
     if (!options.searchMoves.empty()) {
         std::vector<Move> allowed;
