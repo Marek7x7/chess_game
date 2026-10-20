@@ -1610,6 +1610,7 @@ std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt
     std::vector<uint64_t> seen;
     Board board = rootBoard;
     for (int i = 0; i < maxLen; i++) {
+        if (board.halfmoveClock() >= 100) break; // drawn by the fifty-move rule: the search scores it 0, the line ends
         uint64_t key = board.hashKey();
         if (std::find(seen.begin(), seen.end(), key) != seen.end()) break; // cycle guard
         if (std::count(history.begin(), history.end(), key) >= 2) break;   // third occurrence: a draw
