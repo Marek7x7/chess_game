@@ -2,7 +2,7 @@
 //
 //   nnue_train train <data.bin>... --out net.nnue [--epochs 20] [--batch 16384] [--lr 1e-3] [--lambda 0.7]
 //                    [--k 173.7] [--min-depth N] [--min-ply N] [--max-score N] [--init net.nnue] [--seed N]
-//   nnue_train eval  <data.bin>... (--net net.nnue | --hce) [--k 173.7] [same filters]
+//   nnue_train eval  <data.bin>... (--net net.nnue | --hce) [--valid-only] [--k 173.7] [same filters]
 //
 // The loss is the mean squared error between the predicted and the target win probability, where
 //   predicted = sigmoid(output * kScale / K)             (output in the units of the network's last layer)
@@ -42,7 +42,7 @@ constexpr int kBlock = 4096;
 struct Options {
     std::vector<std::string> inputs;
     std::string out, init, net;
-    bool hce = false;
+    bool hce = false, validOnly = false;
     int epochs = 20, batch = 16384, seed = 1;
     double lr = 1e-3, lambda = 0.7, k = 400.0 / std::log(10.0);
     int minDepth = 0, minPly = 0, maxScore = 3000;
@@ -377,9 +377,10 @@ int train(const Options& o) {
 int evaluateSet(const Options& o) {
     std::vector<Record> train, valid;
     if (!loadData(o, train, valid)) return 1;
-    // Everything counts here, not only the held-out blocks: a network under test was not trained on it.
-    std::vector<Record>& data = train;
-    data.insert(data.end(), valid.begin(), valid.end());
+    // By default everything counts: a network under test was not necessarily trained on this data. --valid-only
+    // restricts it to the held-out blocks, which a network trained here by `train` never saw.
+    std::vector<Record>& data = o.validOnly ? valid : train;
+    if (!o.validOnly) data.insert(data.end(), valid.begin(), valid.end());
     std::string error;
     if (!o.hce && !nnue::loadFile(o.net, error)) {
         std::fprintf(stderr, "cannot load %s: %s\n", o.net.c_str(), error.c_str());
@@ -432,6 +433,7 @@ int main(int argc, char** argv) {
         else if (arg == "--init") o.init = value();
         else if (arg == "--net") o.net = value();
         else if (arg == "--hce") o.hce = true;
+        else if (arg == "--valid-only") o.validOnly = true;
         else if (arg == "--epochs") o.epochs = std::atoi(value());
         else if (arg == "--batch") o.batch = std::atoi(value());
         else if (arg == "--lr") o.lr = std::atof(value());
