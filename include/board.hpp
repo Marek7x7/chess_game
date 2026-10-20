@@ -5,6 +5,7 @@
 #include <vector>
 #include <iosfwd>
 
+#include "nnue.hpp"
 #include "piece.hpp"
 #include "move.hpp"
 
@@ -58,6 +59,13 @@ public:
     // 0 (endgame) .. 1 (opening/middlegame), from incrementally-tracked
     // remaining non-pawn material.
     double gamePhase() const;
+
+    // The neural-network accumulator for the current position. Kept up to date by makeMove()/unmakeMove() while a
+    // network is loaded (nnue::active()); refreshNnue() rebuilds it, which is needed after a network gets loaded
+    // for a board that already exists. nnueMatchesScratch() is verification only.
+    const nnue::Accumulator& nnueAccumulator() const { return nnueAcc; }
+    void refreshNnue();
+    bool nnueMatchesScratch() const;
 
     // Recomputes rawEval() from scratch by scanning every square, ignoring
     // the incrementally-maintained fields entirely. Verification-only: used
@@ -116,6 +124,7 @@ public:
         int prevBishopCount[2];
         int prevEgShift;
         int prevHalfmoveCount;
+        nnue::Accumulator prevAcc; // only filled while a network is loaded
     };
 
     // Same as makeMove(const Move&), but also records enough state in `undo`
@@ -174,6 +183,7 @@ private:
     int kingX[2], kingY[2]; // [White, Black]
     int bishopCount[2];     // [White, Black], for the bishop-pair bonus
     int egShift;            // sum of egShiftFor() over all pieces, blended in by phase
+    nnue::Accumulator nnueAcc; // see nnueAccumulator()
 
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 

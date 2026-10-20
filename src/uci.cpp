@@ -20,6 +20,7 @@
 #include "ai.hpp"
 #include "board.hpp"
 #include "move.hpp"
+#include "nnue.hpp"
 #include "transposition_table.hpp"
 #include "version.hpp"
 
@@ -157,6 +158,7 @@ int runUci() {
                 std::printf("option name Threads type spin default %d min 1 max %d\n", threadsOption, maxThreads);
                 std::printf("option name OwnBook type check default false\n");
                 std::printf("option name Move Overhead type spin default %d min 0 max 5000\n", moveOverheadMs);
+                std::printf("option name EvalFile type string default <default>\n");
     #ifdef SPSA
                 for (const SearchParam& sp : searchParamRegistry())
                     std::printf("option name %s type spin default %d min %d max %d\n", sp.name, sp.def, sp.lo, sp.hi);
@@ -203,6 +205,22 @@ int runUci() {
                     ownBook = (value == "true");
                 } else if (name == "Move Overhead") {
                     if (parseInt(value, number)) moveOverheadMs = std::clamp(number, 0, 5000);
+                } else if (name == "EvalFile") {
+                    // "<default>" or empty: the network built into this binary if there is one, else the
+                    // hand-crafted evaluation; "none": the hand-crafted evaluation; otherwise a network file.
+                    std::string error;
+                    if (value.empty() || value == "<default>") {
+                        nnue::unload();
+                        nnue::loadBuiltin();
+                    } else if (value == "none") {
+                        nnue::unload();
+                    } else if (!nnue::loadFile(value, error)) {
+                        std::printf("info string EvalFile: %s\n", error.c_str());
+                    }
+                    board.refreshNnue();
+                    rebuildTT(); // its entries (and their cached static evals) came from the other evaluation
+                    std::printf("info string evaluation: %s\n", nnue::active() ? nnue::netName().c_str() : "hand-crafted");
+                    std::fflush(stdout);
                 }
     #ifdef SPSA
                 for (const SearchParam& sp : searchParamRegistry())

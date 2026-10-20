@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "bitboard.hpp"
+#include "nnue.hpp"
 #include "opening_book.hpp"
 #include "search_params.hpp"
 #include "transposition_table.hpp"
@@ -718,8 +719,22 @@ bool oppositeColouredBishops(const Board& board) {
     return (w / 8 + w % 8) % 2 != (b / 8 + b % 8) % 2;
 }
 
+// The neural network's evaluation (see nnue.hpp): it scores the position for the side to move. What stays of the
+// hand-crafted evaluation is the dead-draw rule and mop-up, which a network trained on games that are decided long
+// before a lone king is mated has nothing to say about.
+int evaluateNetwork(const Board& board, Color color) {
+    if (!(board.pieces(Color::White, PieceType::Pawn) | board.pieces(Color::Black, PieceType::Pawn)) &&
+        !hasMatingMaterial(board, Color::White) && !hasMatingMaterial(board, Color::Black))
+        return 0;
+    int score = nnue::evaluate(board.nnueAccumulator(), board.sideToMove(), bb::popcount(board.occupancy()));
+    if (board.sideToMove() == Color::Black) score = -score; // White's point of view, as in evaluate() below
+    score += mopUp(board);
+    return color == Color::White ? score : -score;
+}
+
 // Positive = good for `color`.
 int evaluate(const Board& board, Color color) {
+    if (nnue::active()) return evaluateNetwork(board, color);
     const PawnInfo& pawns = probePawns(board);
     // A dead draw: no pawns and neither side can mate.
     if (!(pawns.pawns[0] | pawns.pawns[1]) && !hasMatingMaterial(board, Color::White) &&

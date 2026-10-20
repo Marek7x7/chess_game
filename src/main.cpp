@@ -11,6 +11,7 @@
 #include "board.hpp"
 #include "gui.hpp"
 #include "match.hpp"
+#include "nnue.hpp"
 #include "opening_book.hpp"
 #include "pgn.hpp"
 #include "uci.hpp"
@@ -142,6 +143,10 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
         mismatches++;
         std::fprintf(stderr, "BITBOARD MISMATCH at depth=%d\n", depth);
     }
+    if (!board.nnueMatchesScratch()) {
+        mismatches++;
+        std::fprintf(stderr, "NETWORK ACCUMULATOR MISMATCH at depth=%d\n", depth);
+    }
     if (depth == 0) return 1;
     long long nodes = 0;
     for (const Move& m : board.legalMoves(color)) {
@@ -153,17 +158,38 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
     return nodes;
 }
 
+// Both sides' views of a piece must be each other's mirror images, or the network could not be colour-symmetric.
+bool networkFeaturesSymmetric() {
+    for (int color = 0; color < 2; color++)
+        for (int type = 1; type <= 6; type++)
+            for (int x = 0; x < 8; x++)
+                for (int y = 0; y < 8; y++)
+                    if (nnue::featureIndex(0, color, type, x, y) != nnue::featureIndex(1, 1 - color, type, x, 7 - y))
+                        return false;
+    return true;
+}
+
 int runVerifyEval(int maxDepth) {
     bool allPass = true;
-    for (const PerftCase& tc : perftSuite()) {
-        Board board = Board::fromFEN(tc.fen);
-        long long mismatches = 0;
-        long long nodes = verifyEvalNode(board, maxDepth, board.sideToMove(), mismatches);
-        bool pass = mismatches == 0;
-        allPass &= pass;
-        std::printf("%-10s depth=%d nodesChecked=%-12lld mismatches=%lld %s\n", tc.name, maxDepth, nodes, mismatches,
-                    pass ? "OK" : "FAIL");
+    // Once with the hand-crafted evaluation (the incremental terms against a recompute), once with a network of
+    // random weights (the incrementally updated accumulators against a recompute).
+    const bool hadNetwork = nnue::active();
+    for (int round = 0; round < 2; round++) {
+        if (round == 1) nnue::loadRandom(12345);
+        for (const PerftCase& tc : perftSuite()) {
+            Board board = Board::fromFEN(tc.fen);
+            long long mismatches = 0;
+            long long nodes = verifyEvalNode(board, maxDepth, board.sideToMove(), mismatches);
+            const bool pass = mismatches == 0;
+            allPass &= pass;
+            std::printf("%-10s depth=%d nodesChecked=%-12lld mismatches=%lld %s%s\n", tc.name, maxDepth, nodes,
+                        mismatches, pass ? "OK" : "FAIL", round == 1 ? "  (random network)" : "");
+        }
     }
+    if (!hadNetwork) nnue::unload();
+    const bool symmetric = networkFeaturesSymmetric();
+    allPass &= symmetric;
+    std::printf("network features colour-symmetric: %s\n", symmetric ? "OK" : "FAIL");
     std::printf(allPass ? "EVAL VERIFICATION: ALL PASS\n" : "EVAL VERIFICATION: FAILURES\n");
     return allPass ? 0 : 1;
 }
@@ -331,6 +357,7 @@ int runGui() {
 #endif
 
 int main(int argc, char** argv) {
+    nnue::loadBuiltin(); // the network compiled into this binary, if there is one
     if (argc >= 2 && (std::strcmp(argv[1], "--version") == 0 || std::strcmp(argv[1], "-v") == 0)) {
         std::printf("ChessGame %s\n", CHESS_VERSION);
         return 0;

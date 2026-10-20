@@ -1,0 +1,193 @@
+#include "nnue.hpp"
+
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <random>
+
+#if defined(__AVX2__)
+#include <immintrin.h>
+#endif
+
+namespace nnue {
+
+namespace {
+
+struct Net {
+    alignas(64) int16_t featureWeights[kInputs][kHidden];
+    alignas(64) int16_t featureBias[kHidden];
+    alignas(64) int16_t outputWeights[kBuckets][2 * kHidden];
+    int32_t outputBias[kBuckets];
+};
+
+// The network in use. Replaced only while no search is running (UCI setoption stops the search first).
+std::unique_ptr<Net> g_net;
+std::string g_name = "none";
+
+#ifdef CHESS_NNUE_BUILTIN
+extern "C" {
+extern const unsigned char chess_nnue_builtin[];
+extern const unsigned long chess_nnue_builtin_size;
+}
+#endif
+
+bool parse(const unsigned char* data, uint64_t size, std::unique_ptr<Net>& out, std::string& error) {
+    if (size != kFileBytes) {
+        error = "wrong size: " + std::to_string(size) + " bytes, expected " + std::to_string(kFileBytes) +
+                " (a network for a different architecture?)";
+        return false;
+    }
+    FileHeader h;
+    std::memcpy(&h, data, sizeof h);
+    if (std::memcmp(h.magic, "CGNN", 4) != 0 || h.version != kFileVersion || h.inputs != kInputs ||
+        h.hidden != kHidden || h.buckets != kBuckets || h.qa != kQA || h.qb != kQB || h.scale != kScale) {
+        error = "not a network of this engine's architecture";
+        return false;
+    }
+    auto net = std::make_unique<Net>();
+    const unsigned char* p = data + sizeof h;
+    std::memcpy(net->featureWeights, p, sizeof net->featureWeights);
+    p += sizeof net->featureWeights;
+    std::memcpy(net->featureBias, p, sizeof net->featureBias);
+    p += sizeof net->featureBias;
+    std::memcpy(net->outputWeights, p, sizeof net->outputWeights);
+    p += sizeof net->outputWeights;
+    std::memcpy(net->outputBias, p, sizeof net->outputBias);
+    out = std::move(net);
+    return true;
+}
+
+} // namespace
+
+bool active() { return g_net != nullptr; }
+
+const std::string& netName() { return g_name; }
+
+bool loadFile(const std::string& path, std::string& error) {
+    std::FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) {
+        error = "cannot open " + path;
+        return false;
+    }
+    std::fseek(f, 0, SEEK_END);
+    const long size = std::ftell(f);
+    std::fseek(f, 0, SEEK_SET);
+    std::unique_ptr<unsigned char[]> data(new unsigned char[size > 0 ? size : 1]);
+    const size_t got = size > 0 ? std::fread(data.get(), 1, static_cast<size_t>(size), f) : 0;
+    std::fclose(f);
+    if (size <= 0 || got != static_cast<size_t>(size)) {
+        error = "cannot read " + path;
+        return false;
+    }
+    std::unique_ptr<Net> net;
+    if (!parse(data.get(), static_cast<uint64_t>(size), net, error)) return false;
+    g_net = std::move(net);
+    const size_t slash = path.find_last_of("/\\");
+    g_name = slash == std::string::npos ? path : path.substr(slash + 1);
+    return true;
+}
+
+bool loadBuiltin() {
+#ifdef CHESS_NNUE_BUILTIN
+    std::unique_ptr<Net> net;
+    std::string error;
+    if (!parse(chess_nnue_builtin, chess_nnue_builtin_size, net, error)) {
+        std::fprintf(stderr, "built-in network rejected: %s\n", error.c_str());
+        return false;
+    }
+    g_net = std::move(net);
+    g_name = "builtin";
+    return true;
+#else
+    return false;
+#endif
+}
+
+void loadRandom(uint64_t seed) {
+    std::mt19937_64 rng(seed);
+    auto net = std::make_unique<Net>();
+    auto small = [&](int range) { return static_cast<int>(rng() % (2 * range + 1)) - range; };
+    for (auto& row : net->featureWeights)
+        for (int16_t& w : row) w = static_cast<int16_t>(small(40));
+    for (int16_t& b : net->featureBias) b = static_cast<int16_t>(small(60) + 60);
+    for (auto& row : net->outputWeights)
+        for (int16_t& w : row) w = static_cast<int16_t>(small(30));
+    for (int32_t& b : net->outputBias) b = small(2000);
+    g_net = std::move(net);
+    g_name = "random";
+}
+
+void unload() {
+    g_net.reset();
+    g_name = "none";
+}
+
+void reset(Accumulator& acc) {
+    for (int p = 0; p < 2; p++) std::memcpy(acc.v[p], g_net->featureBias, sizeof acc.v[p]);
+}
+
+namespace {
+
+// acc.v[p] += sign * (the weights of one feature): the loops are plain so that the compiler vectorizes them
+// for whatever the target allows.
+template <int Sign>
+inline void update(Accumulator& acc, Color c, PieceType t, int x, int y) {
+    const int type = static_cast<int>(t);
+    const int pieceColor = c == Color::White ? 0 : 1;
+    for (int p = 0; p < 2; p++) {
+        const int16_t* __restrict w = g_net->featureWeights[featureIndex(p, pieceColor, type, x, y)];
+        int16_t* __restrict a = acc.v[p];
+        for (int i = 0; i < kHidden; i++) a[i] = static_cast<int16_t>(a[i] + Sign * w[i]);
+    }
+}
+
+} // namespace
+
+void add(Accumulator& acc, Color c, PieceType t, int x, int y) { update<+1>(acc, c, t, x, y); }
+void sub(Accumulator& acc, Color c, PieceType t, int x, int y) { update<-1>(acc, c, t, x, y); }
+
+int evaluate(const Accumulator& acc, Color sideToMove, int pieceCount) {
+    const int us = sideToMove == Color::White ? 0 : 1;
+    const int bucket = bucketOf(pieceCount);
+    const int16_t* mine = acc.v[us];
+    const int16_t* theirs = acc.v[1 - us];
+    const int16_t* w = g_net->outputWeights[bucket];
+
+    // sum over the two accumulators of  clip(a, 0, kQA)^2 * w , computed as ((a * w) * a) like the vector code
+    // below so that both give the same integers: (a * w) fits 16 bits for |w| <= 128.
+    int32_t sum = 0;
+#if defined(__AVX2__)
+    const __m256i zero = _mm256_setzero_si256();
+    const __m256i qa = _mm256_set1_epi16(kQA);
+    __m256i acc32 = _mm256_setzero_si256();
+    for (int half = 0; half < 2; half++) {
+        const int16_t* a = half == 0 ? mine : theirs;
+        const int16_t* ww = w + half * kHidden;
+        for (int i = 0; i < kHidden; i += 16) {
+            __m256i x = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(a + i));
+            x = _mm256_min_epi16(_mm256_max_epi16(x, zero), qa);
+            const __m256i wv = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(ww + i));
+            acc32 = _mm256_add_epi32(acc32, _mm256_madd_epi16(_mm256_mullo_epi16(x, wv), x));
+        }
+    }
+    alignas(32) int32_t lanes[8];
+    _mm256_store_si256(reinterpret_cast<__m256i*>(lanes), acc32);
+    for (int l = 0; l < 8; l++) sum += lanes[l];
+#else
+    for (int half = 0; half < 2; half++) {
+        const int16_t* a = half == 0 ? mine : theirs;
+        const int16_t* ww = w + half * kHidden;
+        for (int i = 0; i < kHidden; i++) {
+            const int x = std::min(std::max<int>(a[i], 0), kQA);
+            sum += static_cast<int16_t>(x * ww[i]) * x;
+        }
+    }
+#endif
+    const int64_t out = static_cast<int64_t>(sum / kQA) + g_net->outputBias[bucket];
+    const int cp = static_cast<int>(out * kScale / (kQA * kQB));
+    return std::min(std::max(cp, -4000), 4000);
+}
+
+} // namespace nnue

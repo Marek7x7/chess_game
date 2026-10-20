@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "bitboard.hpp"
+#include "nnue.hpp"
 #include "tune.hpp"
 
 namespace {
@@ -344,6 +345,24 @@ void Board::recomputeEval() {
             egShift += egShiftFor(p.type, p.color, x, y);
         }
     }
+    refreshNnue();
+}
+
+void Board::refreshNnue() {
+    if (!nnue::active()) return;
+    nnue::reset(nnueAcc);
+    for (int x = 0; x < 8; x++)
+        for (int y = 0; y < 8; y++) {
+            const Piece& p = squares[x][y];
+            if (!p.isEmpty()) nnue::add(nnueAcc, p.color, p.type, x, y);
+        }
+}
+
+bool Board::nnueMatchesScratch() const {
+    if (!nnue::active()) return true;
+    Board copy = *this;
+    copy.refreshNnue();
+    return std::memcmp(&copy.nnueAcc, &nnueAcc, sizeof nnueAcc) == 0;
 }
 
 int Board::kingTerm() const {
@@ -840,13 +859,16 @@ void Board::makeMove(const Move& m) {
     };
     // Kings are excluded from nonKingScore (see kingTerm()); non-king pieces
     // are summed incrementally at exactly the points their placement changes.
+    const bool network = nnue::active();
     auto addEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore += pieceContribution(t, c, x, y);
         egShift += egShiftFor(t, c, x, y);
+        if (network) nnue::add(nnueAcc, c, t, x, y);
     };
     auto removeEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore -= pieceContribution(t, c, x, y);
         egShift -= egShiftFor(t, c, x, y);
+        if (network) nnue::sub(nnueAcc, c, t, x, y);
     };
 
     Piece moving = squares[m.fromX][m.fromY];
@@ -949,6 +971,7 @@ void Board::makeMove(const Move& m, UndoState& undo) {
     undo.prevBishopCount[1] = bishopCount[1];
     undo.prevEgShift = egShift;
     undo.prevHalfmoveCount = halfmoveCount;
+    if (nnue::active()) undo.prevAcc = nnueAcc;
     const Piece& moving = squares[m.fromX][m.fromY];
     undo.movedType = moving.type;
     undo.movedColor = moving.color;
@@ -1000,6 +1023,7 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     bishopCount[1] = undo.prevBishopCount[1];
     egShift = undo.prevEgShift;
     halfmoveCount = undo.prevHalfmoveCount;
+    if (nnue::active()) nnueAcc = undo.prevAcc;
     turn = color;
 }
 
