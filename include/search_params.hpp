@@ -52,7 +52,11 @@ SEARCH_PARAM(spHistCap, 2247, 400, 4000);
 SEARCH_PARAM(spNullMinDepth, 2, 1, 5);
 SEARCH_PARAM(spSingularMinDepth, 5, 3, 12);
 SEARCH_PARAM(spSingularDepthGap, 3, 1, 5);      // the TT entry may be this much shallower
-SEARCH_PARAM(spLmrMinDepth, 2, 1, 5);
+SEARCH_PARAM(spLmrMinDepth, 3, 3, 7);           // first depth that may reduce (>= 3: the reduction is clamped to [1, depth - 2])
 SEARCH_PARAM(spLmpMaxDepth, 4, 2, 8);
 SEARCH_PARAM(spRfpMaxDepth, 5, 2, 8);
 SEARCH_PARAM(spSeePruneDepth, 5, 2, 10);
+
+#ifndef SPSA
+static_assert(spLmrMinDepth >= 3, "std::clamp(reduction, 1, depth - 2) in negamax needs depth - 2 >= 1");
+#endif
