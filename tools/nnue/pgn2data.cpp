@@ -20,7 +20,7 @@
 
 #include "board.hpp"
 #include "pgn.hpp"
-#include "record.hpp"
+#include "nnue_record.hpp"
 
 namespace {
 

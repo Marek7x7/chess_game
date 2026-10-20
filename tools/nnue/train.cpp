@@ -29,7 +29,7 @@
 
 #include "board.hpp"
 #include "nnue.hpp"
-#include "record.hpp"
+#include "nnue_record.hpp"
 
 int tunerEvaluate(const Board& board); // the hand-crafted evaluation, White's point of view (needs -DTUNING)
 

@@ -9,6 +9,7 @@
 
 #include "ai.hpp"
 #include "board.hpp"
+#include "datagen.hpp"
 #include "gui.hpp"
 #include "match.hpp"
 #include "nnue.hpp"
@@ -343,6 +344,7 @@ void printUsage(std::FILE* out, const char* program) {
                  "  --verify-book                   list the opening book's first moves\n"
                  "  --replay <pgn> [white|black|both]   re-search the positions of a game\n"
                  "  --selfplay <games> [levelA] [levelB]   bot matches, levels easy|medium|hard|expert\n"
+                 "  --datagen --out <file> [--games N] [--nodes N] [--seed N] [--net <file>]   training data\n"
                  "  --version, --help\n",
                  CHESS_VERSION, program);
 }
@@ -387,6 +389,9 @@ int main(int argc, char** argv) {
     }
     if (argc >= 2 && std::strcmp(argv[1], "--uci") == 0) {
         return runUci();
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--datagen") == 0) {
+        return runDatagen(argc, argv);
     }
     if (argc >= 3 && std::strcmp(argv[1], "--replay") == 0) {
         std::string side = argc >= 4 ? argv[3] : "both";
