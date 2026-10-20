@@ -32,10 +32,12 @@ class Engine:
         self.p = subprocess.Popen([path, "--uci"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                   stderr=subprocess.STDOUT, text=True, bufsize=1)
         self.q = queue.Queue()
+        self.log = []  # every line the engine wrote, for the sanitizer check in close()
         threading.Thread(target=self._pump, daemon=True).start()
 
     def _pump(self):
         for line in self.p.stdout:
+            self.log.append(line.rstrip("\n"))
             self.q.put(line.rstrip("\n"))
 
     def send(self, cmd):
@@ -79,6 +81,10 @@ class Engine:
             self.p.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self.p.kill()
+        time.sleep(0.05)
+        # An engine built with -fsanitize=... reports on stderr, which is merged into the stream.
+        bad = [l for l in self.log if "Sanitizer" in l or "runtime error:" in l]
+        assert not bad, "sanitizer report: " + bad[0]
 
 
 def start(path, options=()):
@@ -269,6 +275,23 @@ def go_while_searching(path):
     second = e.read_until("bestmove", 10)
     e.close()
     assert bestmove(first) and bestmove(second), "a second go while searching hung or lost a bestmove"
+
+
+@case
+def multithreaded_search(path):
+    e = start(path, ["Threads value 4", "Hash value 32"])
+    for fen in ("startpos", "fen r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"):
+        e.send("ucinewgame")
+        e.send("position " + fen)
+        e.send("go movetime 800")
+        assert bestmove(e.read_until("bestmove", 20)), "no bestmove with 4 threads"
+        e.send("go movetime 500")  # the second search starts from the table and heuristics of the first
+        assert bestmove(e.read_until("bestmove", 20)), "no bestmove from the warm table"
+    e.send("go infinite")
+    time.sleep(0.5)
+    e.send("stop")
+    assert bestmove(e.read_until("bestmove", 10)), "no bestmove after stop with 4 threads"
+    e.close()
 
 
 @case
