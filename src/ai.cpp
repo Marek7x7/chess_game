@@ -782,6 +782,8 @@ struct SearchContext {
     long long nodeLimit = std::numeric_limits<long long>::max();
     // Where this thread publishes its node count (every 4096 nodes) for the others to add up.
     std::atomic<long long>* nodeSlot = nullptr;
+    // Set by thread 0 when it is done: the helper threads' work is then of no use, so they stop too.
+    const std::atomic<bool>* haltFlag = nullptr;
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
@@ -985,6 +987,7 @@ void checkTime(SearchContext& ctx) {
     if (ctx.nodeSlot) ctx.nodeSlot->store(ctx.nodes, std::memory_order_relaxed);
     if (std::chrono::steady_clock::now() >= ctx.deadline) throw TimeUp{};
     if (ctx.stopFlag && ctx.stopFlag->load(std::memory_order_relaxed)) throw TimeUp{};
+    if (ctx.haltFlag && ctx.haltFlag->load(std::memory_order_relaxed)) throw TimeUp{};
 }
 
 // Converts a score found `ply` levels below the search root into one
@@ -1436,7 +1439,8 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
                                      std::chrono::steady_clock::time_point::max(),
                                  PersistedHeuristics* persisted = nullptr,
                                  long long nodeLimit = std::numeric_limits<long long>::max(),
-                                 std::atomic<long long>* nodeSlots = nullptr, size_t numSlots = 0) {
+                                 std::atomic<long long>* nodeSlots = nullptr, size_t numSlots = 0,
+                                 const std::atomic<bool>* haltFlag = nullptr) {
     RootSearchResult result;
     result.move = rootMoves.front();
     const auto searchStart = std::chrono::steady_clock::now();
@@ -1445,6 +1449,7 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
     SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory};
     std::fill(std::begin(ctx.prevMove), std::end(ctx.prevMove), -1);
     ctx.nodeLimit = nodeLimit;
+    ctx.haltFlag = haltFlag;
     if (nodeSlots) ctx.nodeSlot = &nodeSlots[threadIndex];
     if (persisted) {
         std::memcpy(ctx.counter, persisted->counter, sizeof(ctx.counter));
@@ -1810,6 +1815,10 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     std::vector<std::atomic<long long>> nodeSlots(numThreads); // each thread's node count, for the total in "info"
     for (auto& slot : nodeSlots) slot.store(0, std::memory_order_relaxed);
     const long long nodeLimit = options.nodeLimit > 0 ? options.nodeLimit : std::numeric_limits<long long>::max();
+    // Thread 0 decides the move (and, through its soft limit, when to stop). When it is done the helpers have
+    // nothing left to contribute, so it tells them to stop instead of leaving them to run on by their own
+    // clocks, which only the hard limit ends.
+    std::atomic<bool> halt{false};
 
     std::vector<std::future<RootSearchResult>> futures;
     futures.reserve(numThreads);
@@ -1830,9 +1839,12 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
             std::launch::async,
             [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, softDeadline, &tt, t, stopFlag, progressCb,
              &gameHistory = options.gameHistory, persisted = g_persisted[t].get(), nodeLimit,
-             slots = nodeSlots.data(), numSlots = nodeSlots.size()]() mutable {
-                return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t, stopFlag,
-                                       progressCb, gameHistory, softDeadline, persisted, nodeLimit, slots, numSlots);
+             slots = nodeSlots.data(), numSlots = nodeSlots.size(), &halt]() mutable {
+                RootSearchResult r =
+                    searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t, stopFlag,
+                                   progressCb, gameHistory, softDeadline, persisted, nodeLimit, slots, numSlots, &halt);
+                if (t == 0) halt.store(true, std::memory_order_relaxed);
+                return r;
             }));
     }
 
