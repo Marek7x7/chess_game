@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(ChessGame LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -14,6 +14,26 @@ option(CHESS_NATIVE_ARCH "Build with -march=native (binary may SIGILL on other C
 option(CHESS_WERROR      "Treat warnings as errors" ON)
 option(CHESS_LTO         "Link-time optimisation in Release builds" ON)
 
+# Distribution builds. Neither needs SDL2 installed on the target machine.
+#   CHESS_BUNDLE_SDL2: download SDL2 and link it statically into the executable
+#                      (needs network access at configure time).
+#   CHESS_PORTABLE:    runs on any CPU of the baseline level below instead of
+#                      this one, links the C++ runtime statically, and implies
+#                      CHESS_BUNDLE_SDL2. Overrides CHESS_NATIVE_ARCH.
+# Linux:   cmake -S . -B build-portable -DCHESS_PORTABLE=ON
+# Windows: cross-compile from Linux with MinGW-w64:
+#   cmake -S . -B build-windows -DCHESS_PORTABLE=ON \
+#         -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake
+#   or with MSVC, from a Developer prompt:  cmake -S . -B build -DCHESS_PORTABLE=ON
+option(CHESS_BUNDLE_SDL2 "Build SDL2 from source and link it statically" OFF)
+option(CHESS_PORTABLE    "Self-contained executable for machines without SDL2" OFF)
+set(CHESS_PORTABLE_ARCH "x86-64-v2" CACHE STRING
+    "-march baseline for CHESS_PORTABLE on x86-64 (x86-64-v3 = AVX2/BMI2, 2013+ CPUs)")
+if(CHESS_PORTABLE)
+    set(CHESS_BUNDLE_SDL2 ON)
+    # Static C runtime for MSVC (must be set before the targets are created).
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 # ---- Default build type (single-config generators only) --------------------
 # Only applies to a fresh, never-configured build directory -- an existing
@@ -45,7 +65,17 @@ if(MSVC)
 else()
     target_compile_options(chess_flags INTERFACE -Wall -Wextra
         $<$<BOOL:${CHESS_WERROR}>:-Werror>)
-    if(CHESS_NATIVE_ARCH)
+    if(CHESS_PORTABLE)
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+            target_compile_options(chess_flags INTERFACE -march=${CHESS_PORTABLE_ARCH})
+        endif()
+        # No libstdc++/libgcc .so to ship; MinGW also drops libwinpthread-1.dll.
+        if(MINGW)
+            target_link_options(chess_flags INTERFACE -static)
+        else()
+            target_link_options(chess_flags INTERFACE -static-libstdc++ -static-libgcc)
+        endif()
+    elseif(CHESS_NATIVE_ARCH)
         target_compile_options(chess_flags INTERFACE -march=native)
     endif()
 endif()
@@ -56,8 +86,26 @@ function(chess_configure tgt)
 endfunction()
 
 # ---- Sources ---------------------------------------------------------------
-find_package(SDL2 REQUIRED)
-set(CHESS_SDL2_TARGET SDL2::SDL2)
+if(CHESS_BUNDLE_SDL2)
+    include(FetchContent)
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON  CACHE BOOL "" FORCE)
+    set(SDL_TEST   OFF CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+    # The GUI only calls SDL_Init(SDL_INIT_VIDEO); skipping the rest also avoids
+    # SDL 2.30's PipeWire backend, which does not compile against current headers.
+    foreach(sub AUDIO JOYSTICK HAPTIC SENSOR)
+        set(SDL_${sub} OFF CACHE BOOL "" FORCE)
+    endforeach()
+    FetchContent_Declare(SDL2
+        URL      https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz
+        URL_HASH SHA256=24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4)
+    FetchContent_MakeAvailable(SDL2)
+    set(CHESS_SDL2_TARGET SDL2::SDL2-static)
+else()
+    find_package(SDL2 REQUIRED)
+    set(CHESS_SDL2_TARGET SDL2::SDL2)
+endif()
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp")
 
 # ---- Main engine -----------------------------------------------------------
