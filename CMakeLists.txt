@@ -13,8 +13,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # clangd / clang-tidy support
 option(CHESS_NATIVE_ARCH "Build with -march=native (binary may SIGILL on other CPUs)" ON)
 option(CHESS_WERROR      "Treat warnings as errors" ON)
 option(CHESS_LTO         "Link-time optimisation in Release builds" ON)
+option(CHESS_GUI         "Build the SDL2 GUI (OFF: a UCI/command-line engine that needs no SDL2)" ON)
 
-# Distribution builds. Neither needs SDL2 installed on the target machine.
+# Distribution builds. Neither needs SDL2 installed on the target machine (with CHESS_GUI=OFF SDL2 is not used at all).
 #   CHESS_BUNDLE_SDL2: download SDL2 and link it statically into the executable
 #                      (needs network access at configure time).
 #   CHESS_PORTABLE:    runs on any CPU of the baseline level below instead of
@@ -80,13 +81,32 @@ else()
     endif()
 endif()
 
+if(NOT CHESS_GUI)
+    target_compile_definitions(chess_flags INTERFACE CHESS_NO_GUI)
+endif()
+
+# `git describe` at configure time, shown by --version and in the UCI id.
+set(CHESS_VERSION "unknown")
+find_package(Git QUIET)
+if(Git_FOUND)
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE CHESS_GIT_DESCRIBE
+                    OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET RESULT_VARIABLE CHESS_GIT_RESULT)
+    if(CHESS_GIT_RESULT EQUAL 0 AND CHESS_GIT_DESCRIBE)
+        set(CHESS_VERSION "${CHESS_GIT_DESCRIBE}")
+    endif()
+endif()
+target_compile_definitions(chess_flags INTERFACE CHESS_VERSION="${CHESS_VERSION}")
+
 function(chess_configure tgt)
     target_include_directories(${tgt} PRIVATE include)
     target_link_libraries(${tgt} PRIVATE chess_flags)
 endfunction()
 
 # ---- Sources ---------------------------------------------------------------
-if(CHESS_BUNDLE_SDL2)
+if(NOT CHESS_GUI)
+    message(STATUS "CHESS_GUI=OFF: building without the SDL2 GUI")
+elseif(CHESS_BUNDLE_SDL2)
     include(FetchContent)
     set(SDL_SHARED OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC ON  CACHE BOOL "" FORCE)
@@ -107,11 +127,16 @@ else()
     set(CHESS_SDL2_TARGET SDL2::SDL2)
 endif()
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp")
+if(NOT CHESS_GUI)
+    list(FILTER SRC_FILES EXCLUDE REGEX ".*/gui\\.cpp$")
+endif()
 
 # ---- Main engine -----------------------------------------------------------
 add_executable(chess ${SRC_FILES})
 chess_configure(chess)
-target_link_libraries(chess PRIVATE ${CHESS_SDL2_TARGET})
+if(CHESS_GUI)
+    target_link_libraries(chess PRIVATE ${CHESS_SDL2_TARGET})
+endif()
 
 # ---- SPSA search-constant tuning build (tools/spsa.py) ---------------------
 # The same engine with every SEARCH_PARAM exposed as a UCI spin option.
@@ -119,7 +144,9 @@ target_link_libraries(chess PRIVATE ${CHESS_SDL2_TARGET})
 add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES})
 chess_configure(chess_spsa)
 target_compile_definitions(chess_spsa PRIVATE SPSA)
-target_link_libraries(chess_spsa PRIVATE ${CHESS_SDL2_TARGET})
+if(CHESS_GUI)
+    target_link_libraries(chess_spsa PRIVATE ${CHESS_SDL2_TARGET})
+endif()
 
 # ---- Texel tuner (tools/tune.cpp) ------------------------------------------
 # Not part of the default build: cmake --build <dir> --target chess_tune.

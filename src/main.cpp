@@ -14,6 +14,7 @@
 #include "opening_book.hpp"
 #include "pgn.hpp"
 #include "uci.hpp"
+#include "version.hpp"
 
 namespace {
 
@@ -298,9 +299,41 @@ int runReplay(const std::string& path, const std::string& side) {
     return 0;
 }
 
+void printUsage(std::FILE* out, const char* program) {
+    std::fprintf(out,
+                 "ChessGame %s\n"
+                 "usage: %s [mode]\n"
+                 "  (no mode)                       open the GUI\n"
+                 "  --uci                           UCI engine on stdin/stdout\n"
+                 "  --bench [depth]                 fixed-depth search benchmark (default 6)\n"
+                 "  --perft [depth]                 node count from the start position\n"
+                 "  --perft-suite [depth]           perft against published counts\n"
+                 "  --verify-eval [depth]           incremental eval/hash/bitboards vs from-scratch\n"
+                 "  --verify-book                   list the opening book's first moves\n"
+                 "  --replay <pgn> [white|black|both]   re-search the positions of a game\n"
+                 "  --selfplay <games> [levelA] [levelB]   bot matches, levels easy|medium|hard|expert\n"
+                 "  --version, --help\n",
+                 CHESS_VERSION, program);
+}
+
 } // namespace
 
+#ifdef CHESS_NO_GUI
+int runGui() {
+    std::fprintf(stderr, "this build has no GUI (CHESS_GUI=OFF); run it with --uci\n");
+    return 1;
+}
+#endif
+
 int main(int argc, char** argv) {
+    if (argc >= 2 && (std::strcmp(argv[1], "--version") == 0 || std::strcmp(argv[1], "-v") == 0)) {
+        std::printf("ChessGame %s\n", CHESS_VERSION);
+        return 0;
+    }
+    if (argc >= 2 && (std::strcmp(argv[1], "--help") == 0 || std::strcmp(argv[1], "-h") == 0)) {
+        printUsage(stdout, argv[0]);
+        return 0;
+    }
     if (argc >= 2 && std::strcmp(argv[1], "--perft") == 0) {
         int depth = argc >= 3 ? std::atoi(argv[2]) : 4;
         return runPerft(depth);
@@ -343,6 +376,11 @@ int main(int argc, char** argv) {
             return 1;
         }
         return runSelfplay(games, levelA, levelB);
+    }
+    if (argc >= 2) { // an unknown option must not silently open a window
+        std::fprintf(stderr, "unknown option '%s'\n", argv[1]);
+        printUsage(stderr, argv[0]);
+        return 2;
     }
     return runGui();
 }

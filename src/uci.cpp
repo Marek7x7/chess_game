@@ -21,6 +21,7 @@
 #include "board.hpp"
 #include "move.hpp"
 #include "transposition_table.hpp"
+#include "version.hpp"
 
 namespace {
 
@@ -150,7 +151,7 @@ int runUci() {
 
         try {
             if (cmd == "uci") {
-                std::printf("id name ChessGame\n");
+                std::printf("id name ChessGame %s\n", CHESS_VERSION);
                 std::printf("id author Marek\n");
                 std::printf("option name Hash type spin default %d min 1 max %d\n", hashMB, kMaxHashMB);
                 std::printf("option name Threads type spin default %d min 1 max %d\n", threadsOption, maxThreads);
