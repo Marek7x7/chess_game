@@ -1,0 +1,77 @@
+# The rule-3 gates on every push: perft, the incremental-eval check, the bench signature and the UCI
+# robustness suite (tools/uci_conformance.py). Written without being able to run GitHub Actions: if a
+# job fails for a reason that is not a real failure (a runner package name, say), fix the workflow.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libsdl2-dev
+      # -Werror stays off here so that a newer compiler's new warning does not fail the build; the
+      # zero-warning rule is checked on the development machine.
+      - name: Build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCHESS_WERROR=OFF && cmake --build build -j
+      - name: Gates
+        run: ctest --test-dir build --output-on-failure
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: address-undefined
+            flags: -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+          - name: thread
+            flags: -fsanitize=thread -O1 -fno-omit-frame-pointer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++
+      - name: ThreadSanitizer needs a smaller address-space randomisation
+        if: matrix.name == 'thread'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Build (Debug, no GUI, no LTO)
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCHESS_GUI=OFF -DCHESS_LTO=OFF -DCHESS_WERROR=OFF
+          -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" && cmake --build build -j
+      - name: Gates (shallower than Release: the sanitizers are slow)
+        run: |
+          build/chess --bench 6
+          build/chess --verify-eval 3
+          build/chess --perft-suite 3
+          python3 tools/uci_conformance.py build/chess
+
+  windows:
+    # Cross-compiles the static, portable Windows .exe with llvm-mingw and runs the UCI suite under Wine.
+    runs-on: ubuntu-latest
+    continue-on-error: true  # not yet seen running on GitHub
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cmake and Wine
+        run: sudo apt-get update && sudo apt-get install -y cmake wine64
+      - name: Get llvm-mingw
+        run: |
+          mkdir -p "$RUNNER_TEMP/llvm-mingw" && cd "$RUNNER_TEMP/llvm-mingw"
+          curl -sL -o llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/llvm-mingw-20261006-ucrt-ubuntu-22.04-x86_64.tar.xz
+          tar xf llvm-mingw.tar.xz
+          echo "$PWD/llvm-mingw-20261006-ucrt-ubuntu-22.04-x86_64/bin" >> "$GITHUB_PATH"
+      - name: Build
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCHESS_PORTABLE=ON
+          -DCMAKE_TOOLCHAIN_FILE=cmake/llvm-mingw.cmake && cmake --build build -j
+      - name: UCI suite under Wine
+        env:
+          WINEDEBUG: -all
+        run: |
+          printf '#!/bin/sh\nexec wine "%s/build/chess.exe" "$@"\n' "$PWD" > build/chess-wine
+          chmod +x build/chess-wine
+          wine build/chess.exe --version   # creates the Wine prefix, which takes minutes the first time
+          python3 tools/uci_conformance.py build/chess-wine
