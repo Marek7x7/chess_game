@@ -1726,6 +1726,7 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     // std::vector<Move>&, so convert once here at the root (not a hot path).
     MoveList rootMoveList = board.legalMoves(aiColor);
     std::vector<Move> rootMoves(rootMoveList.begin(), rootMoveList.end());
+    if (rootMoves.empty()) return Move{}; // checkmate or stalemate: the caller should not have asked
     if (rootMoves.size() == 1) return rootMoves.front();
 
     if (g_aiDebugLog) {
