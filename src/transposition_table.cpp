@@ -55,11 +55,11 @@ TTEntry unpack(uint64_t key, uint64_t data) {
 
 } // namespace
 
-TranspositionTable::TranspositionTable(size_t sizePowerOfTwo) : bucketMask((sizePowerOfTwo - 1) & ~size_t(1)) {
+TranspositionTable::TranspositionTable(size_t sizePowerOfTwo) : bucketMask((sizePowerOfTwo - 1) & ~(kBucketSlots - 1)) {
     static std::atomic<uint64_t> nextId{1};
     id = nextId++;
-    if (sizePowerOfTwo < 2 || (sizePowerOfTwo & (sizePowerOfTwo - 1)) != 0) {
-        throw std::invalid_argument("TranspositionTable: sizePowerOfTwo must be a power of two, at least 2");
+    if (sizePowerOfTwo < kBucketSlots || (sizePowerOfTwo & (sizePowerOfTwo - 1)) != 0) {
+        throw std::invalid_argument("TranspositionTable: sizePowerOfTwo must be a power of two, at least 4");
     }
     size_t bytes = (sizePowerOfTwo * sizeof(Slot) + 63) & ~size_t(63); // aligned_alloc wants a multiple of 64
 #ifdef _WIN32
@@ -74,7 +74,7 @@ TranspositionTable::TranspositionTable(size_t sizePowerOfTwo) : bucketMask((size
 
 bool TranspositionTable::probe(uint64_t key, TTEntry& out) const {
     const Slot* bucket = &table[key & bucketMask];
-    for (int i = 0; i < 2; i++) {
+    for (size_t i = 0; i < kBucketSlots; i++) {
         uint64_t data = bucket[i].data.load(std::memory_order_relaxed);
         uint64_t check = bucket[i].check.load(std::memory_order_relaxed);
         if ((check ^ data) == key && storedDepth(data) >= 0) {
@@ -86,20 +86,28 @@ bool TranspositionTable::probe(uint64_t key, TTEntry& out) const {
 }
 
 // If the bucket already holds this position, updates it in place -- unless
-// that's a deeper result, which is kept. Otherwise the new result evicts the
-// less valuable of the two slots.
+// that's a deeper result, which is kept (and marked as belonging to this search, so that being looked at again
+// protects it from being evicted as a leftover). Otherwise the new result evicts the least valuable of the
+// four slots.
 void TranspositionTable::store(uint64_t key, int depth, int score, TTFlag flag, const Move& best, bool hasMove,
                                int eval) {
     Slot* bucket = &table[key & bucketMask];
-    uint64_t old[2];
-    for (int i = 0; i < 2; i++) old[i] = bucket[i].data.load(std::memory_order_relaxed);
+    uint64_t old[kBucketSlots];
+    for (size_t i = 0; i < kBucketSlots; i++) old[i] = bucket[i].data.load(std::memory_order_relaxed);
 
     Slot* target = nullptr;
-    for (int i = 0; i < 2 && !target; i++) {
+    for (size_t i = 0; i < kBucketSlots && !target; i++) {
         bool samePosition =
             (bucket[i].check.load(std::memory_order_relaxed) ^ old[i]) == key && storedDepth(old[i]) >= 0;
         if (!samePosition) continue;
-        if (depth < storedDepth(old[i])) return;
+        if (depth < storedDepth(old[i])) {
+            if (storedGeneration(old[i]) != (generation & 15)) {
+                const uint64_t refreshed = (old[i] & ~(uint64_t(15) << 60)) | ((generation & 15) << 60);
+                bucket[i].data.store(refreshed, std::memory_order_relaxed);
+                bucket[i].check.store(key ^ refreshed, std::memory_order_relaxed);
+            }
+            return;
+        }
         if (eval == kTTNoEval) eval = storedEval(old[i]); // keep an eval this position already has
         target = &bucket[i];
     }
@@ -109,7 +117,10 @@ void TranspositionTable::store(uint64_t key, int depth, int score, TTFlag flag, 
         auto worth = [&](uint64_t data) {
             return storedDepth(data) - (storedGeneration(data) == generation ? 0 : 256);
         };
-        target = worth(old[0]) <= worth(old[1]) ? &bucket[0] : &bucket[1];
+        size_t victim = 0;
+        for (size_t i = 1; i < kBucketSlots; i++)
+            if (worth(old[i]) < worth(old[victim])) victim = i;
+        target = &bucket[victim];
     }
     uint64_t data = pack(depth, score, flag, best, hasMove, generation, eval);
     target->data.store(data, std::memory_order_relaxed);
@@ -117,7 +128,7 @@ void TranspositionTable::store(uint64_t key, int depth, int score, TTFlag flag, 
 }
 
 int TranspositionTable::hashfull() const {
-    const size_t slots = std::min<size_t>(2000, bucketMask + 2); // bucketMask + 2 is the slot count
+    const size_t slots = std::min<size_t>(2000, bucketMask + kBucketSlots); // bucketMask + 4 is the slot count
     size_t used = 0;
     for (size_t i = 0; i < slots; i++) {
         const uint64_t data = table[i].data.load(std::memory_order_relaxed);
