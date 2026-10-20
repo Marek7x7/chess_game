@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+"""UCI conformance and robustness checks for the engine (python3 stdlib only).
+
+  python3 tools/uci_conformance.py build-release/chess
+
+Every case is a way a GUI or tournament manager can hurt an engine: a position
+with no legal move, a malformed FEN, absurd option values, a clock that has run
+out, stdin closing in the middle of a search. The engine must answer, stay
+alive and exit cleanly. Exit status 0 only if every case passes.
+
+Set CHESS_TEST_BIG_HASH=1 to also try `Hash 100000000` (clamped to 4096 MB, so
+it needs about 2 GB of memory).
+"""
+import os
+import queue
+import re
+import subprocess
+import sys
+import threading
+import time
+
+BESTMOVE = re.compile(r"^bestmove (?:[a-h][1-8][a-h][1-8][qrbn]?|0000)$")
+MATE = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"        # black to move, stalemated
+BAD_FENS = ["garbage", "", "9999999/8/8/8/8/8/8/8 w - - 0 1", "8/8/8/8/8/8/8/8 w - - 0 1",
+            "8/8/8/8/8/8/8/4K3 w - - 0 1", "P3k3/8/8/8/8/8/8/4K3 w - - 0 1",
+            "4k3/8/8/8/8/8/8/4R1K1 w - - 0 1",
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQxq - 0 1"]
+
+
+class Engine:
+    def __init__(self, path):
+        self.p = subprocess.Popen([path, "--uci"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT, text=True, bufsize=1)
+        self.q = queue.Queue()
+        threading.Thread(target=self._pump, daemon=True).start()
+
+    def _pump(self):
+        for line in self.p.stdout:
+            self.q.put(line.rstrip("\n"))
+
+    def send(self, cmd):
+        self.p.stdin.write(cmd + "\n")
+        self.p.stdin.flush()
+
+    def read_until(self, prefix, timeout=20):
+        """Lines up to and including the first one starting with prefix (None as the last entry on timeout)."""
+        out, end = [], time.time() + timeout
+        while time.time() < end:
+            try:
+                line = self.q.get(timeout=0.05)
+            except queue.Empty:
+                continue
+            out.append(line)
+            if line.startswith(prefix):
+                return out
+        out.append(None)
+        return out
+
+    def drain(self, wait=0.0):
+        time.sleep(wait)
+        out = []
+        while not self.q.empty():
+            out.append(self.q.get())
+        return out
+
+    def alive(self):
+        return self.p.poll() is None
+
+    def ready(self):
+        self.send("isready")
+        return self.read_until("readyok", 10)[-1] == "readyok"
+
+    def close(self):
+        try:
+            self.send("quit")
+        except Exception:
+            pass
+        try:
+            self.p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.p.kill()
+
+
+def start(path, options=()):
+    e = Engine(path)
+    e.send("uci")
+    e.read_until("uciok")
+    for o in options:
+        e.send("setoption name " + o)
+    return e
+
+
+def bestmove(lines):
+    last = lines[-1] if lines else None
+    return last if last and BESTMOVE.match(last) else None
+
+
+def last_depth_info(lines):
+    infos = [l for l in lines if l and l.startswith("info depth")]
+    return infos[-1] if infos else ""
+
+
+CASES = []
+
+
+def case(fn):
+    CASES.append(fn)
+    return fn
+
+
+@case
+def handshake(path):
+    e = Engine(path)
+    e.send("uci")
+    out = e.read_until("uciok")
+    e.close()
+    text = "\n".join(l for l in out if l)
+    assert out[-1] == "uciok", "no uciok"
+    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead"):
+        assert f"option name {opt} " in text, f"option {opt} not advertised"
+
+
+@case
+def search_returns_a_move(path):
+    e = start(path, ["Threads value 1"])
+    e.send("position startpos moves e2e4 e7e5")
+    e.send("go depth 4")
+    out = e.read_until("bestmove")
+    e.close()
+    assert bestmove(out) and bestmove(out) != "bestmove 0000", f"bad answer {out[-1]!r}"
+    info = last_depth_info(out)
+    for field in (" time ", " nodes ", " nps ", " hashfull ", " pv "):
+        assert field in info, f"info line lacks{field!r}: {info!r}"
+
+
+@case
+def no_legal_move_positions(path):
+    e = start(path, ["Threads value 1"])
+    for fen in (MATE,):
+        e.send(f"position fen {fen}")
+        e.send("go depth 3")
+        assert bestmove(e.read_until("bestmove")) == "bestmove 0000", "stalemate: no bestmove 0000"
+    e.send("position startpos moves f2f3 e7e5 g2g4 d8h4")  # fool's mate
+    e.send("go movetime 100")
+    assert bestmove(e.read_until("bestmove")) == "bestmove 0000", "checkmate: no bestmove 0000"
+    assert e.alive() and e.ready(), "engine died or stopped answering"
+    e.close()
+
+
+@case
+def bad_fens_are_survived(path):
+    e = start(path, ["Threads value 1"])
+    for fen in BAD_FENS:
+        e.send(f"position fen {fen}")
+        e.send("go depth 2")
+        out = e.read_until("bestmove")
+        assert e.alive(), f"engine died on FEN {fen!r}"
+        assert bestmove(out) == "bestmove 0000", f"FEN {fen!r} was accepted: {out[-1]!r}"
+    e.send("position startpos")  # a valid position recovers
+    e.send("go depth 2")
+    assert bestmove(e.read_until("bestmove")) not in (None, "bestmove 0000"), "no recovery after bad FENs"
+    e.send("position fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -")  # four fields only
+    e.send("go depth 2")
+    assert bestmove(e.read_until("bestmove")) not in (None, "bestmove 0000"), "four-field FEN rejected"
+    e.close()
+
+
+@case
+def absurd_options(path):
+    e = start(path, ["Threads value 1"])
+    values = ["Hash value lots", "Hash value -5", "Hash value 0", "Threads value xyz", "Threads value 99999999",
+              "Threads value -3", "Move Overhead value -1", "No Such Option value 1"]
+    if os.environ.get("CHESS_TEST_BIG_HASH"):
+        values.append("Hash value 100000000")
+    for v in values:
+        e.send("setoption name " + v)
+        assert e.alive() and e.ready(), f"engine died or hung on setoption {v!r}"
+    e.send("setoption name Threads value 1")
+    e.send("position startpos")
+    e.send("go depth 3")
+    assert bestmove(e.read_until("bestmove", 60)), "no move after the option abuse"
+    e.close()
+
+
+@case
+def exhausted_clock(path):
+    for go in ("go wtime -100 btime 1000", "go wtime 0 btime 0", "go movetime 0", "go btime 5000 wtime 50 movestogo 1"):
+        e = start(path, ["Threads value 1"])
+        e.send("position startpos")
+        t0 = time.time()
+        e.send(go)
+        out = e.read_until("bestmove", 10)
+        e.close()
+        assert bestmove(out), f"{go!r}: no bestmove"
+        assert time.time() - t0 < 3, f"{go!r}: took {time.time() - t0:.1f} s"
+
+
+@case
+def node_limit(path):
+    e = start(path, ["Threads value 1"])
+    e.send("position startpos")
+    t0 = time.time()
+    e.send("go nodes 50000")
+    out = e.read_until("bestmove", 30)
+    e.close()
+    assert bestmove(out), "no bestmove"
+    assert time.time() - t0 < 5, "go nodes ran far too long"
+    nodes = [int(m.group(1)) for l in out if l for m in [re.search(r" nodes (\d+) ", l)] if m]
+    assert nodes and max(nodes) <= 50000, f"searched past the limit: {nodes}"
+
+
+@case
+def searchmoves(path):
+    e = start(path, ["Threads value 1"])
+    e.send("position startpos")
+    e.send("go depth 5 searchmoves a2a3")
+    assert bestmove(e.read_until("bestmove")) == "bestmove a2a3", "searchmoves a2a3 ignored"
+    e.send("go depth 5 searchmoves a2a3 b1c3")
+    assert bestmove(e.read_until("bestmove")) in ("bestmove a2a3", "bestmove b1c3"), "searchmoves pair ignored"
+    e.close()
+
+
+@case
+def go_depth_is_exact(path):
+    e = start(path, ["Threads value 1"])
+    e.send("position fen 8/8/4k3/8/8/4K3/8/8 w - - 0 1")
+    e.send("go depth 6")
+    out = e.read_until("bestmove")
+    e.close()
+    depths = [int(m.group(1)) for l in out if l for m in [re.match(r"info depth (\d+) ", l)] if m]
+    assert depths and max(depths) == 6, f"go depth 6 reached depth {max(depths) if depths else None}"
+
+
+@case
+def infinite_waits_for_stop(path):
+    e = start(path, ["Threads value 1"])
+    e.send("position fen 6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1")
+    e.send("go infinite depth 4")  # a search that is over in milliseconds
+    early = e.drain(1.5)
+    assert not any(l.startswith("bestmove") for l in early), "bestmove before stop"
+    e.send("stop")
+    assert bestmove(e.read_until("bestmove", 5)), "no bestmove after stop"
+    e.close()
+
+
+@case
+def eof_during_search(path):
+    e = start(path, ["Threads value 2"])
+    e.send("position startpos")
+    e.send("go infinite")
+    time.sleep(0.3)
+    e.p.stdin.close()
+    try:
+        rc = e.p.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        e.p.kill()
+        raise AssertionError("still running 10 s after stdin closed")
+    assert rc == 0, f"exit status {rc}"
+
+
+@case
+def go_while_searching(path):
+    e = start(path, ["Threads value 1"])
+    e.send("position startpos")
+    e.send("go infinite")
+    time.sleep(0.3)
+    e.send("go depth 3")  # a GUI that forgot "stop"
+    first = e.read_until("bestmove", 10)
+    second = e.read_until("bestmove", 10)
+    e.close()
+    assert bestmove(first) and bestmove(second), "a second go while searching hung or lost a bestmove"
+
+
+@case
+def new_game_and_moves(path):
+    e = start(path, ["Threads value 1"])
+    for _ in range(2):
+        e.send("ucinewgame")
+        e.send("position startpos moves e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 e2e9")  # the last move is illegal
+        e.send("go depth 3")
+        assert bestmove(e.read_until("bestmove")), "no move after ucinewgame/position"
+    e.close()
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit(__doc__)
+    path = os.path.abspath(sys.argv[1])
+    failed = 0
+    for fn in CASES:
+        t0 = time.time()
+        try:
+            fn(path)
+            print(f"PASS {fn.__name__} ({time.time() - t0:.1f}s)")
+        except AssertionError as err:
+            failed += 1
+            print(f"FAIL {fn.__name__}: {err}")
+        except Exception as err:  # a crashed pipe etc.
+            failed += 1
+            print(f"FAIL {fn.__name__}: {type(err).__name__}: {err}")
+    print("ALL PASS" if not failed else f"{failed} of {len(CASES)} FAILED")
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()

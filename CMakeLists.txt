@@ -133,3 +133,24 @@ if(OpenMP_CXX_FOUND)
     target_compile_definitions(chess_tune PRIVATE TUNING)
     target_link_libraries(chess_tune PRIVATE OpenMP::OpenMP_CXX)
 endif()
+
+# ---- Correctness gates as tests (ctest) -----------------------------------
+# CLAUDE.md rule 3 in one command:  ctest --test-dir <build-dir> --output-on-failure
+# Perft against published node counts, the incremental-eval/hash self-check, the bench signature
+# (tools/bench_signature.txt) and the UCI robustness cases (tools/uci_conformance.py, needs python3).
+option(CHESS_BUILD_TESTS "Register the correctness gates with CTest" ON)
+if(CHESS_BUILD_TESTS)
+    enable_testing()
+    add_test(NAME perft COMMAND chess --perft-suite 5)
+    add_test(NAME verify_eval COMMAND chess --verify-eval 4)
+    set_tests_properties(perft verify_eval PROPERTIES PASS_REGULAR_EXPRESSION "ALL PASS" TIMEOUT 900)
+    add_test(NAME bench_signature
+             COMMAND ${CMAKE_COMMAND} -DCHESS=$<TARGET_FILE:chess>
+                     -DEXPECTED=${CMAKE_SOURCE_DIR}/tools/bench_signature.txt -P ${CMAKE_SOURCE_DIR}/tools/check_bench.cmake)
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_FOUND AND NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME uci_conformance
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/uci_conformance.py $<TARGET_FILE:chess>)
+        set_tests_properties(uci_conformance PROPERTIES TIMEOUT 300)
+    endif()
+endif()
