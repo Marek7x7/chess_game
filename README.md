@@ -39,6 +39,9 @@ cmake --build build-windows -j
 cmake -S . -B build-uci -DCHESS_GUI=OFF && cmake --build build-uci -j
 ```
 
+For about 5% more speed (same search, identical bench signature) `tools/build_pgo.sh [build-dir]` makes a
+profile-guided GCC build: instrument, train on the benchmark searches, rebuild.
+
 Extra targets that are not built by default: `chess_spsa` (search constants exposed as UCI options, for
 `tools/spsa.py`) and `chess_tune` (the Texel evaluation tuner, needs OpenMP).
 
