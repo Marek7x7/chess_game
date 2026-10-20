@@ -15,13 +15,6 @@
 
 namespace {
 
-const int kBishopDirs[4][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
-const int kRookDirs[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-const int kQueenDirs[8][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-                               {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-const int kKnightOffsets[8][2] = {{1, 2}, {2, 1}, {2, -1}, {1, -2},
-                                    {-1, -2}, {-2, -1}, {-2, 1}, {-1, 2}};
-
 int pieceTypeIndex(PieceType t) { return static_cast<int>(t); }
 
 // Phase weight of remaining non-pawn material (knight/bishop=1, rook=2,
