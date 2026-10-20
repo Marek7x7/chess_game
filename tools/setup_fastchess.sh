@@ -12,7 +12,13 @@ if [ -x "$DEST/fastchess" ]; then
     exit 0
 fi
 
-git clone --depth 1 https://github.com/Disservin/fastchess.git "$DEST"
+# Pinned: every SPRT in STRENGTH_LOG.md ran on this build (fastchess alpha 1.8.2, 60d7a7a), and a newer one
+# could change defaults (the SPRT model, for one) under the same command line.
+FASTCHESS_COMMIT=60d7a7a26c6b0582a15c112fb29a1829bef2adb3
+git init -q "$DEST"
+git -C "$DEST" remote add origin https://github.com/Disservin/fastchess.git
+git -C "$DEST" fetch -q --depth 1 origin "$FASTCHESS_COMMIT"
+git -C "$DEST" checkout -q FETCH_HEAD
 # LDFLAGS override: fastchess's Makefile unconditionally links -lstdc++fs,
 # which GCC 9+ no longer ships as a separate library (std::filesystem moved
 # into libstdc++ itself) -- linking fails on this system's GCC 15.2.0

@@ -36,7 +36,8 @@ def play(binary, a, b, args):
                 "option.Hash=32", "option.OwnBook=false"] + opts
     cmd = [FASTCHESS] + eng("plus", a) + eng("minus", b) + [
         "-each", f"tc={args.tc}", "-openings", f"file={OPENINGS}", "format=pgn", "order=random",
-        "-rounds", str(args.rounds), "-repeat", "-concurrency", str(args.concurrency), "-recover"]
+        "-rounds", str(args.rounds), "-repeat", "-concurrency", str(args.concurrency), "-recover",
+        "-config", "outname=" + os.path.join(REPO, ".sprt-work", "spsa-config.json")]  # not ./config.json
     out = subprocess.run(cmd, capture_output=True, text=True).stdout
     games = re.findall(r"Games: (\d+), Wins: (\d+), Losses: (\d+), Draws: (\d+)", out)
     if not games:
