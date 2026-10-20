@@ -19,6 +19,12 @@ public:
     // input to be well-formed since callers pass fixed literal FEN strings.
     static Board fromFEN(const std::string& fen);
 
+    // For input that may be malformed or illegal (a UCI "position fen"): returns false, leaving `out`
+    // untouched, unless the text is a well-formed FEN of a legal setup (one king each, no pawn on a
+    // back rank, the side not to move not in check, plausible piece counts). The castling field may be
+    // missing and is cut down to the rights the pieces allow; so is an en passant square no pawn can use.
+    static bool tryFromFEN(const std::string& fen, Board& out);
+
     Piece at(int x, int y) const { return squares[x][y]; }
 
     // Bitboards (see bitboard.hpp) of where `color`'s pieces of a type stand, of

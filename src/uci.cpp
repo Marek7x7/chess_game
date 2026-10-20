@@ -82,6 +82,7 @@ int runUci() {
     std::setvbuf(stdout, nullptr, _IOLBF, 0);
 
     Board board;
+    bool positionValid = true; // false after a "position fen" that could not be parsed, until the next valid one
     std::vector<uint64_t> gameHistory; // hashKey() of every position from "position", for repetition detection
     int hashMB = 224; // UCI "Hash" default; the GUI and --selfplay use kTTSize (ai.hpp) instead
     auto tt = std::make_unique<TranspositionTable>(hashMBToEntries(hashMB));
@@ -170,6 +171,7 @@ int runUci() {
             size_t i = 1;
             if (i < tok.size() && tok[i] == "startpos") {
                 board = Board();
+                positionValid = true;
                 i++;
             } else if (i < tok.size() && tok[i] == "fen") {
                 i++;
@@ -179,7 +181,15 @@ int runUci() {
                     fen += tok[i];
                     i++;
                 }
-                board = Board::fromFEN(fen);
+                // A malformed or illegal FEN must not crash the engine or leave the old position in
+                // place under the new moves: no position is set until a valid one arrives.
+                if (!Board::tryFromFEN(fen, board)) {
+                    positionValid = false;
+                    std::printf("info string invalid FEN, position ignored: %s\n", fen.c_str());
+                    std::fflush(stdout);
+                    continue;
+                }
+                positionValid = true;
             }
             gameHistory.assign(1, board.hashKey());
             if (i < tok.size() && tok[i] == "moves") {
@@ -195,6 +205,11 @@ int runUci() {
             joinSearch(); // defensive: finish any stray prior search first
             stopFlag.store(false);
 
+            if (!positionValid) {
+                std::printf("info string no valid position\nbestmove 0000\n");
+                std::fflush(stdout);
+                continue;
+            }
             int maxDepth = 64;
             long long timeBudgetMs = -1;
             long long softTimeMs = 0;

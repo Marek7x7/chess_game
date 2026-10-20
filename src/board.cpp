@@ -4,8 +4,11 @@
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <ostream>
 #include <random>
+#include <sstream>
+#include <vector>
 
 #include "bitboard.hpp"
 #include "tune.hpp"
@@ -503,6 +506,93 @@ Board Board::fromFEN(const std::string& fen) {
     board.recomputeHash();
     board.recomputeEval();
     return board;
+}
+
+bool Board::tryFromFEN(const std::string& fen, Board& out) {
+    std::istringstream in(fen);
+    std::vector<std::string> field;
+    for (std::string t; in >> t;) field.push_back(t);
+    if (field.size() < 2 || field.size() > 6) return false;
+
+    // Piece placement: eight ranks of exactly eight squares each.
+    char grid[8][8] = {}; // [rank 1..8 as 0..7][file]; 0 = empty
+    int rank = 7, file = 0, kings[2] = {0, 0};
+    int count[2][7] = {}; // [color][pawn, knight, bishop, rook, queen, king] by index 1..6
+    for (char c : field[0]) {
+        if (c == '/') {
+            if (file != 8 || rank == 0) return false;
+            rank--;
+            file = 0;
+        } else if (c >= '1' && c <= '8') {
+            file += c - '0';
+            if (file > 8) return false;
+        } else {
+            const char lower = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            const char* kinds = "pnbrqk";
+            const char* hit = lower ? std::strchr(kinds, lower) : nullptr;
+            if (!hit || file >= 8) return false;
+            const int color = std::isupper(static_cast<unsigned char>(c)) ? 0 : 1;
+            const int kind = static_cast<int>(hit - kinds) + 1;
+            if (kind == 1 && (rank == 0 || rank == 7)) return false; // a pawn on a back rank
+            grid[rank][file++] = c;
+            count[color][kind]++;
+            if (kind == 6) kings[color]++;
+        }
+    }
+    if (rank != 0 || file != 8 || kings[0] != 1 || kings[1] != 1) return false;
+    for (int color = 0; color < 2; color++) {
+        int pieces = 0;
+        for (int kind = 1; kind <= 6; kind++) pieces += count[color][kind];
+        // Every piece beyond the starting set must have come from a pawn.
+        const int promoted = std::max(0, count[color][2] - 2) + std::max(0, count[color][3] - 2) +
+                             std::max(0, count[color][4] - 2) + std::max(0, count[color][5] - 1);
+        if (pieces > 16 || count[color][1] > 8 || count[color][1] + promoted > 8) return false;
+    }
+
+    if (field[1] != "w" && field[1] != "b") return false;
+    const bool whiteToMove = field[1] == "w";
+
+    // Castling rights: only the letters KQkq (or "-"), and only those the king and rook squares allow.
+    std::string castling = "-";
+    if (field.size() >= 3) {
+        if (field[2] != "-" && field[2].find_first_not_of("KQkq") != std::string::npos) return false;
+        std::string kept;
+        for (char c : std::string("KQkq")) {
+            if (field[2].find(c) == std::string::npos) continue;
+            const bool white = std::isupper(static_cast<unsigned char>(c)) != 0;
+            const int r = white ? 0 : 7;
+            const char king = white ? 'K' : 'k', rook = white ? 'R' : 'r';
+            const int rookFile = (c == 'K' || c == 'k') ? 7 : 0;
+            if (grid[r][4] == king && grid[r][rookFile] == rook) kept += c;
+        }
+        if (!kept.empty()) castling = kept;
+    }
+
+    // En passant: a square on the right rank, behind an enemy pawn that just moved two squares.
+    std::string ep = "-";
+    if (field.size() >= 4 && field[3] != "-") {
+        const std::string& e = field[3];
+        if (e.size() != 2 || e[0] < 'a' || e[0] > 'h' || (e[1] != '3' && e[1] != '6')) return false;
+        const int f = e[0] - 'a';
+        const bool rankFits = whiteToMove ? e[1] == '6' : e[1] == '3';
+        const int pawnRank = whiteToMove ? 4 : 3, behindRank = whiteToMove ? 5 : 2, fromRank = whiteToMove ? 6 : 1;
+        const char enemyPawn = whiteToMove ? 'p' : 'P';
+        if (rankFits && grid[pawnRank][f] == enemyPawn && grid[behindRank][f] == 0 && grid[fromRank][f] == 0)
+            ep = e;
+    }
+
+    std::string halfmove = "0";
+    if (field.size() >= 5) {
+        if (field[4].find_first_not_of("0123456789") != std::string::npos || field[4].size() > 3) return false;
+        halfmove = field[4];
+    }
+    if (field.size() == 6 && (field[5].find_first_not_of("0123456789") != std::string::npos || field[5].size() > 5))
+        return false;
+
+    const Board candidate = fromFEN(field[0] + " " + field[1] + " " + castling + " " + ep + " " + halfmove);
+    if (candidate.isInCheck(opponent(candidate.sideToMove()))) return false; // the side that just moved left its king attacked
+    out = candidate;
+    return true;
 }
 
 void Board::addSlidingMoves(MoveList& moves, int x, int y, Color color, int firstDir, int numDirs,
