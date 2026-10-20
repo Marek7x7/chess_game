@@ -185,17 +185,22 @@ const std::vector<BenchPosition>& benchPositions() {
 
 int runBench(int depth) {
     long long totalNodes = 0;
+    double totalSecs = 0;
     for (const BenchPosition& bp : benchPositions()) {
         Board board = bp.fen ? Board::fromFEN(bp.fen) : Board();
-        auto start = std::chrono::steady_clock::now();
         BenchResult r = benchSearch(board, board.sideToMove(), depth);
-        double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        double secs = r.seconds;
         double nps = secs > 0 ? r.nodes / secs : 0;
         std::string mv = squareStr(r.move.fromX, r.move.fromY) + squareStr(r.move.toX, r.move.toY);
         std::printf("%-22s depth=%d nodes=%-10lld time=%.3fs nps=%.0f score=%d move=%s\n", bp.name, depth, r.nodes,
                      secs, nps, r.score, mv.c_str());
         totalNodes += r.nodes;
+        totalSecs += secs;
     }
+    // Speed over all positions together, search time only (the 64 MiB table's allocation is outside the
+    // clock). Depth 6 is far too short to time (a tenth of a second): use `--bench 12` or more.
+    std::printf("BENCH SPEED: nodes=%lld time=%.3fs nps=%.0f\n", totalNodes, totalSecs,
+                totalSecs > 0 ? totalNodes / totalSecs : 0.0);
     // Stable, single-line summary for scripted regression checks: a pure
     // speedup commit must reproduce this line byte-for-byte across builds
     // (same tree, same node count); anything else means search behavior

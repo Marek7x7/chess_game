@@ -1685,7 +1685,9 @@ BenchResult benchSearch(const Board& board, Color color, int depth) {
     Board local = board;
     TranspositionTable tt(kTTSize);
     auto deadline = std::chrono::steady_clock::now() + std::chrono::hours(24);
+    const auto start = std::chrono::steady_clock::now();
     RootSearchResult r = searchRootFull(local, color, rootMoves, depth, deadline, tt, 0);
+    result.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     result.move = r.move;
     result.score = r.score;
     result.nodes = r.nodes;

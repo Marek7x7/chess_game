@@ -118,6 +118,7 @@ struct BenchResult {
     Move move{};
     int score = 0;
     long long nodes = 0;
+    double seconds = 0; // the search alone: the table is allocated and cleared before the clock starts
 };
 
 // Single-threaded, fixed-depth (no time cutoff) search used only for
