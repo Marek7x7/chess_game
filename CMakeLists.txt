@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
 project(ChessGame LANGUAGES CXX)
 
+if(MSVC)
+    message(FATAL_ERROR "MSVC is not supported (the code uses GCC/Clang builtins). "
+                        "Use MinGW-w64 or llvm-mingw: see cmake/mingw-w64.cmake and cmake/llvm-mingw.cmake.")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)           # -std=c++17, not gnu++17
@@ -22,18 +27,16 @@ option(CHESS_GUI         "Build the SDL2 GUI (OFF: a UCI/command-line engine tha
 #                      this one, links the C++ runtime statically, and implies
 #                      CHESS_BUNDLE_SDL2. Overrides CHESS_NATIVE_ARCH.
 # Linux:   cmake -S . -B build-portable -DCHESS_PORTABLE=ON
-# Windows: cross-compile from Linux with MinGW-w64:
-#   cmake -S . -B build-windows -DCHESS_PORTABLE=ON \
-#         -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake
-#   or with MSVC, from a Developer prompt:  cmake -S . -B build -DCHESS_PORTABLE=ON
+# Windows: cross-compile from Linux (GCC MinGW-w64, or the self-contained llvm-mingw clang toolchain):
+#   cmake -S . -B build-windows -DCHESS_PORTABLE=ON -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake
+#   cmake -S . -B build-windows -DCHESS_PORTABLE=ON -DCMAKE_TOOLCHAIN_FILE=cmake/llvm-mingw.cmake
+# (MSVC is not supported: the code uses the GCC/Clang builtins __builtin_popcountll, __builtin_prefetch, ...)
 option(CHESS_BUNDLE_SDL2 "Build SDL2 from source and link it statically" OFF)
 option(CHESS_PORTABLE    "Self-contained executable for machines without SDL2" OFF)
 set(CHESS_PORTABLE_ARCH "x86-64-v2" CACHE STRING
     "-march baseline for CHESS_PORTABLE on x86-64 (x86-64-v3 = AVX2/BMI2, 2013+ CPUs)")
 if(CHESS_PORTABLE)
     set(CHESS_BUNDLE_SDL2 ON)
-    # Static C runtime for MSVC (must be set before the targets are created).
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 # ---- Default build type (single-config generators only) --------------------
@@ -60,25 +63,20 @@ endif()
 
 # ---- Shared compile flags (applied per target, not globally) ---------------
 add_library(chess_flags INTERFACE)
-if(MSVC)
-    target_compile_options(chess_flags INTERFACE /W4
-        $<$<BOOL:${CHESS_WERROR}>:/WX>)
-else()
-    target_compile_options(chess_flags INTERFACE -Wall -Wextra
-        $<$<BOOL:${CHESS_WERROR}>:-Werror>)
-    if(CHESS_PORTABLE)
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
-            target_compile_options(chess_flags INTERFACE -march=${CHESS_PORTABLE_ARCH})
-        endif()
-        # No libstdc++/libgcc .so to ship; MinGW also drops libwinpthread-1.dll.
-        if(MINGW)
-            target_link_options(chess_flags INTERFACE -static)
-        else()
-            target_link_options(chess_flags INTERFACE -static-libstdc++ -static-libgcc)
-        endif()
-    elseif(CHESS_NATIVE_ARCH)
-        target_compile_options(chess_flags INTERFACE -march=native)
+target_compile_options(chess_flags INTERFACE -Wall -Wextra
+    $<$<BOOL:${CHESS_WERROR}>:-Werror>)
+if(CHESS_PORTABLE)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+        target_compile_options(chess_flags INTERFACE -march=${CHESS_PORTABLE_ARCH})
     endif()
+    # No libstdc++/libgcc .so to ship; MinGW also drops libwinpthread-1.dll.
+    if(MINGW)
+        target_link_options(chess_flags INTERFACE -static)
+    else()
+        target_link_options(chess_flags INTERFACE -static-libstdc++ -static-libgcc)
+    endif()
+elseif(CHESS_NATIVE_ARCH)
+    target_compile_options(chess_flags INTERFACE -march=native)
 endif()
 
 if(NOT CHESS_GUI)
