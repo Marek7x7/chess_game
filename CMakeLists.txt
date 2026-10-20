@@ -179,3 +179,17 @@ if(CHESS_BUILD_TESTS)
         set_tests_properties(uci_conformance PROPERTIES TIMEOUT 300)
     endif()
 endif()
+
+# ---- NNUE tools (tools/nnue/) ----------------------------------------------
+# nnue_data: PGN -> training records; nnue_train: the trainer. Not part of the default build.
+set(NNUE_SRC ${SRC_FILES})
+list(FILTER NNUE_SRC EXCLUDE REGEX ".*/(main|gui)\\.cpp$")
+add_executable(nnue_data EXCLUDE_FROM_ALL ${NNUE_SRC} tools/nnue/pgn2data.cpp)
+chess_configure(nnue_data)
+if(OpenMP_CXX_FOUND)
+    # TUNING exposes the hand-crafted evaluation (tunerEvaluate), which `nnue_train eval --hce` compares against.
+    add_executable(nnue_train EXCLUDE_FROM_ALL ${NNUE_SRC} tools/nnue/train.cpp)
+    chess_configure(nnue_train)
+    target_compile_definitions(nnue_train PRIVATE TUNING)
+    target_link_libraries(nnue_train PRIVATE OpenMP::OpenMP_CXX)
+endif()
