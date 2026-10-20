@@ -42,7 +42,7 @@ constexpr size_t kTTSize = size_t(1) << 22;
 struct SearchProgress {
     int depth = 0;
     int score = 0;      // centipawns, positive = good for aiColor
-    long long nodes = 0; // cumulative nodes so far this call
+    long long nodes = 0; // cumulative nodes so far this call, over all search threads
     Move bestMove{};
 };
 
@@ -66,6 +66,14 @@ struct SearchOptions {
     // deepening depth (timeBudgetMs stays the hard limit that aborts one
     // in progress). 0 = keep deepening until the hard limit.
     int softTimeMs = 0;
+    // > 0: a search thread stops once it has searched this many nodes (UCI "go nodes"). The count is per
+    // thread, so the limit is exact only with one thread.
+    long long nodeLimit = 0;
+    // Non-empty: only these root moves are searched (UCI "searchmoves"); ignored if none of them is legal.
+    std::vector<Move> searchMoves;
+    // Add 2 (then 4) plies to the depth cap in endgames, where the same time reaches further. The GUI's
+    // depth-capped presets want that; a UCI "go depth N" means exactly N.
+    bool endgameDepthBonus = true;
 };
 
 // Picks a move for `aiColor`: an opening-book move if the position is a

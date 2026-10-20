@@ -115,3 +115,13 @@ void TranspositionTable::store(uint64_t key, int depth, int score, TTFlag flag, 
     target->data.store(data, std::memory_order_relaxed);
     target->check.store(key ^ data, std::memory_order_relaxed);
 }
+
+int TranspositionTable::hashfull() const {
+    const size_t slots = std::min<size_t>(2000, bucketMask + 2); // bucketMask + 2 is the slot count
+    size_t used = 0;
+    for (size_t i = 0; i < slots; i++) {
+        const uint64_t data = table[i].data.load(std::memory_order_relaxed);
+        if (storedDepth(data) >= 0 && storedGeneration(data) == generation) used++;
+    }
+    return static_cast<int>(used * 1000 / slots);
+}

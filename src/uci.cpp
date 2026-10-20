@@ -266,6 +266,8 @@ int runUci() {
                 long long movetime = -1, wtime = 0, btime = 0, winc = 0, binc = 0;
                 bool haveWtime = false, haveBtime = false, infinite = false;
                 int movestogo = 0;
+                long long nodeLimit = 0;
+                std::vector<Move> searchMoves;
                 for (size_t i = 1; i < tok.size(); i++) {
                     // Reads the number after the current token, if there is one.
                     auto next = [&](long long& dst) {
@@ -291,6 +293,15 @@ int runUci() {
                         if (next(v)) movestogo = static_cast<int>(std::clamp<long long>(v, 0, 1000));
                     } else if (tok[i] == "infinite") {
                         infinite = true;
+                    } else if (tok[i] == "nodes") {
+                        next(nodeLimit);
+                    } else if (tok[i] == "searchmoves") {
+                        // The moves after it, up to the first token that is not a legal move here.
+                        Move m;
+                        while (i + 1 < tok.size() && parseUciMove(board, tok[i + 1], m)) {
+                            searchMoves.push_back(m);
+                            i++;
+                        }
                     }
                     // Any other token: no explicit handling needed -- the fallback 24h deadline below
                     // already means "don't stop on your own, rely on depth or an explicit stop."
@@ -338,6 +349,9 @@ int runUci() {
                 opts.stopFlag = &stopFlag;
                 opts.gameHistory = gameHistory;
                 opts.softTimeMs = static_cast<int>(std::max<long long>(softTimeMs, 0));
+                opts.nodeLimit = std::max<long long>(nodeLimit, 0);
+                opts.searchMoves = searchMoves;
+                opts.endgameDepthBonus = false; // "go depth N" searches N plies, endgame or not
                 auto start = std::chrono::steady_clock::now();
                 opts.onDepthComplete = [&tt, searchBoard, start, history = gameHistory](const SearchProgress& p) {
                     // p.bestMove is the authoritative move for this depth --
@@ -362,8 +376,9 @@ int runUci() {
                     pv.insert(pv.end(), rest.begin(), rest.end());
                     double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
                     long long nps = secs > 0 ? static_cast<long long>(p.nodes / secs) : 0;
-                    std::printf("info depth %d score %s nodes %lld nps %lld pv %s\n", p.depth,
-                                formatUciScore(p.score).c_str(), p.nodes, nps, formatUciMoveList(pv).c_str());
+                    std::printf("info depth %d score %s time %lld nodes %lld nps %lld hashfull %d pv %s\n", p.depth,
+                                formatUciScore(p.score).c_str(), static_cast<long long>(secs * 1000), p.nodes, nps,
+                                tt->hashfull(), formatUciMoveList(pv).c_str());
                     std::fflush(stdout);
                 };
 

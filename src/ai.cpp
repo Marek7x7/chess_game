@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <future>
+#include <limits>
 #include <random>
 #include <string>
 #include <thread>
@@ -781,6 +782,10 @@ struct SearchContext {
     // the node at that ply (-1: none, as at the root or after a null move).
     uint16_t counter[2][64][64]{};
     int prevMove[kMaxPly + 1]{};
+    // Stop (as at the deadline) once this thread has searched this many nodes.
+    long long nodeLimit = std::numeric_limits<long long>::max();
+    // Where this thread publishes its node count (every 4096 nodes) for the others to add up.
+    std::atomic<long long>* nodeSlot = nullptr;
 };
 
 int colorIdx(Color c) { return c == Color::White ? 0 : 1; }
@@ -979,7 +984,9 @@ private:
 };
 
 void checkTime(SearchContext& ctx) {
+    if (ctx.nodes >= ctx.nodeLimit) throw TimeUp{};
     if ((ctx.nodes & 0xFFF) != 0) return;
+    if (ctx.nodeSlot) ctx.nodeSlot->store(ctx.nodes, std::memory_order_relaxed);
     if (std::chrono::steady_clock::now() >= ctx.deadline) throw TimeUp{};
     if (ctx.stopFlag && ctx.stopFlag->load(std::memory_order_relaxed)) throw TimeUp{};
 }
@@ -1431,7 +1438,9 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
                                  const std::vector<uint64_t>& gameHistory = {},
                                  std::chrono::steady_clock::time_point softDeadline =
                                      std::chrono::steady_clock::time_point::max(),
-                                 PersistedHeuristics* persisted = nullptr) {
+                                 PersistedHeuristics* persisted = nullptr,
+                                 long long nodeLimit = std::numeric_limits<long long>::max(),
+                                 std::atomic<long long>* nodeSlots = nullptr, size_t numSlots = 0) {
     RootSearchResult result;
     result.move = rootMoves.front();
     const auto searchStart = std::chrono::steady_clock::now();
@@ -1439,6 +1448,8 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 
     SearchContext ctx{tt, {}, {}, 0, deadline, stopFlag, gameHistory};
     std::fill(std::begin(ctx.prevMove), std::end(ctx.prevMove), -1);
+    ctx.nodeLimit = nodeLimit;
+    if (nodeSlots) ctx.nodeSlot = &nodeSlots[threadIndex];
     if (persisted) {
         std::memcpy(ctx.counter, persisted->counter, sizeof(ctx.counter));
         int* hist = &ctx.history[0][0][0][0][0];
@@ -1554,7 +1565,13 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 
         // Fired after the store above, so extractPV()'s first hop (this
         // root move) is guaranteed present in tt at this instant.
-        if (onDepthComplete) onDepthComplete(SearchProgress{depth, depthBest, ctx.nodes, depthBestMove});
+        if (onDepthComplete) {
+            // This thread's exact count plus what the others last published.
+            long long total = ctx.nodes;
+            for (size_t i = 0; i < numSlots; i++)
+                if (i != threadIndex) total += nodeSlots[i].load(std::memory_order_relaxed);
+            onDepthComplete(SearchProgress{depth, depthBest, total, depthBestMove});
+        }
 
         if (depthBest > kMateThreshold) break; // forced mate found, no need to search deeper
         // Past the soft limit, the next depth -- typically taking as long as
@@ -1727,6 +1744,16 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     MoveList rootMoveList = board.legalMoves(aiColor);
     std::vector<Move> rootMoves(rootMoveList.begin(), rootMoveList.end());
     if (rootMoves.empty()) return Move{}; // checkmate or stalemate: the caller should not have asked
+    if (!options.searchMoves.empty()) {
+        std::vector<Move> allowed;
+        for (const Move& m : rootMoves)
+            for (const Move& wanted : options.searchMoves)
+                if (sameMove(m, wanted)) {
+                    allowed.push_back(m);
+                    break;
+                }
+        if (!allowed.empty()) rootMoves = allowed;
+    }
     if (rootMoves.size() == 1) return rootMoves.front();
 
     if (g_aiDebugLog) {
@@ -1741,8 +1768,10 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     // of material left on the board.
     double phase = board.gamePhase();
     int effectiveMaxDepth = maxDepth;
-    if (phase < 0.5) effectiveMaxDepth += 2;
-    if (phase < 0.2) effectiveMaxDepth += 2;
+    if (options.endgameDepthBonus) {
+        if (phase < 0.5) effectiveMaxDepth += 2;
+        if (phase < 0.2) effectiveMaxDepth += 2;
+    }
 
     if (g_aiDebugLog) {
         std::fprintf(stderr, "[ai] gamePhase=%.3f effectiveMaxDepth=%d\n", phase, effectiveMaxDepth);
@@ -1779,6 +1808,10 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     }
     while (g_persisted.size() < numThreads) g_persisted.push_back(std::make_unique<PersistedHeuristics>());
 
+    std::vector<std::atomic<long long>> nodeSlots(numThreads); // each thread's node count, for the total in "info"
+    for (auto& slot : nodeSlots) slot.store(0, std::memory_order_relaxed);
+    const long long nodeLimit = options.nodeLimit > 0 ? options.nodeLimit : std::numeric_limits<long long>::max();
+
     std::vector<std::future<RootSearchResult>> futures;
     futures.reserve(numThreads);
     for (size_t t = 0; t < numThreads; t++) {
@@ -1797,9 +1830,10 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         futures.push_back(std::async(
             std::launch::async,
             [threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, softDeadline, &tt, t, stopFlag, progressCb,
-             &gameHistory = options.gameHistory, persisted = g_persisted[t].get()]() mutable {
+             &gameHistory = options.gameHistory, persisted = g_persisted[t].get(), nodeLimit,
+             slots = nodeSlots.data(), numSlots = nodeSlots.size()]() mutable {
                 return searchRootFull(threadBoard, aiColor, rootMoves, effectiveMaxDepth, deadline, tt, t, stopFlag,
-                                       progressCb, gameHistory, softDeadline, persisted);
+                                       progressCb, gameHistory, softDeadline, persisted, nodeLimit, slots, numSlots);
             }));
     }
 
