@@ -443,8 +443,18 @@ void Board::computeHashes(uint64_t& full, uint64_t& pawns) const {
     if (castleQueenside[0]) full ^= z.castle[0][1];
     if (castleKingside[1]) full ^= z.castle[1][0];
     if (castleQueenside[1]) full ^= z.castle[1][1];
-    if (enPassantX != -1) full ^= z.enPassantFile[enPassantX];
+    if (enPassantHashed()) full ^= z.enPassantFile[enPassantX];
     if (turn == Color::Black) full ^= z.sideToMove;
+}
+
+bool Board::enPassantHashed() const {
+    if (enPassantX == -1) return false;
+    const int y = enPassantY - (turn == Color::White ? 1 : -1); // the rank a capturing pawn stands on
+    for (int dx = -1; dx <= 1; dx += 2) {
+        const int x = enPassantX + dx;
+        if (inBounds(x, y) && squares[x][y].type == PieceType::Pawn && squares[x][y].color == turn) return true;
+    }
+    return false;
 }
 
 Board Board::fromFEN(const std::string& fen) {
@@ -871,6 +881,7 @@ void Board::makeMove(const Move& m) {
         if (network) nnue::sub(nnueAcc, c, t, x, y);
     };
 
+    const bool oldEnPassantHashed = enPassantHashed(); // decided on the position as it is before the move
     Piece moving = squares[m.fromX][m.fromY];
     Color color = moving.color;
     Piece captured = squares[m.toX][m.toY];
@@ -940,12 +951,20 @@ void Board::makeMove(const Move& m) {
         }
     }
 
-    if (enPassantX != -1) hash ^= z.enPassantFile[enPassantX];
+    if (oldEnPassantHashed) hash ^= z.enPassantFile[enPassantX];
     enPassantX = enPassantY = -1;
     if (moving.type == PieceType::Pawn && std::abs(m.toY - m.fromY) == 2) {
         enPassantX = m.fromX;
         enPassantY = (m.fromY + m.toY) / 2;
-        hash ^= z.enPassantFile[enPassantX];
+        // The opponent moves next; the target counts toward the hash only if one of its pawns stands beside
+        // the pawn that just advanced.
+        for (int dx = -1; dx <= 1; dx += 2) {
+            const int x = m.toX + dx;
+            if (inBounds(x, m.toY) && squares[x][m.toY].type == PieceType::Pawn && squares[x][m.toY].color == opponent(color)) {
+                hash ^= z.enPassantFile[enPassantX];
+                break;
+            }
+        }
     }
 
     hash ^= z.sideToMove;
@@ -1032,7 +1051,7 @@ void Board::makeNullMove(NullMoveUndo& undo) {
     undo.prevHash = hash;
     undo.prevEnPassantX = enPassantX;
     undo.prevEnPassantY = enPassantY;
-    if (enPassantX != -1) hash ^= z.enPassantFile[enPassantX];
+    if (enPassantHashed()) hash ^= z.enPassantFile[enPassantX];
     enPassantX = enPassantY = -1;
     hash ^= z.sideToMove;
     turn = opponent(turn);

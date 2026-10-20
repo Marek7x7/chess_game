@@ -170,6 +170,10 @@ private:
     bool castleKingside[2];
     bool castleQueenside[2];
     int enPassantX, enPassantY; // target square a capturing pawn would move to; (-1,-1) if none
+    // True if the en passant target is part of the position's identity: the side to move has a pawn that could
+    // take there. Only then is the file in the Zobrist hash, so that a position reached right after a double
+    // pawn push equals the same position reached any other way (and repetition counts it as the same).
+    bool enPassantHashed() const;
     uint64_t hash;
     uint64_t pawnHash; // see pawnKey()
     int halfmoveCount = 0;
