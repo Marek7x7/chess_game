@@ -129,9 +129,31 @@ if(NOT CHESS_GUI)
     list(FILTER SRC_FILES EXCLUDE REGEX ".*/gui\\.cpp$")
 endif()
 
+# ---- Built-in network ------------------------------------------------------
+# The evaluation network nnue/default.nnue (if the file exists) is compiled into the executable, so a single
+# file is all there is to ship. -DCHESS_NNUE_FILE=<path> uses another one, -DCHESS_NNUE=OFF none (the
+# hand-crafted evaluation; the UCI option EvalFile can still load a network at run time).
+option(CHESS_NNUE "Compile the network into the executable" ON)
+set(CHESS_NNUE_FILE "${CMAKE_SOURCE_DIR}/nnue/default.nnue" CACHE FILEPATH "The network to compile in")
+set(CHESS_NNUE_SOURCES "")
+if(CHESS_NNUE AND EXISTS "${CHESS_NNUE_FILE}")
+    set(CHESS_NNUE_CPP "${CMAKE_BINARY_DIR}/nnue_builtin.cpp")
+    add_custom_command(
+        OUTPUT "${CHESS_NNUE_CPP}"
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${CHESS_NNUE_FILE} -DOUTPUT=${CHESS_NNUE_CPP} -DSYMBOL=chess_nnue_builtin
+                -P ${CMAKE_SOURCE_DIR}/tools/embed_file.cmake
+        DEPENDS "${CHESS_NNUE_FILE}" "${CMAKE_SOURCE_DIR}/tools/embed_file.cmake"
+        COMMENT "Embedding ${CHESS_NNUE_FILE}")
+    set(CHESS_NNUE_SOURCES "${CHESS_NNUE_CPP}")
+    message(STATUS "Built-in network: ${CHESS_NNUE_FILE}")
+endif()
+
 # ---- Main engine -----------------------------------------------------------
-add_executable(chess ${SRC_FILES})
+add_executable(chess ${SRC_FILES} ${CHESS_NNUE_SOURCES})
 chess_configure(chess)
+if(CHESS_NNUE_SOURCES)
+    target_compile_definitions(chess PRIVATE CHESS_NNUE_BUILTIN)
+endif()
 if(CHESS_GUI)
     target_link_libraries(chess PRIVATE ${CHESS_SDL2_TARGET})
 endif()
@@ -139,8 +161,11 @@ endif()
 # ---- SPSA search-constant tuning build (tools/spsa.py) ---------------------
 # The same engine with every SEARCH_PARAM exposed as a UCI spin option.
 # cmake --build <dir> --target chess_spsa
-add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES})
+add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES} ${CHESS_NNUE_SOURCES})
 chess_configure(chess_spsa)
+if(CHESS_NNUE_SOURCES)
+    target_compile_definitions(chess_spsa PRIVATE CHESS_NNUE_BUILTIN)
+endif()
 target_compile_definitions(chess_spsa PRIVATE SPSA)
 if(CHESS_GUI)
     target_link_libraries(chess_spsa PRIVATE ${CHESS_SDL2_TARGET})
