@@ -121,7 +121,7 @@ CHILD=""
 TICKER=""
 kill_tree() {
     local p="$1" c
-    for c in $(ps -o pid= --ppid "$p" 2>/dev/null); do kill_tree "$c"; done
+    for c in $(ps -o pid= --ppid "$p" 2>/dev/null || true); do kill_tree "$c"; done
     kill "$p" 2>/dev/null || true
 }
 on_signal() {
@@ -278,15 +278,15 @@ step_sprt() {
         cd "$1"
         shift
         CONCURRENCY="$1" ROUNDS="$2" NEW_OPTIONS="option.EvalFile=$3" BASE_OPTIONS="$4" \
-            tools/sprt.sh "$5" "$5" "$6" $7 2>&1 | grep --line-buffered -E "^(Games|LLR|Elo|nElo|SPRT|Building|Running|WARNING)|rror"
-    ' _ "$REPO" "$SPRT_CONC" "$SPRT_ROUNDS" "$chal" "$base_opt" "$HEAD_REF" "$SPRT_TC" "$BOUNDS" > "$out" 2>&1 || true
+            tools/sprt.sh "$5" "$5" "$6" $7 2> "$8" | grep --line-buffered -E "^(Games|LLR|Elo|nElo|SPRT|Building|Running|WARNING)"
+    ' _ "$REPO" "$SPRT_CONC" "$SPRT_ROUNDS" "$chal" "$base_opt" "$HEAD_REF" "$SPRT_TC" "$BOUNDS" "$out.err" > "$out" || true
     local games llr elo verdict
     games="$(grep -E '^Games:' "$out" | tail -1 || true)"
     llr="$(grep -E '^LLR:' "$out" | tail -1 || true)"
     elo="$(grep -E '^Elo:' "$out" | tail -1 || true)"
     if [ -z "$games" ]; then
         VERDICT=error
-        verdict="no result (the match did not run: see $out)"
+        verdict="no result (the match did not run: $(tail -n 3 "$out.err" 2>/dev/null | tr '\n' ' '))"
     elif grep -q "H1 was accepted" "$out"; then
         VERDICT=accepted; verdict="H1 was accepted"
     elif grep -q "H0 was accepted" "$out"; then
