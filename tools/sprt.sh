@@ -43,6 +43,7 @@ fi
 
 build_ref() { # $1=ref $2=name(new|base) $3=extra cmake arguments
     local ref="$1" name="$2" extra="${3:-}"
+    git -C "$REPO" worktree prune # a run killed while building leaves a record that makes the next `worktree add` fail
     # shellcheck disable=SC2086  # $extra is a list of arguments on purpose
     if [ "$ref" = "WORKTREE" ]; then
         cmake -S "$REPO" -B "$REPO/build-sprt-$name" -DCMAKE_BUILD_TYPE=Release $extra >/dev/null
