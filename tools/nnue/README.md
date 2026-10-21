@@ -59,3 +59,26 @@ NEW_OPTIONS="option.EvalFile=$PWD/net.nnue" BASE_OPTIONS="option.EvalFile=none" 
 network). To ship one in the executable, copy it to `nnue/default.nnue` and rebuild (`-DCHESS_NNUE=OFF` leaves it
 out); `--verify-eval` then checks the incrementally updated accumulators against a recompute, and
 `tools/bench_signature.txt` has to be updated, since the search is no longer the same.
+
+## 5. Unattended: `auto.sh`
+
+```sh
+tools/nnue/auto.sh --work ~/nnue-run --hours 12 [--start-net best.nnue] [--seed-data old.bin] [--max-rounds N]
+```
+
+Loops over: self-play with the best network so far (the hand-crafted evaluation in round 1, unless `--start-net`),
+training a challenger on the data pool plus the new data, and an SPRT of the challenger against the best network
+(same binary, only `EvalFile` differs; 5+0.05, bounds -3 1, 20 games at once). If H1 is accepted the challenger
+becomes the best network (`<work>/best/round-N.nnue`); if not, one retry with twice the epochs and another lambda,
+then the run ends. The steps never overlap. Options: `--procs 22 --games 8000 --nodes 5000 --epochs 30 --lambda 0.7`,
+`--keep-rounds 6` (rounds of data kept), `--min-free-gb 20`, `--sprt-bounds "-3 1"`, `--sprt-rounds`, `--sprt-tc`.
+
+- Everything is under `--work`, which must be on a real disk (it refuses a RAM disk). It checks the free space before
+  each step, and the engine is built from the checked-out sources, so commit them first (matches build `HEAD`).
+- `<work>/state` is written after every step: after a crash or `Ctrl-C`, run the same command again to resume
+  (a half-finished data run is redone from its start). `touch <work>/STOP` stops after the current step. The
+  `--hours` budget is checked between steps, so the last step can run past it (a data run takes about an hour
+  at the defaults).
+- A status line is printed every 20 minutes; `<work>/log.txt` has the exact SPRT numbers (Elo, games, LLR) of every
+  test, which are what the `STRENGTH_LOG.md` row is written from by hand. At the end it prints how to ship the best
+  network (it never touches `nnue/default.nnue`, merges or pushes).
