@@ -226,7 +226,7 @@ bool readNet(const std::string& path, std::vector<float>& th) {
 
 // ---- training ---------------------------------------------------------------------------------------------
 
-int train(const Options& o) {
+int train(Options o) { // (by value: the batch size may be lowered)
     std::vector<Record> data, valid;
     if (!loadData(o, data, valid)) return 1;
 
@@ -252,6 +252,10 @@ int train(const Options& o) {
     std::iota(order.begin(), order.end(), size_t(0));
     std::mt19937_64 shuffler(static_cast<uint64_t>(o.seed) * 7919u);
 
+    if (data.size() < static_cast<size_t>(o.batch)) { // fewer positions than one batch: a batch is all of them
+        std::printf("only %zu training positions: batch size %d lowered to match\n", data.size(), o.batch);
+        o.batch = static_cast<int>(data.size());
+    }
     const size_t batchesPerEpoch = std::max<size_t>(1, data.size() / static_cast<size_t>(o.batch));
     const long long totalSteps = static_cast<long long>(batchesPerEpoch) * o.epochs;
     const float scaleOut = nnue::kScale / static_cast<float>(o.k);
