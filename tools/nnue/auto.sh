@@ -24,7 +24,9 @@
 # <work>/round-N/            that round's data, logs, challengers.   touch <work>/STOP  to stop after this step.
 #
 # It does not touch nnue/default.nnue, merge, or push; STRENGTH_LOG.md rows are written by hand afterwards.
-set -euo pipefail
+set -Eeuo pipefail
+# (a failure nobody expected must not end the run silently)
+trap 'echo "auto.sh: unexpected failure (exit $?) at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
@@ -144,7 +146,7 @@ run() {
 status_line() {
     local prog=""
     if [ "$STEP" = sprt ] && [ -f "$WORK/round-$ROUND/sprt-a$ATTEMPT.txt" ]; then
-        prog=" | now: $(grep -E '^(Games|LLR)' "$WORK/round-$ROUND/sprt-a$ATTEMPT.txt" | tail -2 | tr '\n' ' ')"
+        prog=" | now: $( (grep -E '^(Games|LLR)' "$WORK/round-$ROUND/sprt-a$ATTEMPT.txt" || true) | tail -2 | tr '\n' ' ')"
     fi
     echo "[status $(date '+%H:%M')] round $ROUND, step $STEP, attempt $ATTEMPT, elapsed $(hms "$(used)") of $(hms "$BUDGET_S"), rounds done $DONE | last: $LAST$prog" | tee -a "$LOG"
 }
