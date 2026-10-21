@@ -25,4 +25,4 @@ for i in $(seq 1 "$PROCS"); do
     pids+=($!)
 done
 for p in "${pids[@]}"; do wait "$p"; done
-cat "$OUT"/log-*.txt | grep -h '^games' | awk '{g+=$2; p+=$4; w+=$6; d+=$8; l+=$10} END {printf "total: %d games, %d positions (W %d D %d L %d)\n", g, p, w, d, l}' || true
+cat "$OUT"/log-*.txt | grep -hE '^games [0-9]+, positions [0-9]+, W' | awk '{g+=$2; p+=$4; w+=$6; d+=$8; l+=$10} END {printf "total: %d games, %d positions (W %d D %d L %d)\n", g, p, w, d, l}' || true
