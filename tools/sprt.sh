@@ -13,7 +13,8 @@
 #     NEW_OPTIONS / BASE_OPTIONS (extra fastchess engine arguments for each side,
 #     e.g. "option.EvalFile=nets/b.nnue": the same binary against itself with two
 #     different networks);
-#     SEED (fastchess -srand, to replay the same opening order).
+#     SEED (fastchess -srand, to replay the same opening order);
+#     ROUNDS (cap on the game pairs, default 20000: a test run of a script that calls this one).
 #   Units: elo0/elo1 are NORMALIZED Elo (fastchess's default SPRT model, pinned
 #     below as model=normalized). That is not the logistic "Elo" fastchess prints
 #     in its summary and STRENGTH_LOG.md records: nElo divides by the spread of
@@ -84,7 +85,7 @@ echo "Running SPRT: tc=$TC elo0=$ELO0 elo1=$ELO1 openings=$OPENINGS concurrency=
     -each tc="$TC" \
     -openings file="$OPENINGS" format=pgn order=random \
     -sprt elo0="$ELO0" elo1="$ELO1" alpha=0.05 beta=0.05 model=normalized \
-    -rounds 20000 -repeat -concurrency "$CONCURRENCY" -recover \
+    -rounds "${ROUNDS:-20000}" -repeat -concurrency "$CONCURRENCY" -recover \
     ${SEED:+-srand "$SEED"} \
     -config outname="$WORK/config.json" \
     -log file="$WORK/sprt.log" level=warn append=false \
