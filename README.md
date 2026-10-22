@@ -1,11 +1,12 @@
 # chess_game
 
 A chess engine and an SDL2 game around it, written in C++17: mailbox 8x8 board with bitboards, negamax/PVS
-with quiescence search, a lock-free shared transposition table, Lazy SMP threads, a hand-tuned evaluation,
-a small opening book, a UCI mode and a mouse-driven GUI (human vs computer, bot vs bot).
+with quiescence search, a lock-free shared transposition table, Lazy SMP threads, an NNUE evaluation (with the hand-tuned one as a
+fallback), a small opening book, a UCI mode and a mouse-driven GUI (human vs computer, bot vs bot).
 
 Strength is measured, not claimed: every kept change has an SPRT row in [STRENGTH_LOG.md](STRENGTH_LOG.md),
-and the last absolute estimate (against Stockfish `UCI_Elo`, 2026-09-28) is in the same file.
+and the last absolute estimate is in the same file: about 3090 on the CCRL 40/4 scale against Stockfish
+`UCI_Elo` (2026-10-22, one thread, 60+0.6, so the GUI and multi-thread UCI play are stronger still).
 
 ## Build
 
@@ -56,7 +57,8 @@ Extra targets that are not built by default: `chess_spsa` (search constants expo
 | `chess --selfplay <games> [levelA] [levelB]` | bot matches (`easy`, `medium`, `hard`, `expert`) |
 | `chess --version`, `chess --help` | |
 
-UCI options: `Hash` (MB, 1-4096), `Threads`, `OwnBook` (off by default), `Move Overhead`. Supported `go`
+UCI options: `Hash` (MB, 1-4096), `Threads`, `OwnBook` (off by default), `Move Overhead`, `EvalFile` (a `.nnue`
+file, `none` for the hand-tuned evaluation, `<default>` for the built-in network). Supported `go`
 parameters: `depth`, `nodes`, `movetime`, `wtime`/`btime`/`winc`/`binc`/`movestogo`, `infinite`, `searchmoves`.
 Not supported: `ponder`, `mate`, MultiPV, `UCI_LimitStrength`, tablebases.
 
@@ -85,6 +87,8 @@ CONCURRENCY=20 tools/sprt.sh <new-ref|WORKTREE> <base-ref> 5+0.05 0 10
 | `src/ai.cpp` | evaluation and search (`evaluate`, `negamax`, `quiescence`, `findBestMove`) |
 | `src/board.cpp`, `src/bitboard.cpp` | board, move generation, incremental evaluation and hashing |
 | `src/transposition_table.cpp` | the lock-free hash table |
+| `src/nnue.cpp`, `nnue/default.nnue` | the network evaluation and the net compiled into the executable (`-DCHESS_NNUE=OFF` leaves it out) |
 | `src/uci.cpp`, `src/gui.cpp`, `src/match.cpp` | UCI driver, SDL2 GUI, bot matches |
 | `include/tune.hpp`, `include/search_params.hpp` | tunable evaluation weights and search constants |
-| `tools/` | SPRT and SPSA drivers, the Texel tuner, Stockfish analysis scripts, the UCI suite |
+| `tools/nnue/` | network trainer, self-play data generator and `auto.sh`, the unattended retraining loop ([README](tools/nnue/README.md)) |
+| `tools/` | SPRT and SPSA drivers, `anchor.sh` (Stockfish gauntlet), the Texel tuner, Stockfish analysis scripts, the UCI suite |
