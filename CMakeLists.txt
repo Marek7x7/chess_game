@@ -97,7 +97,7 @@ endif()
 target_compile_definitions(chess_flags INTERFACE CHESS_VERSION="${CHESS_VERSION}")
 
 function(chess_configure tgt)
-    target_include_directories(${tgt} PRIVATE include)
+    target_include_directories(${tgt} PRIVATE include third_party/fathom)
     target_link_libraries(${tgt} PRIVATE chess_flags)
 endfunction()
 
@@ -127,6 +127,17 @@ endif()
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp")
 if(NOT CHESS_GUI)
     list(FILTER SRC_FILES EXCLUDE REGEX ".*/gui\\.cpp$")
+endif()
+
+# ---- Syzygy tablebases -----------------------------------------------------
+# Fathom (third_party/fathom, MIT) is compiled as C++ without our warning flags. Without the option the
+# UCI options SyzygyPath/SyzygyProbeDepth are still accepted but no table can be loaded.
+option(CHESS_SYZYGY "Syzygy tablebase probing (Fathom)" ON)
+if(CHESS_SYZYGY)
+    set(FATHOM_SRC "${CMAKE_SOURCE_DIR}/third_party/fathom/tbprobe.c")
+    set_source_files_properties("${FATHOM_SRC}" PROPERTIES LANGUAGE CXX COMPILE_OPTIONS "-w")
+    list(APPEND SRC_FILES "${FATHOM_SRC}")
+    target_compile_definitions(chess_flags INTERFACE CHESS_SYZYGY)
 endif()
 
 # ---- Built-in network ------------------------------------------------------

@@ -122,7 +122,7 @@ def handshake(path):
     e.close()
     text = "\n".join(l for l in out if l)
     assert out[-1] == "uciok", "no uciok"
-    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead", "Ponder", "MultiPV"):
+    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead", "Ponder", "MultiPV", "SyzygyPath", "SyzygyProbeDepth"):
         assert f"option name {opt} " in text, f"option {opt} not advertised"
 
 
@@ -406,6 +406,18 @@ def multipv_stop_and_movetime(path):
     e.drain(0.6)
     e.send("stop")
     assert bestmove(e.read_until("bestmove", 3)), "stop did not end the MultiPV search"
+    e.close()
+
+
+@case
+def syzygy_options_survive_bad_input(path):
+    e = start(path, ["Threads value 1"])
+    e.send("setoption name SyzygyPath value /no/such/directory")
+    e.send("setoption name SyzygyProbeDepth value 99999")
+    e.send("setoption name SyzygyPath value <empty>")
+    e.send("position startpos moves e2e4 e7e5")
+    e.send("go depth 5")
+    assert bestmove(e.read_until("bestmove", 20)), "no bestmove after the Syzygy options"
     e.close()
 
 

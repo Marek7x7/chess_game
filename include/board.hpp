@@ -40,6 +40,10 @@ public:
     // Verification only: do the bitboards match squares[][]?
     bool bitboardsConsistent() const;
     Color sideToMove() const { return turn; }
+    bool hasCastlingRights() const { return castleKingside[0] || castleKingside[1] || castleQueenside[0] || castleQueenside[1]; }
+    // The en passant target square (where a capturing pawn would land), or file -1 if there is none.
+    int enPassantFile() const { return enPassantX; }
+    int enPassantRank() const { return enPassantY; }
     int kingFile(Color c) const { return kingX[colorIndex(c)]; }
     int kingRank(Color c) const { return kingY[colorIndex(c)]; }
     // Plies since the last capture or pawn move (the fifty-move-rule count).

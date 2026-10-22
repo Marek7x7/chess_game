@@ -10,6 +10,7 @@
 #include <exception>
 #include <future>
 #include <iostream>
+#include <cmath>
 #include <memory>
 #include <new>
 #include <sstream>
@@ -18,6 +19,7 @@
 #include <vector>
 
 #include "ai.hpp"
+#include "syzygy.hpp"
 #include "board.hpp"
 #include "move.hpp"
 #include "nnue.hpp"
@@ -138,7 +140,7 @@ std::string multiPvSearch(const Board& board, Color color, int maxDepth, long lo
             infos.push_back(std::string("info multipv ") + buf + formatUciScore(last.score) + " time " +
                             std::to_string(static_cast<long long>(secs * 1000)) + " nodes " + std::to_string(nodes) +
                             " nps " + std::to_string(secs > 0 ? static_cast<long long>(nodes / secs) : 0) +
-                            " hashfull " + std::to_string(tt.hashfull()) + " pv " + formatUciMoveList(pv));
+                            " hashfull " + std::to_string(tt.hashfull()) + " tbhits " + std::to_string(syzygy::hits()) + " pv " + formatUciMoveList(pv));
             if (k == 0) {
                 best = formatUciMove(m);
                 line.first = best;
@@ -244,6 +246,8 @@ int runUci() {
                 std::printf("option name Move Overhead type spin default %d min 0 max 5000\n", moveOverheadMs);
                 std::printf("option name Ponder type check default false\n");
                 std::printf("option name MultiPV type spin default 1 min 1 max 256\n");
+                std::printf("option name SyzygyPath type string default <empty>\n");
+                std::printf("option name SyzygyProbeDepth type spin default 1 min 1 max 100\n");
                 std::printf("option name EvalFile type string default <default>\n");
     #ifdef SPSA
                 for (const SearchParam& sp : searchParamRegistry())
@@ -289,6 +293,13 @@ int runUci() {
                     if (parseInt(value, number)) threadsOption = std::clamp(number, 1, maxThreads);
                 } else if (name == "OwnBook") {
                     ownBook = (value == "true");
+                } else if (name == "SyzygyPath") {
+                    std::string message;
+                    syzygy::init(value, message);
+                    std::printf("info string Syzygy: %s\n", message.c_str());
+                    std::fflush(stdout);
+                } else if (name == "SyzygyProbeDepth") {
+                    if (parseInt(value, number)) syzygy::setProbeDepth(std::clamp(number, 1, 100));
                 } else if (name == "MultiPV") {
                     if (parseInt(value, number)) multiPvOption = std::clamp(number, 1, 256);
                 } else if (name == "Ponder") {
@@ -459,6 +470,7 @@ int runUci() {
                 }
                 timeBudgetMs = std::clamp<long long>(timeBudgetMs, 1, kMaxSearchMs);
 
+                syzygy::resetHits();
                 Board searchBoard = board;
                 SearchOptions opts;
                 opts.useOpeningBook = ownBook;
@@ -498,9 +510,9 @@ int runUci() {
                     line->second = pv.size() > 1 ? formatUciMove(pv[1]) : "";
                     double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
                     long long nps = secs > 0 ? static_cast<long long>(p.nodes / secs) : 0;
-                    std::printf("info depth %d score %s time %lld nodes %lld nps %lld hashfull %d pv %s\n", p.depth,
+                    std::printf("info depth %d score %s time %lld nodes %lld nps %lld hashfull %d tbhits %lld pv %s\n", p.depth,
                                 formatUciScore(p.score).c_str(), static_cast<long long>(secs * 1000), p.nodes, nps,
-                                tt->hashfull(), formatUciMoveList(pv).c_str());
+                                tt->hashfull(), syzygy::hits(), formatUciMoveList(pv).c_str());
                     std::fflush(stdout);
                 };
 

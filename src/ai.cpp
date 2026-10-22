@@ -22,6 +22,7 @@
 #include "bitboard.hpp"
 #include "nnue.hpp"
 #include "opening_book.hpp"
+#include "syzygy.hpp"
 #include "search_params.hpp"
 #include "transposition_table.hpp"
 #include "tune.hpp"
@@ -771,6 +772,9 @@ int evaluate(const Board& board, Color color) {
 // ---------------------------------------------------------------------
 
 constexpr int kMaxPly = 64;
+// A tablebase win scores this less the plies it takes to reach the probe, so a quicker win scores higher.
+// It stays well below the mate scores and above anything the evaluation produces.
+constexpr int kTbWin = 20000;
 // kMateScore/kMateThreshold are declared in ai.hpp (needed there so external
 // callers formatting scores, e.g. UCI's "score mate <n>", don't duplicate
 // these magic numbers).
@@ -1190,6 +1194,18 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     if (alpha >= beta) return alpha;
 
     if (depth <= 0) return quiescence(board, alpha, beta, color, ply, ctx);
+
+    // Endgame tablebases: a position with few enough pieces whose fifty-move clock has just reset is
+    // looked up outright (a cursed win or blessed loss is a draw in play, so it scores 0).
+    if (ply > 0 && !excluded && syzygy::largest() > 0 && depth >= syzygy::probeDepth() &&
+        bb::popcount(board.occupancy()) <= syzygy::largest()) {
+        syzygy::Wdl wdl;
+        if (syzygy::probeWdl(board, wdl)) {
+            const int tbScore = wdl == syzygy::Wdl::Win ? kTbWin - ply : wdl == syzygy::Wdl::Loss ? -(kTbWin - ply) : 0;
+            ctx.tt.store(key, depth, tbScore, TTFlag::Exact, Move{}, false, kTTNoEval);
+            return tbScore;
+        }
+    }
 
     int origAlpha = alpha;
     bool pvNode = beta - alpha > 1; // searched with an open window: its exact score matters
@@ -1844,6 +1860,18 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
                 std::uniform_int_distribution<size_t> dist(0, choices.size() - 1);
                 return choices[dist(rng)];
             }
+        }
+    }
+
+    // A tablebase position at the root: play the move the DTZ table gives (it keeps the result and
+    // respects the fifty-move rule) instead of searching; MultiPV and "searchmoves" want a real search.
+    if (syzygy::largest() > 0 && options.searchMoves.empty() && bb::popcount(board.occupancy()) <= syzygy::largest()) {
+        Move tbMove;
+        syzygy::Wdl wdl;
+        if (syzygy::probeRoot(board, tbMove, wdl)) {
+            const int tbScore = wdl == syzygy::Wdl::Win ? kTbWin : wdl == syzygy::Wdl::Loss ? -kTbWin : 0;
+            if (options.onDepthComplete) options.onDepthComplete(SearchProgress{1, tbScore, 1, tbMove});
+            return tbMove;
         }
     }
 
