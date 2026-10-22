@@ -260,7 +260,9 @@ step_train() {
     mapfile -t inputs < <(training_inputs)
     [ "${#inputs[@]}" -gt 0 ] || die "no training data"
     log "round $ROUND attempt $ATTEMPT: training on ${#inputs[@]} file(s), $epochs epochs, lambda $lambda"
-    run "$TRAIN" train "${inputs[@]}" --out "$dir/challenger-a$ATTEMPT.nnue" --epochs "$epochs" --lambda "$lambda" \
+    # OpenMP's threads wait for each other at every batch: with one per logical CPU, any other process that
+    # runs at all stalls the whole team (measured 6x slower), so leave the cores --procs does not use alone.
+    run env OMP_NUM_THREADS="$PROCS" "$TRAIN" train "${inputs[@]}" --out "$dir/challenger-a$ATTEMPT.nnue" --epochs "$epochs" --lambda "$lambda" \
         > "$dir/train-a$ATTEMPT.log" 2>&1 || { tail -5 "$dir/train-a$ATTEMPT.log" >&2; die "training failed (see $dir/train-a$ATTEMPT.log)"; }
     [ -s "$dir/challenger-a$ATTEMPT.nnue" ] || die "training wrote no network (see $dir/train-a$ATTEMPT.log)"
     grep -E 'validation loss' "$dir/train-a$ATTEMPT.log" | tail -1 | tee -a "$LOG"
