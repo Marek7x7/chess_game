@@ -57,28 +57,13 @@ Extra targets that are not built by default: `chess_spsa` (search constants expo
 | `chess --selfplay <games> [levelA] [levelB]` | bot matches (`easy`, `medium`, `hard`, `expert`) |
 | `chess --version`, `chess --help` | |
 
-UCI options: `Hash` (MB, 1-4096), `Threads`, `OwnBook` (off by default), `Move Overhead`, `EvalFile` (a `.nnue`
-file, `none` for the hand-tuned evaluation, `<default>` for the built-in network). Supported `go`
-parameters: `depth`, `nodes`, `movetime`, `wtime`/`btime`/`winc`/`binc`/`movestogo`, `infinite`, `searchmoves`.
-Not supported: `ponder`, `mate`, MultiPV, `UCI_LimitStrength`, tablebases.
-
-## Tests
-
-```sh
-ctest --test-dir build-release --output-on-failure
-```
-
-runs perft against published node counts, the incremental-evaluation self-check, the bench signature
-(`tools/bench_signature.txt`) and `tools/uci_conformance.py`, a suite of the ways a GUI or tournament manager
-can hurt an engine. A change meant to alter the search updates `tools/bench_signature.txt` in the same commit; a
-speedup or refactor must leave it alone.
-
-Strength changes go through an SPRT with [fastchess](https://github.com/Disservin/fastchess):
-
-```sh
-tools/setup_fastchess.sh && tools/fetch_openings.sh        # once
-CONCURRENCY=20 tools/sprt.sh <new-ref|WORKTREE> <base-ref> 5+0.05 0 10
-```
+UCI options: `Hash` (MB, 1-4096), `Threads`, `OwnBook` (off by default), `Move Overhead`, `Ponder`, `MultiPV`,
+`UCI_LimitStrength` with `UCI_Elo` (1500-3100: one thread and a node cap per rating, measured against
+Stockfish's own `UCI_Elo` levels), `SyzygyPath` and `SyzygyProbeDepth` (3-5 piece tables and up, through Fathom;
+`-DCHESS_SYZYGY=OFF` leaves it out), `EvalFile` (a `.nnue` file, `none` for the hand-tuned evaluation,
+`<default>` for the built-in network). Supported `go` parameters: `depth`, `nodes`, `movetime`,
+`wtime`/`btime`/`winc`/`binc`/`movestogo`, `infinite`, `ponder` (with `ponderhit`), `searchmoves`.
+Not supported: `mate`.
 
 ## Layout
 
