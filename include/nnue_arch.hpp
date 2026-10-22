@@ -20,7 +20,7 @@
 namespace nnue {
 
 constexpr int kInputs = 768;
-constexpr int kHidden = 128;
+constexpr int kHidden = 256;
 constexpr int kBuckets = 8; // output weight sets, by piece count
 constexpr int kQA = 255;
 constexpr int kQB = 64;
