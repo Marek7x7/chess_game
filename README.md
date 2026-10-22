@@ -76,5 +76,8 @@ Not supported: `mate`.
 | `src/nnue.cpp`, `nnue/default.nnue` | the network evaluation and the net compiled into the executable (`-DCHESS_NNUE=OFF` leaves it out) |
 | `src/uci.cpp`, `src/gui.cpp`, `src/match.cpp` | UCI driver, SDL2 GUI, bot matches |
 | `include/tune.hpp`, `include/search_params.hpp` | tunable evaluation weights and search constants |
+| `third_party/fathom/` | Fathom (MIT), the Syzygy tablebase probing code, behind `src/syzygy.cpp` |
+| `tools/anchor.sh`, `tools/calibrate_elo.sh` | rating against Stockfish's `UCI_Elo` levels; the node caps behind `UCI_Elo` |
+| `tools/book/`, `tools/syzygy_check.py`, `tools/gui_test/`, `tools/package.sh` | book building, tablebase cross-check against python-chess, the headless GUI driver, release archives |
 | `tools/nnue/` | network trainer, self-play data generator and `auto.sh`, the unattended retraining loop ([README](tools/nnue/README.md)) |
 | `tools/` | SPRT and SPSA drivers, `anchor.sh` (Stockfish gauntlet), the Texel tuner, Stockfish analysis scripts, the UCI suite |

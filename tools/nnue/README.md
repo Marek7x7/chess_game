@@ -1,7 +1,7 @@
 # Neural-network evaluation: data, training, use
 
 The engine can evaluate with a small neural network instead of the hand-crafted terms (`include/nnue_arch.hpp`
-describes the shape: 768 one-hot inputs per side, 128 hidden units, SCReLU, eight output weight sets chosen by the
+describes the shape: 768 one-hot inputs per side, 256 hidden units, SCReLU, eight output weight sets chosen by the
 piece count). Nothing here needs Python or a GPU: the trainer is C++ and trains about 2 million positions per second
 per three cores.
 
