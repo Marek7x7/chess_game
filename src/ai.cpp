@@ -1314,8 +1314,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         ttEntry.flag != TTFlag::UpperBound && std::abs(fromTT(ttEntry.score, ply)) < kMateThreshold) {
         const int sBeta = fromTT(ttEntry.score, ply) - spSingularMargin * depth;
         const int s = negamax(board, (depth - 1) / 2, ply, sBeta - 1, sBeta, color, ctx, extensionsLeft, &ttMove);
-        if (s < sBeta) singularExtension = 1;
+        if (s < sBeta - spSingularDoubleMargin) singularExtension = 2; // no other move comes close: two plies
+        else if (s < sBeta) singularExtension = 1;
         else if (sBeta >= beta) return sBeta;
+        else if (fromTT(ttEntry.score, ply) >= beta) singularExtension = -1; // the others nearly match it: a ply less
     }
 
     // Legality is tested lazily: only a move that is actually searched needs it, and a node that cuts
@@ -1390,7 +1392,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         anyLegal = true;
         ctx.tt.prefetch(board.hashKey());
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
-        const int extension = singularExtension && sameMove(m, ttMove) ? 1 : 0;
+        const int extension = sameMove(m, ttMove) ? singularExtension : 0;
 
         // Late-move pruning: at shallow depth in a non-PV node, the quiet moves ordered
         // after the first few are very unlikely to matter.
