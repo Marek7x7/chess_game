@@ -84,6 +84,31 @@ bool parseInt(const std::string& s, int& out) {
 constexpr int kMaxHashMB = 4096;
 constexpr long long kMaxSearchMs = 24LL * 60 * 60 * 1000; // "no limit" is a 24 hour deadline
 
+// UCI_LimitStrength / UCI_Elo: the engine is weakened by capping the nodes of one search (and using one
+// thread). The caps come from a fit of 11 measurements against Stockfish's own UCI_Elo levels
+// (tools/calibrate_elo.sh, 20+0.2, 100 games each, rows in STRENGTH_LOG.md; rating = a quadratic in
+// log2(nodes), within about 40 Elo of every point) and are interpolated between the entries on a log scale.
+// Below about 300 nodes the search cannot finish even its first depth and plays almost at random, so
+// 1500 is the lowest rating offered (Stockfish goes down to 1320); at and above kMaxElo the engine plays
+// unrestricted (its measured strength is about 3090).
+constexpr int kMinElo = 1500;
+constexpr int kMaxElo = 3100;
+struct EloNodes { int elo; double nodes; };
+constexpr EloNodes kEloNodes[] = {{1500, 350}, {1600, 470}, {1800, 900}, {2000, 1840}, {2200, 4000}, {2400, 9750},
+                                  {2600, 28000}, {2800, 110000}, {3000, 1000000}, {3100, 2500000}};
+
+long long nodesForElo(int elo) {
+    elo = std::clamp(elo, kMinElo, kMaxElo);
+    const size_t n = sizeof(kEloNodes) / sizeof(kEloNodes[0]);
+    for (size_t i = 1; i < n; i++) {
+        if (elo <= kEloNodes[i].elo) {
+            const double f = static_cast<double>(elo - kEloNodes[i - 1].elo) / (kEloNodes[i].elo - kEloNodes[i - 1].elo);
+            return static_cast<long long>(std::exp(std::log(kEloNodes[i - 1].nodes) * (1 - f) + std::log(kEloNodes[i].nodes) * f));
+        }
+    }
+    return static_cast<long long>(kEloNodes[n - 1].nodes);
+}
+
 // MultiPV: the `multiPv` best moves, each with its own score and line. Done on top of the ordinary search
 // rather than inside it: at every depth, one search per line over the root moves not yet chosen (the
 // "searchmoves" restriction), all sharing the table. A depth whose lines did not all finish in time is
@@ -187,6 +212,8 @@ int runUci() {
     int threadsOption = hwThreads;
     int moveOverheadMs = 50;
     int multiPvOption = 1;
+    bool limitStrength = false;
+    int eloOption = kMaxElo;
     bool ponderOption = false; // UCI "Ponder": GUIs only ponder when it is on, so "bestmove" names a ponder move only then
 
     // (Re)creates the table for the current Hash size. The old one goes first, so a big table is
@@ -248,6 +275,8 @@ int runUci() {
                 std::printf("option name MultiPV type spin default 1 min 1 max 256\n");
                 std::printf("option name SyzygyPath type string default <empty>\n");
                 std::printf("option name SyzygyProbeDepth type spin default 1 min 1 max 100\n");
+                std::printf("option name UCI_LimitStrength type check default false\n");
+                std::printf("option name UCI_Elo type spin default %d min %d max %d\n", kMaxElo, kMinElo, kMaxElo);
                 std::printf("option name EvalFile type string default <default>\n");
     #ifdef SPSA
                 for (const SearchParam& sp : searchParamRegistry())
@@ -293,6 +322,10 @@ int runUci() {
                     if (parseInt(value, number)) threadsOption = std::clamp(number, 1, maxThreads);
                 } else if (name == "OwnBook") {
                     ownBook = (value == "true");
+                } else if (name == "UCI_LimitStrength") {
+                    limitStrength = (value == "true");
+                } else if (name == "UCI_Elo") {
+                    if (parseInt(value, number)) eloOption = std::clamp(number, kMinElo, kMaxElo);
                 } else if (name == "SyzygyPath") {
                     std::string message;
                     syzygy::init(value, message);
@@ -479,6 +512,11 @@ int runUci() {
                 opts.gameHistory = gameHistory;
                 opts.softTimeMs = static_cast<int>(std::max<long long>(softTimeMs, 0));
                 opts.nodeLimit = std::max<long long>(nodeLimit, 0);
+                if (limitStrength && eloOption < kMaxElo) { // weakened play: one thread, a node cap by rating
+                    opts.threadOverride = 1;
+                    const long long cap = nodesForElo(eloOption);
+                    opts.nodeLimit = opts.nodeLimit > 0 ? std::min(opts.nodeLimit, cap) : cap;
+                }
                 opts.searchMoves = searchMoves;
                 opts.endgameDepthBonus = false; // "go depth N" searches N plies, endgame or not
                 auto start = std::chrono::steady_clock::now();

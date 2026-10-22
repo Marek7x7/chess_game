@@ -122,7 +122,8 @@ def handshake(path):
     e.close()
     text = "\n".join(l for l in out if l)
     assert out[-1] == "uciok", "no uciok"
-    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead", "Ponder", "MultiPV", "SyzygyPath", "SyzygyProbeDepth"):
+    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead", "Ponder", "MultiPV", "UCI_LimitStrength", "UCI_Elo",
+                "SyzygyPath", "SyzygyProbeDepth"):
         assert f"option name {opt} " in text, f"option {opt} not advertised"
 
 
@@ -419,6 +420,19 @@ def syzygy_options_survive_bad_input(path):
     e.send("go depth 5")
     assert bestmove(e.read_until("bestmove", 20)), "no bestmove after the Syzygy options"
     e.close()
+
+
+@case
+def limited_strength_plays_and_is_cheaper(path):
+    e = start(path, ["Threads value 1", "UCI_LimitStrength value true", "UCI_Elo value 1800"])
+    e.send("position startpos moves e2e4 e7e5")
+    t0 = time.time()
+    e.send("go movetime 2000")
+    out = e.read_until("bestmove", 6)
+    took = time.time() - t0
+    e.close()
+    assert bestmove(out), f"no bestmove: {out[-2:]}"
+    assert took < 1.0, f"a 1800-rated search used {took:.1f}s of a 2 s budget (it should be node-capped)"
 
 
 def main():
