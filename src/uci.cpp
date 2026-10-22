@@ -82,6 +82,77 @@ bool parseInt(const std::string& s, int& out) {
 constexpr int kMaxHashMB = 4096;
 constexpr long long kMaxSearchMs = 24LL * 60 * 60 * 1000; // "no limit" is a 24 hour deadline
 
+// MultiPV: the `multiPv` best moves, each with its own score and line. Done on top of the ordinary search
+// rather than inside it: at every depth, one search per line over the root moves not yet chosen (the
+// "searchmoves" restriction), all sharing the table. A depth whose lines did not all finish in time is
+// dropped, so the answer is the best move of the last depth that did. With multiPv 1 nothing here is used.
+std::string multiPvSearch(const Board& board, Color color, int maxDepth, long long budgetMs, long long softMs,
+                          int multiPv, TranspositionTable& tt, const SearchOptions& base,
+                          const std::vector<uint64_t>& history, std::pair<std::string, std::string>& line) {
+    const auto start = std::chrono::steady_clock::now();
+    const auto deadline = start + std::chrono::milliseconds(budgetMs);
+    std::vector<Move> legal;
+    for (const Move& m : board.legalMoves(color)) legal.push_back(m);
+    const int lines = std::min<int>(multiPv, static_cast<int>(legal.size()));
+    std::string best = formatUciMove(legal.front());
+    if (legal.size() == 1) return best; // nothing to rank (the ordinary search answers at once too)
+    long long nodes = 0;
+
+    for (int depth = 1; depth <= maxDepth; depth++) {
+        std::vector<Move> chosen;
+        std::vector<std::string> infos;
+        bool complete = true;
+        for (int k = 0; k < lines && complete; k++) {
+            const long long remaining =
+                std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()).count();
+            if (remaining <= 0 || (base.stopFlag && base.stopFlag->load())) {
+                complete = false;
+                break;
+            }
+            SearchOptions opts = base;
+            opts.useOpeningBook = false;
+            opts.softTimeMs = 0;
+            opts.searchMoves.clear();
+            for (const Move& m : legal) {
+                bool taken = false;
+                for (const Move& c : chosen) taken = taken || sameMove(m, c);
+                if (!taken) opts.searchMoves.push_back(m);
+            }
+            SearchProgress last;
+            opts.onDepthComplete = [&last](const SearchProgress& p) { last = p; };
+            const Move m = findBestMove(board, color, depth, static_cast<int>(remaining), tt, opts);
+            nodes += last.nodes;
+            if (last.depth != depth) { // cut off before this depth finished
+                complete = false;
+                break;
+            }
+            chosen.push_back(m);
+            Board after = board;
+            after.makeMove(m);
+            std::vector<Move> pv = {m};
+            const std::vector<Move> rest = extractPV(after, tt, 31, history);
+            pv.insert(pv.end(), rest.begin(), rest.end());
+            const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+            char buf[64];
+            std::snprintf(buf, sizeof buf, "%d depth %d score ", k + 1, depth);
+            infos.push_back(std::string("info multipv ") + buf + formatUciScore(last.score) + " time " +
+                            std::to_string(static_cast<long long>(secs * 1000)) + " nodes " + std::to_string(nodes) +
+                            " nps " + std::to_string(secs > 0 ? static_cast<long long>(nodes / secs) : 0) +
+                            " hashfull " + std::to_string(tt.hashfull()) + " pv " + formatUciMoveList(pv));
+            if (k == 0) {
+                best = formatUciMove(m);
+                line.first = best;
+                line.second = pv.size() > 1 ? formatUciMove(pv[1]) : "";
+            }
+        }
+        if (!complete) break;
+        for (const std::string& s : infos) std::printf("%s\n", s.c_str());
+        std::fflush(stdout);
+        if (softMs > 0 && std::chrono::steady_clock::now() - start >= std::chrono::milliseconds(softMs)) break;
+    }
+    return best;
+}
+
 std::vector<std::string> splitTokens(const std::string& line) {
     std::istringstream iss(line);
     std::vector<std::string> tokens;
@@ -113,6 +184,7 @@ int runUci() {
     const int maxThreads = std::max(1, hwThreads * 4);
     int threadsOption = hwThreads;
     int moveOverheadMs = 50;
+    int multiPvOption = 1;
     bool ponderOption = false; // UCI "Ponder": GUIs only ponder when it is on, so "bestmove" names a ponder move only then
 
     // (Re)creates the table for the current Hash size. The old one goes first, so a big table is
@@ -171,6 +243,7 @@ int runUci() {
                 std::printf("option name OwnBook type check default false\n");
                 std::printf("option name Move Overhead type spin default %d min 0 max 5000\n", moveOverheadMs);
                 std::printf("option name Ponder type check default false\n");
+                std::printf("option name MultiPV type spin default 1 min 1 max 256\n");
                 std::printf("option name EvalFile type string default <default>\n");
     #ifdef SPSA
                 for (const SearchParam& sp : searchParamRegistry())
@@ -216,6 +289,8 @@ int runUci() {
                     if (parseInt(value, number)) threadsOption = std::clamp(number, 1, maxThreads);
                 } else if (name == "OwnBook") {
                     ownBook = (value == "true");
+                } else if (name == "MultiPV") {
+                    if (parseInt(value, number)) multiPvOption = std::clamp(number, 1, 256);
                 } else if (name == "Ponder") {
                     ponderOption = (value == "true");
                 } else if (name == "Move Overhead") {
@@ -430,11 +505,21 @@ int runUci() {
                 };
 
                 int tbMs = static_cast<int>(timeBudgetMs);
+                const int multiPv = multiPvOption;
+                const long long softMs = opts.softTimeMs;
                 searchTask = std::async(std::launch::async, [&tt, &stopFlag, &pondering, &ponderOption, searchBoard, aiColor,
-                                                              maxDepth, tbMs, opts, infinite, line]() {
+                                                              maxDepth, tbMs, opts, infinite, line, multiPv, softMs,
+                                                              history = gameHistory]() {
                     std::string best = "0000";
                     try {
-                        best = formatUciMove(findBestMove(searchBoard, aiColor, maxDepth, tbMs, *tt, opts));
+                        if (multiPv > 1) {
+                            SearchOptions mpOpts = opts;
+                            mpOpts.onDepthComplete = nullptr; // multiPvSearch reports its own lines
+                            best = multiPvSearch(searchBoard, aiColor, maxDepth, tbMs, softMs, multiPv, *tt, mpOpts,
+                                                 history, *line);
+                        } else {
+                            best = formatUciMove(findBestMove(searchBoard, aiColor, maxDepth, tbMs, *tt, opts));
+                        }
                     } catch (const std::exception& e) {
                         std::printf("info string search error: %s\n", e.what());
                     }

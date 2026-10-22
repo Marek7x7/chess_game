@@ -122,7 +122,7 @@ def handshake(path):
     e.close()
     text = "\n".join(l for l in out if l)
     assert out[-1] == "uciok", "no uciok"
-    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead", "Ponder"):
+    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead", "Ponder", "MultiPV"):
         assert f"option name {opt} " in text, f"option {opt} not advertised"
 
 
@@ -346,6 +346,67 @@ def no_ponder_move_unless_enabled(path):
     out = e.read_until("bestmove", 20)
     e.close()
     assert bestmove(out) and "ponder" not in out[-1], f"unexpected: {out[-1]}"
+
+
+def multipv_lines(out, depth=None):
+    """{multipv index: (depth, first pv move)} from the info lines (the last depth's, if depth is None)."""
+    rows = []
+    for l in out:
+        m = re.match(r"^info multipv (\d+) depth (\d+) .* pv ([a-h][1-8][a-h][1-8][qrbn]?)", l or "")
+        if m:
+            rows.append((int(m.group(2)), int(m.group(1)), m.group(3)))
+    if not rows:
+        return {}
+    d = depth if depth is not None else max(r[0] for r in rows)
+    return {k: (dd, mv) for dd, k, mv in rows if dd == d}
+
+
+@case
+def multipv_reports_distinct_lines(path):
+    e = start(path, ["Threads value 1", "MultiPV value 3"])
+    e.send("position startpos moves e2e4 e7e5")
+    e.send("go depth 6")
+    out = e.read_until("bestmove", 30)
+    e.close()
+    assert bestmove(out), "no bestmove"
+    lines = multipv_lines(out)
+    assert sorted(lines) == [1, 2, 3], f"expected lines 1-3 at the last depth, got {sorted(lines)}"
+    assert lines[1][0] == 6, f"deepest lines are at depth {lines[1][0]}, not 6"
+    firsts = [lines[k][1] for k in (1, 2, 3)]
+    assert len(set(firsts)) == 3, f"first moves are not distinct: {firsts}"
+    assert out[-1].split()[1] == firsts[0], f"bestmove {out[-1]} is not line 1 ({firsts[0]})"
+
+
+@case
+def multipv_with_fewer_legal_moves_than_lines(path):
+    e = start(path, ["Threads value 1", "MultiPV value 5"])
+    e.send("position fen 7k/8/8/2b5/8/8/8/7K w - - 0 1")  # two legal moves: Kg2 and Kh2 (the bishop covers g1)
+    e.send("go depth 4")
+    out = e.read_until("bestmove", 10)
+    assert bestmove(out), f"no bestmove: {out[-3:]}"
+    assert sorted(multipv_lines(out)) == [1, 2], f"expected two lines, got {sorted(multipv_lines(out))}"
+    e.send("position fen 7k/8/8/8/8/8/6q1/7K w - - 0 1")  # one legal move: Kxg2
+    e.send("go depth 4")
+    out = e.read_until("bestmove", 10)
+    e.close()
+    assert bestmove(out) and out[-1].split()[1] == "h1g2", f"expected h1g2, got {out[-1]}"
+
+
+@case
+def multipv_stop_and_movetime(path):
+    e = start(path, ["Threads value 1", "MultiPV value 4"])
+    e.send("position startpos")
+    t0 = time.time()
+    e.send("go movetime 600")
+    out = e.read_until("bestmove", 5)
+    took = time.time() - t0
+    assert bestmove(out), "no bestmove for movetime"
+    assert took < 2.0, f"movetime 600 took {took:.1f}s"
+    e.send("go infinite")
+    e.drain(0.6)
+    e.send("stop")
+    assert bestmove(e.read_until("bestmove", 3)), "stop did not end the MultiPV search"
+    e.close()
 
 
 def main():

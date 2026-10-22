@@ -1863,7 +1863,9 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
                 }
         if (!allowed.empty()) rootMoves = allowed;
     }
-    if (rootMoves.size() == 1) return rootMoves.front();
+    // The only legal move needs no search -- unless the caller restricted the moves and wants it scored
+    // (MultiPV asks for the last of its lines this way).
+    if (rootMoves.size() == 1 && options.searchMoves.empty()) return rootMoves.front();
 
     if (g_aiDebugLog) {
         std::fprintf(stderr, "[ai] findBestMove: color=%s maxDepth=%d timeBudgetMs=%d rootMoves=%zu\n",
