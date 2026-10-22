@@ -1757,8 +1757,17 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
                     std::uniform_int_distribution<size_t> dist(0, bestReplies.size() - 1);
                     return bestReplies[dist(rng)];
                 }
-                std::uniform_int_distribution<size_t> dist(0, legalBookMoves.size() - 1);
-                return legalBookMoves[dist(rng)].move;
+                // White varies too, but only among moves within 10 points of the
+                // best-weighted one (a weight-62 gambit is not as good a choice
+                // as a weight-95 main line).
+                int bestWeight = legalBookMoves.front().weight;
+                for (const BookEntry& be : legalBookMoves) bestWeight = std::max(bestWeight, be.weight);
+                std::vector<Move> choices;
+                for (const BookEntry& be : legalBookMoves) {
+                    if (be.weight >= bestWeight - 10) choices.push_back(be.move);
+                }
+                std::uniform_int_distribution<size_t> dist(0, choices.size() - 1);
+                return choices[dist(rng)];
             }
         }
     }
