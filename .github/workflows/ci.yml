@@ -42,7 +42,7 @@ jobs:
         run: >
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCHESS_GUI=OFF -DCHESS_LTO=OFF -DCHESS_WERROR=OFF
           -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" && cmake --build build -j
-      - name: Gates (shallower than Release: the sanitizers are slow)
+      - name: Gates (shallower than Release, the sanitizers are slow)
         run: |
           build/chess --bench 6
           build/chess --verify-eval 3
