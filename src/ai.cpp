@@ -1373,6 +1373,14 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             moveIndex++;
             continue;
         }
+        // Quiet-move SEE pruning: at shallow depth in a non-PV node, a quiet move onto a square where it
+        // would simply be lost (or lose more than a margin) is skipped.
+        if (!pvNode && !inCheck && moveIndex > 0 && depth <= spQuietSeeDepth && best > -kMateThreshold &&
+            m.captured == PieceType::None && m.promotion == PieceType::None &&
+            see(board, m) < -spQuietSeeMargin * depth) {
+            moveIndex++;
+            continue;
+        }
         Board::UndoState undo;
         board.makeMove(m, undo);
         if (mayBeIllegal(m) && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
