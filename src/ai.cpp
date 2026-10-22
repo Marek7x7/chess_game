@@ -1365,6 +1365,14 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             moveIndex++;
             continue;
         }
+        // History pruning: at shallow depth in a non-PV node, a quiet move that has mostly failed
+        // before is skipped.
+        if (!pvNode && !inCheck && moveIndex > 0 && depth <= spHistPruneDepth && best > -kMateThreshold &&
+            m.captured == PieceType::None && m.promotion == PieceType::None &&
+            ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY] < -spHistPruneMargin * depth) {
+            moveIndex++;
+            continue;
+        }
         Board::UndoState undo;
         board.makeMove(m, undo);
         if (mayBeIllegal(m) && board.isInCheck(color)) { // illegal: leaves the mover's king attacked

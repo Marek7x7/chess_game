@@ -60,6 +60,11 @@ SEARCH_PARAM(spRazorMargin, 300, 100, 600);     // razoring: drop to quiescence 
 SEARCH_PARAM(spRazorMaxDepth, 3, 1, 4);
 SEARCH_PARAM(spProbCutMargin, 190, 80, 400);    // ProbCut: captures tried against beta + margin
 SEARCH_PARAM(spProbCutMinDepth, 5, 4, 9);
+SEARCH_PARAM(spHistPruneDepth, 3, 1, 6);        // history pruning: quiet moves with history < -margin * depth
+SEARCH_PARAM(spHistPruneMargin, 600, 100, 4000);
+SEARCH_PARAM(spQuietSeeDepth, 6, 2, 10);        // quiet moves that lose more than margin * depth to SEE are skipped
+SEARCH_PARAM(spQuietSeeMargin, 60, 20, 150);
+SEARCH_PARAM(spSingularDoubleMargin, 25, 10, 80); // singular by this much more: extend two plies
 
 #ifndef SPSA
 static_assert(spLmrMinDepth >= 3, "std::clamp(reduction, 1, depth - 2) in negamax needs depth - 2 >= 1");
