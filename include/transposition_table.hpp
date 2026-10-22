@@ -33,14 +33,14 @@ struct TTEntry {
 // through rewriting it sees a key that doesn't match and treats it as a
 // miss, so a torn entry is never used (the classic lockless-hashing scheme).
 //
-// Slots come in buckets of four (one 64-byte cache line), and a position can
-// live in any slot of its bucket: a new result evicts whichever of the four is
-// worth least -- one left over from an earlier search before one from this
-// search, then the shallowest -- so a deep result isn't lost to an unrelated
-// shallow store landing on the same slot.
+// Slots come in buckets of two, and a position can live in either slot of
+// its bucket: a new result evicts whichever of the two is worth less -- one
+// left over from an earlier search before one from this search, then the
+// shallower one -- so a deep result isn't lost to an unrelated shallow
+// store landing on the same slot.
 class TranspositionTable {
 public:
-    explicit TranspositionTable(size_t sizePowerOfTwo); // total slots (four per bucket), at least 4
+    explicit TranspositionTable(size_t sizePowerOfTwo); // total slots (two per bucket), at least 2
 
     // Distinct for every table ever constructed: lets state that lives beside the
     // table (see ai.cpp) tell a new game's table from the previous one's.
@@ -71,7 +71,8 @@ private:
     };
     static_assert(sizeof(Slot) == kEntryBytes, "kEntryBytes must match the slot layout");
 
-    // Cache-line aligned: a bucket is 64 bytes, exactly one line, so it must start on one.
+    // Cache-line aligned: a bucket is 32 bytes, so with only the allocator's
+    // 16-byte alignment half the buckets would straddle two cache lines.
     struct FreeDeleter {
 #ifdef _WIN32
         void operator()(void* p) const { _aligned_free(p); } // memory from _aligned_malloc
@@ -79,9 +80,8 @@ private:
         void operator()(void* p) const { std::free(p); }
 #endif
     };
-    static constexpr size_t kBucketSlots = 4;
     std::unique_ptr<Slot[], FreeDeleter> table;
-    size_t bucketMask; // slot index of a key's bucket = key & bucketMask (a multiple of 4)
+    size_t bucketMask; // slot index of a key's bucket = key & bucketMask (always even)
     uint64_t generation = 0;
     uint64_t id = 0;
 };
