@@ -19,7 +19,7 @@ import sys
 import threading
 import time
 
-BESTMOVE = re.compile(r"^bestmove (?:[a-h][1-8][a-h][1-8][qrbn]?|0000)$")
+BESTMOVE = re.compile(r"^bestmove (?:[a-h][1-8][a-h][1-8][qrbn]?|0000)(?: ponder [a-h][1-8][a-h][1-8][qrbn]?)?$")
 MATE = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"        # black to move, stalemated
 BAD_FENS = ["garbage", "", "9999999/8/8/8/8/8/8/8 w - - 0 1", "8/8/8/8/8/8/8/8 w - - 0 1",
             "8/8/8/8/8/8/8/4K3 w - - 0 1", "P3k3/8/8/8/8/8/8/4K3 w - - 0 1",
@@ -122,7 +122,7 @@ def handshake(path):
     e.close()
     text = "\n".join(l for l in out if l)
     assert out[-1] == "uciok", "no uciok"
-    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead"):
+    for opt in ("Hash", "Threads", "OwnBook", "Move Overhead", "Ponder"):
         assert f"option name {opt} " in text, f"option {opt} not advertised"
 
 
@@ -303,6 +303,49 @@ def new_game_and_moves(path):
         e.send("go depth 3")
         assert bestmove(e.read_until("bestmove")), "no move after ucinewgame/position"
     e.close()
+
+
+@case
+def ponder_waits_for_ponderhit_then_answers(path):
+    e = start(path, ["Threads value 2", "Ponder value true"])
+    e.send("position startpos moves e2e4 e7e5")
+    e.send("go ponder wtime 30000 btime 30000")
+    early = e.read_until("bestmove", 1.5)
+    assert early[-1] is None, "answered before ponderhit"
+    t0 = time.time()
+    e.send("ponderhit")
+    out = e.read_until("bestmove", 6)
+    took = time.time() - t0
+    e.close()
+    assert bestmove(out), f"no bestmove after ponderhit: {out[-3:]}"
+    assert " ponder " in out[-1], f"no ponder move in {out[-1]}"
+    assert took < 3.5, f"took {took:.1f}s after ponderhit with 30 s on the clock"
+
+
+@case
+def ponder_stop_and_depth_limit(path):
+    e = start(path, ["Threads value 1", "Ponder value true"])
+    e.send("position startpos")
+    e.send("go ponder wtime 30000 btime 30000")
+    e.drain(0.5)
+    e.send("stop")
+    assert bestmove(e.read_until("bestmove", 3)), "stop did not end the ponder search"
+    e.send("go ponder depth 3")  # finishes at once, but must wait for ponderhit
+    assert e.read_until("bestmove", 1.0)[-1] is None, "depth-limited ponder answered before ponderhit"
+    e.send("ponderhit")
+    out = e.read_until("bestmove", 3)
+    e.close()
+    assert bestmove(out), "no bestmove after ponderhit"
+
+
+@case
+def no_ponder_move_unless_enabled(path):
+    e = start(path, ["Threads value 1"])
+    e.send("position startpos moves e2e4 e7e5")
+    e.send("go depth 8")
+    out = e.read_until("bestmove", 20)
+    e.close()
+    assert bestmove(out) and "ponder" not in out[-1], f"unexpected: {out[-1]}"
 
 
 def main():

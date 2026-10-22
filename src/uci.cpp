@@ -113,6 +113,7 @@ int runUci() {
     const int maxThreads = std::max(1, hwThreads * 4);
     int threadsOption = hwThreads;
     int moveOverheadMs = 50;
+    bool ponderOption = false; // UCI "Ponder": GUIs only ponder when it is on, so "bestmove" names a ponder move only then
 
     // (Re)creates the table for the current Hash size. The old one goes first, so a big table is
     // never alive twice at once; if the memory is not there, the size is halved until it is.
@@ -132,6 +133,13 @@ int runUci() {
     rebuildTT();
 
     std::atomic<bool> stopFlag{false};
+    // "go ponder" searches the position after the move the engine expects, with no time limit, until
+    // "ponderhit" (the opponent played it: the search is kept and a timer ends it after the usual time
+    // for a move) or "stop"/a new "position" (it did not: the search is thrown away).
+    std::atomic<bool> pondering{false};
+    std::atomic<bool> timerCancel{false};
+    long long ponderOptimumMs = 0;
+    std::thread ponderTimer;
     std::future<void> searchTask;
     auto joinSearch = [&]() {
         if (searchTask.valid()) searchTask.get();
@@ -140,8 +148,12 @@ int runUci() {
     // leave us waiting for an infinite search before the next command can be handled.
     auto haltSearch = [&]() {
         stopFlag.store(true);
+        timerCancel.store(true);
+        if (ponderTimer.joinable()) ponderTimer.join();
         joinSearch();
+        pondering.store(false);
         stopFlag.store(false);
+        timerCancel.store(false);
     };
 
     std::string line;
@@ -158,6 +170,7 @@ int runUci() {
                 std::printf("option name Threads type spin default %d min 1 max %d\n", threadsOption, maxThreads);
                 std::printf("option name OwnBook type check default false\n");
                 std::printf("option name Move Overhead type spin default %d min 0 max 5000\n", moveOverheadMs);
+                std::printf("option name Ponder type check default false\n");
                 std::printf("option name EvalFile type string default <default>\n");
     #ifdef SPSA
                 for (const SearchParam& sp : searchParamRegistry())
@@ -203,6 +216,8 @@ int runUci() {
                     if (parseInt(value, number)) threadsOption = std::clamp(number, 1, maxThreads);
                 } else if (name == "OwnBook") {
                     ownBook = (value == "true");
+                } else if (name == "Ponder") {
+                    ponderOption = (value == "true");
                 } else if (name == "Move Overhead") {
                     if (parseInt(value, number)) moveOverheadMs = std::clamp(number, 0, 5000);
                 } else if (name == "EvalFile") {
@@ -283,7 +298,7 @@ int runUci() {
                 long long timeBudgetMs = -1;
                 long long softTimeMs = 0;
                 long long movetime = -1, wtime = 0, btime = 0, winc = 0, binc = 0;
-                bool haveWtime = false, haveBtime = false, infinite = false;
+                bool haveWtime = false, haveBtime = false, infinite = false, ponder = false;
                 int movestogo = 0;
                 long long nodeLimit = 0;
                 std::vector<Move> searchMoves;
@@ -312,6 +327,8 @@ int runUci() {
                         if (next(v)) movestogo = static_cast<int>(std::clamp<long long>(v, 0, 1000));
                     } else if (tok[i] == "infinite") {
                         infinite = true;
+                    } else if (tok[i] == "ponder") {
+                        ponder = true;
                     } else if (tok[i] == "nodes") {
                         next(nodeLimit);
                     } else if (tok[i] == "searchmoves") {
@@ -359,6 +376,12 @@ int runUci() {
                     timeBudgetMs = kMaxSearchMs;
                     softTimeMs = 0;
                 }
+                if (ponder && !infinite) { // no limit until "ponderhit"; the time it will then get is kept here
+                    ponderOptimumMs = softTimeMs > 0 ? std::min<long long>(softTimeMs * 2, timeBudgetMs) : timeBudgetMs;
+                    timeBudgetMs = kMaxSearchMs;
+                    softTimeMs = 0;
+                    pondering.store(true);
+                }
                 timeBudgetMs = std::clamp<long long>(timeBudgetMs, 1, kMaxSearchMs);
 
                 Board searchBoard = board;
@@ -372,7 +395,10 @@ int runUci() {
                 opts.searchMoves = searchMoves;
                 opts.endgameDepthBonus = false; // "go depth N" searches N plies, endgame or not
                 auto start = std::chrono::steady_clock::now();
-                opts.onDepthComplete = [&tt, searchBoard, start, history = gameHistory](const SearchProgress& p) {
+                // The first two moves of the last completed depth's line: what the engine will play and
+                // what it expects back (written by the search's first thread, read once it has ended).
+                auto line = std::make_shared<std::pair<std::string, std::string>>();
+                opts.onDepthComplete = [&tt, searchBoard, start, history = gameHistory, line](const SearchProgress& p) {
                     // p.bestMove is the authoritative move for this depth --
                     // exactly what becomes `bestmove` if this is the last
                     // completed depth. extractPV()'s own TT root-probe is NOT
@@ -393,6 +419,8 @@ int runUci() {
                     std::vector<Move> pv = {p.bestMove};
                     std::vector<Move> rest = extractPV(afterBest, *tt, 31, history);
                     pv.insert(pv.end(), rest.begin(), rest.end());
+                    line->first = formatUciMove(pv[0]);
+                    line->second = pv.size() > 1 ? formatUciMove(pv[1]) : "";
                     double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
                     long long nps = secs > 0 ? static_cast<long long>(p.nodes / secs) : 0;
                     std::printf("info depth %d score %s time %lld nodes %lld nps %lld hashfull %d pv %s\n", p.depth,
@@ -402,24 +430,46 @@ int runUci() {
                 };
 
                 int tbMs = static_cast<int>(timeBudgetMs);
-                searchTask = std::async(std::launch::async, [&tt, &stopFlag, searchBoard, aiColor, maxDepth, tbMs, opts,
-                                                              infinite]() {
+                searchTask = std::async(std::launch::async, [&tt, &stopFlag, &pondering, &ponderOption, searchBoard, aiColor,
+                                                              maxDepth, tbMs, opts, infinite, line]() {
                     std::string best = "0000";
                     try {
                         best = formatUciMove(findBestMove(searchBoard, aiColor, maxDepth, tbMs, *tt, opts));
                     } catch (const std::exception& e) {
                         std::printf("info string search error: %s\n", e.what());
                     }
-                    // "go infinite" must not answer before "stop" (or "quit"), even when the search ran out of depth.
-                    while (infinite && !stopFlag.load()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                    std::printf("bestmove %s\n", best.c_str());
+                    // "go infinite" must not answer before "stop" (or "quit"), even when the search ran out of depth;
+                    // nor "go ponder" before "ponderhit" or "stop".
+                    while ((infinite || pondering.load()) && !stopFlag.load())
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    if (ponderOption && best == line->first && !line->second.empty())
+                        std::printf("bestmove %s ponder %s\n", best.c_str(), line->second.c_str());
+                    else
+                        std::printf("bestmove %s\n", best.c_str());
                     std::fflush(stdout);
                 });
+            } else if (cmd == "ponderhit") {
+                if (pondering.exchange(false)) {
+                    if (ponderTimer.joinable()) ponderTimer.join();
+                    timerCancel.store(false);
+                    ponderTimer = std::thread([&, ms = ponderOptimumMs]() {
+                        const auto end = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+                        while (std::chrono::steady_clock::now() < end && !timerCancel.load() && !stopFlag.load())
+                            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                        if (!timerCancel.load()) stopFlag.store(true);
+                    });
+                }
             } else if (cmd == "stop") {
                 stopFlag.store(true);
                 joinSearch(); // blocks until the search thread notices and prints bestmove
+                timerCancel.store(true);
+                if (ponderTimer.joinable()) ponderTimer.join();
+                timerCancel.store(false);
+                pondering.store(false);
             } else if (cmd == "quit") {
                 stopFlag.store(true);
+                timerCancel.store(true);
+                if (ponderTimer.joinable()) ponderTimer.join();
                 joinSearch();
                 break;
             }
@@ -432,6 +482,8 @@ int runUci() {
     }
     // stdin closed (the GUI went away): do not leave a search running.
     stopFlag.store(true);
+    timerCancel.store(true);
+    if (ponderTimer.joinable()) ponderTimer.join();
     joinSearch();
     return 0;
 }
