@@ -781,6 +781,10 @@ constexpr int kMaxCheckExtensions = 16;
 
 struct TimeUp {};
 
+constexpr int kCorrSize = 16384;  // entries per side, indexed by the pawn key
+constexpr int kCorrGrain = 256;   // stored units per centipawn
+constexpr int kCorrLimit = 32 * kCorrGrain;
+
 struct SearchContext {
     TranspositionTable& tt;
     Move killers[kMaxPly][2]{};
@@ -796,6 +800,9 @@ struct SearchContext {
     // 1 + (from * 64 + to) of the reply. prevMove[ply] is the move that led to
     // the node at that ply (-1: none, as at the root or after a null move).
     uint16_t counter[2][64][64]{};
+    // How far the search result has tended to land from the static eval in positions with this
+    // pawn structure, by side to move (see kCorrGrain): added to the eval the pruning rules look at.
+    int16_t corrHist[2][kCorrSize]{};
     int prevMove[kMaxPly + 1]{};
     // Stop (as at the deadline) once this thread has searched this many nodes.
     long long nodeLimit = std::numeric_limits<long long>::max();
@@ -1208,7 +1215,9 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     // The static eval, for the pruning decisions below -- only computed where
     // one of them can apply, since it isn't free.
     bool haveStaticEval = !pvNode && !inCheck;
-    int staticEval = haveStaticEval ? (ttEntry.eval != kTTNoEval ? ttEntry.eval : evaluate(board, color)) : 0;
+    const int rawEval = haveStaticEval ? (ttEntry.eval != kTTNoEval ? ttEntry.eval : evaluate(board, color)) : 0;
+    int16_t* corr = haveStaticEval ? &ctx.corrHist[colorIdx(color)][board.pawnKey() & (kCorrSize - 1)] : nullptr;
+    const int staticEval = haveStaticEval ? rawEval + *corr / kCorrGrain : 0;
 
     // Reverse futility pruning: if the static eval beats beta by more than
     // the opponent could plausibly win back in the remaining plies, assume
@@ -1425,7 +1434,15 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     if (!anyLegal) return inCheck ? -(kMateScore - ply) : 0; // checkmate or stalemate
 
     TTFlag flag = best <= origAlpha ? TTFlag::UpperBound : (best >= beta ? TTFlag::LowerBound : TTFlag::Exact);
-    if (!excluded) ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true, haveStaticEval ? staticEval : kTTNoEval);
+    // Learn from the result unless it says nothing about the eval: a capture as best move, a bound
+    // on the wrong side of the eval, or a mate score.
+    if (haveStaticEval && !excluded && std::abs(best) < kMateThreshold && bestMove.captured == PieceType::None &&
+        !(flag == TTFlag::LowerBound && best <= staticEval) && !(flag == TTFlag::UpperBound && best >= staticEval)) {
+        const int target = std::clamp((best - rawEval) * kCorrGrain, -kCorrLimit, kCorrLimit);
+        const int weight = std::min(depth + 1, 16);
+        *corr = static_cast<int16_t>((*corr * (256 - weight) + target * weight) / 256);
+    }
+    if (!excluded) ctx.tt.store(key, depth, toTT(best, ply), flag, bestMove, true, haveStaticEval ? rawEval : kTTNoEval);
     return best;
 }
 
