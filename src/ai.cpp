@@ -1218,6 +1218,14 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         staticEval - kReverseFutilityMargin * depth >= beta)
         return staticEval;
 
+    // Razoring: this far below alpha at low depth, only a capture sequence could save the node, so
+    // let quiescence decide and cut when it confirms that nothing does.
+    if (haveStaticEval && depth <= spRazorMaxDepth && !excluded && alpha > -kMateThreshold && alpha < kMateThreshold &&
+        staticEval + spRazorMargin * depth <= alpha) {
+        const int q = quiescence(board, alpha, alpha + 1, color, ply, ctx);
+        if (q <= alpha) return q;
+    }
+
     // Null-move pruning: "pass" (give the opponent a free move) and search
     // at a reduced depth with a minimal window around beta. If the
     // position is still so good after passing that it fails high, a real

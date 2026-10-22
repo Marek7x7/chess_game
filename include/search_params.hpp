@@ -56,6 +56,8 @@ SEARCH_PARAM(spLmrMinDepth, 3, 3, 7);           // first depth that may reduce (
 SEARCH_PARAM(spLmpMaxDepth, 3, 2, 8);
 SEARCH_PARAM(spRfpMaxDepth, 6, 2, 8);
 SEARCH_PARAM(spSeePruneDepth, 5, 2, 10);
+SEARCH_PARAM(spRazorMargin, 300, 100, 600);     // razoring: drop to quiescence when eval + margin * depth <= alpha
+SEARCH_PARAM(spRazorMaxDepth, 3, 1, 4);
 
 #ifndef SPSA
 static_assert(spLmrMinDepth >= 3, "std::clamp(reduction, 1, depth - 2) in negamax needs depth - 2 >= 1");
