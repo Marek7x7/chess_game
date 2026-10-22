@@ -43,6 +43,8 @@ bool insufficientMaterial(const Board& board) {
 
 } // namespace
 
+bool isInsufficientMaterial(const Board& board) { return insufficientMaterial(board); }
+
 int presetIndexByName(const std::string& name) {
     std::string upper;
     for (char c : name) upper += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
