@@ -1,7 +1,21 @@
 #include "opening_book.hpp"
 
+#include <algorithm>
 #include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <map>
+#include <tuple>
+#include <sstream>
 #include <unordered_map>
+
+#ifdef CHESS_BOOK_BUILTIN
+// The generated book compiled into the executable (made by tools/embed_file.cmake).
+extern "C" {
+extern const unsigned char chess_book_builtin[];
+extern const unsigned long chess_book_builtin_size;
+}
+#endif
 
 namespace {
 
@@ -217,11 +231,170 @@ const std::unordered_map<uint64_t, std::vector<BookEntry>>& bookIndex() {
     return index;
 }
 
+// ---- The generated book ---------------------------------------------------
+// File: "CGBK", u32 version (1), u32 record count, then records sorted by key, little-endian:
+// u64 position key (Board::hashKey), u8 from square, u8 to square (file * 8 + rank), u8 promotion (the
+// PieceType value), u8 weight.
+constexpr char kMagic[4] = {'C', 'G', 'B', 'K'};
+constexpr uint32_t kVersion = 1;
+constexpr size_t kRecordBytes = 12;
+
+struct Record {
+    uint64_t key;
+    uint8_t from, to, promotion, weight;
+};
+
+#ifdef CHESS_BOOK_BUILTIN
+bool parseBook(const unsigned char* data, size_t size, std::vector<Record>& out) {
+    if (size < 12 || std::memcmp(data, kMagic, 4) != 0) return false;
+    uint32_t version, count;
+    std::memcpy(&version, data + 4, 4);
+    std::memcpy(&count, data + 8, 4);
+    if (version != kVersion || size != 12 + static_cast<size_t>(count) * kRecordBytes) return false;
+    out.resize(count);
+    for (uint32_t i = 0; i < count; i++) {
+        const unsigned char* r = data + 12 + static_cast<size_t>(i) * kRecordBytes;
+        std::memcpy(&out[i].key, r, 8);
+        out[i].from = r[8];
+        out[i].to = r[9];
+        out[i].promotion = r[10];
+        out[i].weight = r[11];
+    }
+    return true;
+}
+#endif
+
+const std::vector<Record>& generatedBook() {
+    static const std::vector<Record> book = [] {
+        std::vector<Record> records;
+#ifdef CHESS_BOOK_BUILTIN
+        if (!parseBook(chess_book_builtin, chess_book_builtin_size, records)) {
+            std::fprintf(stderr, "[opening_book] the built-in book is malformed and is ignored\n");
+            records.clear();
+        }
+#endif
+        return records;
+    }();
+    return book;
+}
+
 } // namespace
 
+size_t generatedBookPositions() {
+    const auto& book = generatedBook();
+    size_t positions = 0;
+    for (size_t i = 0; i < book.size(); i++)
+        if (i == 0 || book[i].key != book[i - 1].key) positions++;
+    return positions;
+}
+
 std::vector<BookEntry> lookupBook(const Board& board) {
-    const auto& index = bookIndex();
-    auto it = index.find(board.hashKey());
-    if (it == index.end()) return {};
-    return it->second;
+    const auto& index = bookIndex(); // (built first, so that a bad hand-written line is always reported)
+    const auto& book = generatedBook();
+    const uint64_t key = board.hashKey();
+    auto it = std::lower_bound(book.begin(), book.end(), key, [](const Record& r, uint64_t k) { return r.key < k; });
+    if (it != book.end() && it->key == key) {
+        std::vector<BookEntry> entries;
+        for (; it != book.end() && it->key == key; ++it) {
+            Move m;
+            m.fromX = static_cast<int8_t>(it->from / 8);
+            m.fromY = static_cast<int8_t>(it->from % 8);
+            m.toX = static_cast<int8_t>(it->to / 8);
+            m.toY = static_cast<int8_t>(it->to % 8);
+            m.promotion = static_cast<PieceType>(it->promotion);
+            entries.push_back({m, it->weight}); // the caller checks the move against the legal moves
+        }
+        return entries;
+    }
+    auto hand = index.find(key);
+    if (hand == index.end()) return {};
+    return hand->second;
+}
+
+bool buildBookFile(const std::string& linesPath, const std::string& outPath, int minCount, std::string& message) {
+    std::ifstream in(linesPath);
+    if (!in) {
+        message = "cannot read " + linesPath;
+        return false;
+    }
+    // position key -> (from, to, promotion) -> games
+    struct MoveKey {
+        uint8_t from, to, promotion;
+        bool operator<(const MoveKey& o) const {
+            return std::tie(from, to, promotion) < std::tie(o.from, o.to, o.promotion);
+        }
+    };
+    std::map<uint64_t, std::map<MoveKey, long long>> positions;
+    std::string line;
+    size_t lineNo = 0;
+    while (std::getline(in, line)) {
+        lineNo++;
+        std::istringstream words(line);
+        std::vector<std::string> tok;
+        for (std::string w; words >> w;) tok.push_back(w);
+        if (tok.size() < 2) continue;
+        const long long count = std::atoll(tok.back().c_str());
+        Board board;
+        for (size_t i = 0; i + 1 < tok.size(); i++) {
+            const std::string& u = tok[i];
+            if (u.size() < 4) {
+                message = "line " + std::to_string(lineNo) + ": bad move '" + u + "'";
+                return false;
+            }
+            PieceType promotion = PieceType::None;
+            if (u.size() == 5) {
+                switch (u[4]) {
+                    case 'q': promotion = PieceType::Queen; break;
+                    case 'r': promotion = PieceType::Rook; break;
+                    case 'b': promotion = PieceType::Bishop; break;
+                    case 'n': promotion = PieceType::Knight; break;
+                    default: break;
+                }
+            }
+            Move m;
+            if (!board.findLegalMove(u[0] - 'a', u[1] - '1', u[2] - 'a', u[3] - '1', promotion, m)) {
+                message = "line " + std::to_string(lineNo) + ": illegal move " + u;
+                return false;
+            }
+            if (i + 2 == tok.size()) { // the last move is the book move for this position
+                const MoveKey mk{static_cast<uint8_t>(m.fromX * 8 + m.fromY), static_cast<uint8_t>(m.toX * 8 + m.toY),
+                                 static_cast<uint8_t>(m.promotion)};
+                positions[board.hashKey()][mk] += count;
+            }
+            board.makeMove(m);
+        }
+    }
+    std::vector<Record> records;
+    for (const auto& [key, moves] : positions) {
+        long long top = 0;
+        for (const auto& [mk, n] : moves) top = std::max(top, n);
+        for (const auto& [mk, n] : moves) {
+            if (n < minCount || n * 5 < top) continue;
+            records.push_back({key, mk.from, mk.to, mk.promotion,
+                               static_cast<uint8_t>(60 + (40 * n + top / 2) / top)});
+        }
+    }
+    std::ofstream out(outPath, std::ios::binary);
+    if (!out) {
+        message = "cannot write " + outPath;
+        return false;
+    }
+    const uint32_t version = kVersion, count = static_cast<uint32_t>(records.size());
+    out.write(kMagic, 4);
+    out.write(reinterpret_cast<const char*>(&version), 4);
+    out.write(reinterpret_cast<const char*>(&count), 4);
+    for (const Record& r : records) {
+        out.write(reinterpret_cast<const char*>(&r.key), 8);
+        out.put(static_cast<char>(r.from));
+        out.put(static_cast<char>(r.to));
+        out.put(static_cast<char>(r.promotion));
+        out.put(static_cast<char>(r.weight));
+    }
+    if (!out) {
+        message = "write failed: " + outPath;
+        return false;
+    }
+    message = std::to_string(positions.size()) + " positions read, " + std::to_string(records.size()) +
+              " book moves written";
+    return true;
 }

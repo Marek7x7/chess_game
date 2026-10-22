@@ -435,6 +435,20 @@ def limited_strength_plays_and_is_cheaper(path):
     assert took < 1.0, f"a 1800-rated search used {took:.1f}s of a 2 s budget (it should be node-capped)"
 
 
+@case
+def own_book_answers_known_positions_at_once(path):
+    e = start(path, ["Threads value 1", "OwnBook value true"])
+    for moves in ("", "e2e4 c7c5", "d2d4 g8f6 c2c4 e7e6"):
+        e.send("position startpos" + (" moves " + moves if moves else ""))
+        t0 = time.time()
+        e.send("go movetime 2000")
+        out = e.read_until("bestmove", 5)
+        took = time.time() - t0
+        assert bestmove(out), f"no bestmove after '{moves}': {out[-2:]}"
+        assert took < 0.5, f"after '{moves}' the book position took {took:.1f}s (a search, not a book move)"
+    e.close()
+
+
 def main():
     if len(sys.argv) != 2:
         sys.exit(__doc__)

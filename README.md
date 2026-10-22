@@ -72,6 +72,7 @@ Not supported: `mate`.
 | `src/ai.cpp` | evaluation and search (`evaluate`, `negamax`, `quiescence`, `findBestMove`) |
 | `src/board.cpp`, `src/bitboard.cpp` | board, move generation, incremental evaluation and hashing |
 | `src/transposition_table.cpp` | the lock-free hash table |
+| `src/opening_book.cpp`, `book/default.book` | hand-written lines plus a book of 22,000 positions built from three months of Lichess elite games (`tools/book/`, public Lichess data, CC0); `-DCHESS_BOOK=OFF` leaves the generated part out |
 | `src/nnue.cpp`, `nnue/default.nnue` | the network evaluation and the net compiled into the executable (`-DCHESS_NNUE=OFF` leaves it out) |
 | `src/uci.cpp`, `src/gui.cpp`, `src/match.cpp` | UCI driver, SDL2 GUI, bot matches |
 | `include/tune.hpp`, `include/search_params.hpp` | tunable evaluation weights and search constants |

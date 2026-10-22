@@ -159,8 +159,27 @@ if(CHESS_NNUE AND EXISTS "${CHESS_NNUE_FILE}")
     message(STATUS "Built-in network: ${CHESS_NNUE_FILE}")
 endif()
 
+# ---- Built-in opening book -------------------------------------------------
+# book/default.book (made by tools/book/extract_lines.py and `chess --build-book`) is compiled in the same
+# way; without it, or with -DCHESS_BOOK=OFF, only the hand-written lines of src/opening_book.cpp are known.
+option(CHESS_BOOK "Compile the generated opening book into the executable" ON)
+set(CHESS_BOOK_FILE "${CMAKE_SOURCE_DIR}/book/default.book" CACHE FILEPATH "The generated opening book to compile in")
+set(CHESS_BOOK_SOURCES "")
+if(CHESS_BOOK AND EXISTS "${CHESS_BOOK_FILE}")
+    set(CHESS_BOOK_CPP "${CMAKE_BINARY_DIR}/book_builtin.cpp")
+    add_custom_command(
+        OUTPUT "${CHESS_BOOK_CPP}"
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${CHESS_BOOK_FILE} -DOUTPUT=${CHESS_BOOK_CPP} -DSYMBOL=chess_book_builtin
+                -P ${CMAKE_SOURCE_DIR}/tools/embed_file.cmake
+        DEPENDS "${CHESS_BOOK_FILE}" "${CMAKE_SOURCE_DIR}/tools/embed_file.cmake"
+        COMMENT "Embedding ${CHESS_BOOK_FILE}")
+    set(CHESS_BOOK_SOURCES "${CHESS_BOOK_CPP}")
+    target_compile_definitions(chess_flags INTERFACE CHESS_BOOK_BUILTIN)
+    message(STATUS "Built-in opening book: ${CHESS_BOOK_FILE}")
+endif()
+
 # ---- Main engine -----------------------------------------------------------
-add_executable(chess ${SRC_FILES} ${CHESS_NNUE_SOURCES})
+add_executable(chess ${SRC_FILES} ${CHESS_NNUE_SOURCES} ${CHESS_BOOK_SOURCES})
 chess_configure(chess)
 if(CHESS_NNUE_SOURCES)
     target_compile_definitions(chess PRIVATE CHESS_NNUE_BUILTIN)
@@ -172,7 +191,7 @@ endif()
 # ---- SPSA search-constant tuning build (tools/spsa.py) ---------------------
 # The same engine with every SEARCH_PARAM exposed as a UCI spin option.
 # cmake --build <dir> --target chess_spsa
-add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES} ${CHESS_NNUE_SOURCES})
+add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES} ${CHESS_NNUE_SOURCES} ${CHESS_BOOK_SOURCES})
 chess_configure(chess_spsa)
 if(CHESS_NNUE_SOURCES)
     target_compile_definitions(chess_spsa PRIVATE CHESS_NNUE_BUILTIN)
@@ -189,7 +208,7 @@ find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
     set(TUNE_SRC ${SRC_FILES})
     list(FILTER TUNE_SRC EXCLUDE REGEX ".*/(main|gui)\\.cpp$")
-    add_executable(chess_tune EXCLUDE_FROM_ALL ${TUNE_SRC} tools/tune.cpp)
+    add_executable(chess_tune EXCLUDE_FROM_ALL ${TUNE_SRC} ${CHESS_BOOK_SOURCES} tools/tune.cpp)
     chess_configure(chess_tune)
     target_compile_definitions(chess_tune PRIVATE TUNING)
     target_link_libraries(chess_tune PRIVATE OpenMP::OpenMP_CXX)
@@ -220,11 +239,11 @@ endif()
 # nnue_data: PGN -> training records; nnue_train: the trainer. Not part of the default build.
 set(NNUE_SRC ${SRC_FILES})
 list(FILTER NNUE_SRC EXCLUDE REGEX ".*/(main|gui)\\.cpp$")
-add_executable(nnue_data EXCLUDE_FROM_ALL ${NNUE_SRC} tools/nnue/pgn2data.cpp)
+add_executable(nnue_data EXCLUDE_FROM_ALL ${NNUE_SRC} ${CHESS_BOOK_SOURCES} tools/nnue/pgn2data.cpp)
 chess_configure(nnue_data)
 if(OpenMP_CXX_FOUND)
     # TUNING exposes the hand-crafted evaluation (tunerEvaluate), which `nnue_train eval --hce` compares against.
-    add_executable(nnue_train EXCLUDE_FROM_ALL ${NNUE_SRC} tools/nnue/train.cpp)
+    add_executable(nnue_train EXCLUDE_FROM_ALL ${NNUE_SRC} ${CHESS_BOOK_SOURCES} tools/nnue/train.cpp)
     chess_configure(nnue_train)
     target_compile_definitions(nnue_train PRIVATE TUNING)
     target_link_libraries(nnue_train PRIVATE OpenMP::OpenMP_CXX)

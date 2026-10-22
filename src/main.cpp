@@ -254,6 +254,7 @@ int runBench(int depth) {
 int runVerifyBook() {
     Board board;
     std::vector<BookEntry> replies = lookupBook(board);
+    std::printf("Generated book: %zu position(s) (0: none compiled in).\n", generatedBookPositions());
     std::printf("Book has %zu known first move(s) for White.\n", replies.size());
     for (const BookEntry& be : replies) {
         std::string mv = squareStr(be.move.fromX, be.move.fromY) + squareStr(be.move.toX, be.move.toY);
@@ -353,6 +354,7 @@ void printUsage(std::FILE* out, const char* program) {
                  "  --perft-suite [depth]           perft against published counts\n"
                  "  --verify-eval [depth]           incremental eval/hash/bitboards vs from-scratch\n"
                  "  --verify-book                   list the opening book's first moves\n"
+                 "  --build-book <lines> <out> [min]  make the generated book (tools/book/extract_lines.py)\n"
                  "  --replay <pgn> [white|black|both]   re-search the positions of a game\n"
                  "  --selfplay <games> [levelA] [levelB]   bot matches, levels easy|medium|hard|expert\n"
                  "  --datagen --out <file> [--games N] [--nodes N] [--seed N] [--net <file>]   training data\n"
@@ -397,6 +399,13 @@ int main(int argc, char** argv) {
     }
     if (argc >= 2 && std::strcmp(argv[1], "--verify-book") == 0) {
         return runVerifyBook();
+    }
+    if (argc >= 4 && std::strcmp(argv[1], "--build-book") == 0) {
+        const int minCount = argc >= 5 ? std::atoi(argv[4]) : 20;
+        std::string message;
+        const bool ok = buildBookFile(argv[2], argv[3], minCount, message);
+        std::fprintf(ok ? stdout : stderr, "build-book: %s\n", message.c_str());
+        return ok ? 0 : 1;
     }
     if (argc >= 2 && std::strcmp(argv[1], "--uci") == 0) {
         return runUci();
