@@ -563,8 +563,12 @@ int kingSafety(const Board& board, const PawnInfo& pawns, const KingAttack (&att
 // has no forced mate however far ahead it looks.
 bool hasMatingMaterial(const Board& board, Color color) {
     if (board.pieces(color, PieceType::Queen) | board.pieces(color, PieceType::Rook)) return true;
-    const int bishops = bb::popcount(board.pieces(color, PieceType::Bishop));
-    return bishops >= 2 || (bishops == 1 && board.pieces(color, PieceType::Knight));
+    const uint64_t bishopBB = board.pieces(color, PieceType::Bishop);
+    constexpr uint64_t kDarkSquares = 0xAA55AA55AA55AA55ULL; // squares with (file + rank) even
+    const int bishops = bb::popcount(bishopBB);
+    // Two bishops mate only when they stand on opposite colours.
+    if (bishops >= 2) return (bishopBB & kDarkSquares) && (bishopBB & ~kDarkSquares);
+    return bishops == 1 && board.pieces(color, PieceType::Knight);
 }
 
 // A rook behind a passed pawn, either side's (the rook's owner gains): from
