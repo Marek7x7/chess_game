@@ -1196,7 +1196,8 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     Move ttMove{};
     TTEntry ttEntry;
     bool haveTTMove = false;
-    if (ctx.tt.probe(key, ttEntry)) {
+    const bool ttHit = ctx.tt.probe(key, ttEntry);
+    if (ttHit) {
         if (ttEntry.hasMove) {
             ttMove = ttEntry.best;
             haveTTMove = true;
@@ -1270,6 +1271,37 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             -negamax(board, depth - 1 - nullMoveReduction, ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
         board.unmakeNullMove(nu);
         if (nullScore >= beta) return beta;
+    }
+
+    // ProbCut: a capture that still beats beta by a margin after a quiescence search and a
+    // shallower full search very probably makes this node fail high, so cut without searching it.
+    // (Skipped when the table already says the position is worth less than that.)
+    if (haveStaticEval && !excluded && depth >= spProbCutMinDepth && std::abs(beta) < kMateThreshold) {
+        const int probBeta = beta + spProbCutMargin;
+        if (!(ttHit && ttEntry.depth >= depth - 3 && ttEntry.flag != TTFlag::LowerBound &&
+              fromTT(ttEntry.score, ply) < probBeta)) {
+            MoveList captures = board.pseudoLegal(color, true);
+            ctx.path.push_back(key);
+            for (const Move& m : captures) {
+                if (m.captured == PieceType::None || see(board, m) < probBeta - staticEval) continue;
+                Board::UndoState undo;
+                board.makeMove(m, undo);
+                if (board.isInCheck(color)) { // illegal: leaves the mover's king attacked
+                    board.unmakeMove(m, undo);
+                    continue;
+                }
+                if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
+                int v = -quiescence(board, -probBeta, -probBeta + 1, opponent(color), ply + 1, ctx);
+                if (v >= probBeta)
+                    v = -negamax(board, depth - 4, ply + 1, -probBeta, -probBeta + 1, opponent(color), ctx, extensionsLeft);
+                board.unmakeMove(m, undo);
+                if (v >= probBeta) {
+                    ctx.path.pop_back();
+                    return v - (probBeta - beta);
+                }
+            }
+            ctx.path.pop_back();
+        }
     }
 
     // Singular extension: if the stored best move is the only one that holds its
