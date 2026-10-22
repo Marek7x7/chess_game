@@ -144,6 +144,17 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
         mismatches++;
         std::fprintf(stderr, "BITBOARD MISMATCH at depth=%d\n", depth);
     }
+    {
+        // toFEN must read back (tryFromFEN may drop an en passant square no pawn can use, so the
+        // comparison stops after the castling field).
+        const std::string fen = board.toFEN();
+        Board again;
+        const auto head = [](const std::string& f) { return f.substr(0, f.find(' ', f.find(' ', f.find(' ') + 1) + 1)); };
+        if (!Board::tryFromFEN(fen, again) || head(again.toFEN()) != head(fen)) {
+            mismatches++;
+            std::fprintf(stderr, "FEN ROUND-TRIP MISMATCH at depth=%d: %s\n", depth, fen.c_str());
+        }
+    }
     if (!board.nnueMatchesScratch()) {
         mismatches++;
         std::fprintf(stderr, "NETWORK ACCUMULATOR MISMATCH at depth=%d\n", depth);

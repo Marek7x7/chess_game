@@ -447,6 +447,46 @@ void Board::computeHashes(uint64_t& full, uint64_t& pawns) const {
     if (turn == Color::Black) full ^= z.sideToMove;
 }
 
+std::string Board::toFEN() const {
+    std::string fen;
+    for (int y = 7; y >= 0; y--) {
+        int empty = 0;
+        for (int x = 0; x < 8; x++) {
+            const Piece p = squares[x][y];
+            if (p.isEmpty()) {
+                empty++;
+                continue;
+            }
+            if (empty) fen += static_cast<char>('0' + empty);
+            empty = 0;
+            char c = 'p';
+            switch (p.type) {
+                case PieceType::Knight: c = 'n'; break;
+                case PieceType::Bishop: c = 'b'; break;
+                case PieceType::Rook: c = 'r'; break;
+                case PieceType::Queen: c = 'q'; break;
+                case PieceType::King: c = 'k'; break;
+                default: break;
+            }
+            fen += p.color == Color::White ? static_cast<char>(std::toupper(c)) : c;
+        }
+        if (empty) fen += static_cast<char>('0' + empty);
+        if (y > 0) fen += '/';
+    }
+    fen += turn == Color::White ? " w " : " b ";
+    const size_t castlingStart = fen.size();
+    if (castleKingside[0]) fen += 'K';
+    if (castleQueenside[0]) fen += 'Q';
+    if (castleKingside[1]) fen += 'k';
+    if (castleQueenside[1]) fen += 'q';
+    if (fen.size() == castlingStart) fen += '-';
+    fen += ' ';
+    if (enPassantX == -1) fen += '-';
+    else fen += {static_cast<char>('a' + enPassantX), static_cast<char>('1' + enPassantY)};
+    fen += " " + std::to_string(halfmoveCount) + " 1";
+    return fen;
+}
+
 Board Board::fromFEN(const std::string& fen) {
     Board board;
     for (int x = 0; x < 8; x++)

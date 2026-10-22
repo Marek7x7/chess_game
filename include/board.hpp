@@ -26,6 +26,9 @@ public:
     // missing and is cut down to the rights the pieces allow; so is an en passant square no pawn can use.
     static bool tryFromFEN(const std::string& fen, Board& out);
 
+    // The position as a FEN string (the move number is always written as 1).
+    std::string toFEN() const;
+
     Piece at(int x, int y) const { return squares[x][y]; }
 
     // Bitboards (see bitboard.hpp) of where `color`'s pieces of a type stand, of
