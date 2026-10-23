@@ -5,6 +5,7 @@
 #include <vector>
 #include <iosfwd>
 
+#include "nnue.hpp"
 #include "piece.hpp"
 #include "move.hpp"
 
@@ -19,6 +20,15 @@ public:
     // input to be well-formed since callers pass fixed literal FEN strings.
     static Board fromFEN(const std::string& fen);
 
+    // For input that may be malformed or illegal (a UCI "position fen"): returns false, leaving `out`
+    // untouched, unless the text is a well-formed FEN of a legal setup (one king each, no pawn on a
+    // back rank, the side not to move not in check, plausible piece counts). The castling field may be
+    // missing and is cut down to the rights the pieces allow; so is an en passant square no pawn can use.
+    static bool tryFromFEN(const std::string& fen, Board& out);
+
+    // The position as a FEN string (the move number is always written as 1).
+    std::string toFEN() const;
+
     Piece at(int x, int y) const { return squares[x][y]; }
 
     // Bitboards (see bitboard.hpp) of where `color`'s pieces of a type stand, of
@@ -30,6 +40,10 @@ public:
     // Verification only: do the bitboards match squares[][]?
     bool bitboardsConsistent() const;
     Color sideToMove() const { return turn; }
+    bool hasCastlingRights() const { return castleKingside[0] || castleKingside[1] || castleQueenside[0] || castleQueenside[1]; }
+    // The en passant target square (where a capturing pawn would land), or file -1 if there is none.
+    int enPassantFile() const { return enPassantX; }
+    int enPassantRank() const { return enPassantY; }
     int kingFile(Color c) const { return kingX[colorIndex(c)]; }
     int kingRank(Color c) const { return kingY[colorIndex(c)]; }
     // Plies since the last capture or pawn move (the fifty-move-rule count).
@@ -52,6 +66,13 @@ public:
     // 0 (endgame) .. 1 (opening/middlegame), from incrementally-tracked
     // remaining non-pawn material.
     double gamePhase() const;
+
+    // The neural-network accumulator for the current position. Kept up to date by makeMove()/unmakeMove() while a
+    // network is loaded (nnue::active()); refreshNnue() rebuilds it, which is needed after a network gets loaded
+    // for a board that already exists. nnueMatchesScratch() is verification only.
+    const nnue::Accumulator& nnueAccumulator() const { return nnueAcc; }
+    void refreshNnue();
+    bool nnueMatchesScratch() const;
 
     // Recomputes rawEval() from scratch by scanning every square, ignoring
     // the incrementally-maintained fields entirely. Verification-only: used
@@ -110,6 +131,7 @@ public:
         int prevBishopCount[2];
         int prevEgShift;
         int prevHalfmoveCount;
+        nnue::Accumulator prevAcc; // only filled while a network is loaded
     };
 
     // Same as makeMove(const Move&), but also records enough state in `undo`
@@ -168,6 +190,7 @@ private:
     int kingX[2], kingY[2]; // [White, Black]
     int bishopCount[2];     // [White, Black], for the bishop-pair bonus
     int egShift;            // sum of egShiftFor() over all pieces, blended in by phase
+    nnue::Accumulator nnueAcc; // see nnueAccumulator()
 
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 

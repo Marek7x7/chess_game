@@ -32,27 +32,40 @@ struct SearchParamReg {
 #define SEARCH_PARAM(name, def, lo, hi) constexpr int name = def
 #endif
 
-SEARCH_PARAM(spRfpMargin, 59, 50, 220);        // reverse futility, per remaining ply
-SEARCH_PARAM(spFutMargin1, 291, 50, 600);       // futility margin at depth 1
-SEARCH_PARAM(spFutMargin2, 246, 120, 550);      // futility margin at depth 2
-SEARCH_PARAM(spLmpBase, 5, 1, 8);               // late-move pruning: moveIndex >= base + depth^2
-SEARCH_PARAM(spLmrBase, 114, 20, 130);           // LMR table: (base + ln d ln m / div) / 100
-SEARCH_PARAM(spLmrDiv, 238, 140, 380);          // LMR table divisor, in hundredths
-SEARCH_PARAM(spLmrHistDiv, 13033, 2500, 30000);  // history score per extra/less LMR ply
+SEARCH_PARAM(spRfpMargin, 63, 50, 220);        // reverse futility, per remaining ply
+SEARCH_PARAM(spFutMargin1, 330, 50, 600);       // futility margin at depth 1
+SEARCH_PARAM(spFutMargin2, 453, 120, 800);      // futility margin at depth 2
+SEARCH_PARAM(spLmpBase, 6, 1, 8);               // late-move pruning: moveIndex >= base + depth^2
+SEARCH_PARAM(spLmrBase, 124, 20, 170);           // LMR table: (base + ln d ln m / div) / 100
+SEARCH_PARAM(spLmrDiv, 318, 140, 380);          // LMR table divisor, in hundredths
+SEARCH_PARAM(spLmrHistDiv, 6059, 2500, 30000);  // history score per extra/less LMR ply
 SEARCH_PARAM(spLmrStart, 3, 2, 7);              // first move index that may be reduced
 SEARCH_PARAM(spNullBase, 3, 2, 5);              // null-move reduction: base + depth / div
-SEARCH_PARAM(spNullDiv, 8, 3, 12);
+SEARCH_PARAM(spNullDiv, 6, 3, 12);
 SEARCH_PARAM(spSingularMargin, 1, 1, 5);        // singular beta = ttScore - margin * depth
-SEARCH_PARAM(spSeePruneMargin, 76, 30, 220);   // SEE pruning of captures, per remaining ply
-SEARCH_PARAM(spAspiration, 19, 8, 60);          // initial aspiration window
-SEARCH_PARAM(spDeltaMargin, 307, 90, 380);      // quiescence delta pruning
-SEARCH_PARAM(spLazyMargin, 267, 220, 700);      // quiescence lazy-eval cutoff
-SEARCH_PARAM(spHistBonus, 7, 1, 12);            // history bonus: depth^2 * this, capped
-SEARCH_PARAM(spHistCap, 2247, 400, 4000);
-SEARCH_PARAM(spNullMinDepth, 2, 1, 5);
-SEARCH_PARAM(spSingularMinDepth, 5, 3, 12);
+SEARCH_PARAM(spSeePruneMargin, 209, 30, 320);   // SEE pruning of captures, per remaining ply
+SEARCH_PARAM(spAspiration, 21, 8, 60);          // initial aspiration window
+SEARCH_PARAM(spDeltaMargin, 300, 90, 380);      // quiescence delta pruning
+SEARCH_PARAM(spLazyMargin, 586, 220, 900);      // quiescence lazy-eval cutoff
+SEARCH_PARAM(spHistBonus, 11, 1, 20);            // history bonus: depth^2 * this, capped
+SEARCH_PARAM(spHistCap, 1103, 400, 4000);
+SEARCH_PARAM(spNullMinDepth, 1, 1, 5);
+SEARCH_PARAM(spSingularMinDepth, 4, 3, 12);
 SEARCH_PARAM(spSingularDepthGap, 3, 1, 5);      // the TT entry may be this much shallower
-SEARCH_PARAM(spLmrMinDepth, 2, 1, 5);
-SEARCH_PARAM(spLmpMaxDepth, 4, 2, 8);
-SEARCH_PARAM(spRfpMaxDepth, 5, 2, 8);
+SEARCH_PARAM(spLmrMinDepth, 3, 3, 7);           // first depth that may reduce (>= 3: the reduction is clamped to [1, depth - 2])
+SEARCH_PARAM(spLmpMaxDepth, 3, 2, 8);
+SEARCH_PARAM(spRfpMaxDepth, 6, 2, 8);
 SEARCH_PARAM(spSeePruneDepth, 5, 2, 10);
+SEARCH_PARAM(spRazorMargin, 300, 100, 600);     // razoring: drop to quiescence when eval + margin * depth <= alpha
+SEARCH_PARAM(spRazorMaxDepth, 3, 1, 4);
+SEARCH_PARAM(spProbCutMargin, 190, 80, 400);    // ProbCut: captures tried against beta + margin
+SEARCH_PARAM(spProbCutMinDepth, 5, 4, 9);
+SEARCH_PARAM(spHistPruneDepth, 3, 1, 6);        // history pruning: quiet moves with history < -margin * depth
+SEARCH_PARAM(spHistPruneMargin, 600, 100, 4000);
+SEARCH_PARAM(spQuietSeeDepth, 6, 2, 10);        // quiet moves that lose more than margin * depth to SEE are skipped
+SEARCH_PARAM(spQuietSeeMargin, 60, 20, 150);
+SEARCH_PARAM(spSingularDoubleMargin, 25, 10, 80); // singular by this much more: extend two plies
+
+#ifndef SPSA
+static_assert(spLmrMinDepth >= 3, "std::clamp(reduction, 1, depth - 2) in negamax needs depth - 2 >= 1");
+#endif

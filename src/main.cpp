@@ -9,11 +9,14 @@
 
 #include "ai.hpp"
 #include "board.hpp"
+#include "datagen.hpp"
 #include "gui.hpp"
 #include "match.hpp"
+#include "nnue.hpp"
 #include "opening_book.hpp"
 #include "pgn.hpp"
 #include "uci.hpp"
+#include "version.hpp"
 
 namespace {
 
@@ -73,6 +76,17 @@ const std::vector<PerftCase>& perftSuite() {
         {"kiwipete", "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
          {48, 2039, 97862, 4085603, 193690690}},
         {"endgame", "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", {14, 191, 2812, 43238, 674624}},
+        // Chess Programming Wiki positions 4 and 5 (promotions, castling through check, en passant), position 4
+        // mirrored, position 6, and two more edge cases: all four castlings, and promotions with captures.
+        {"cpw4", "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+         {6, 264, 9467, 422333, 15833292}},
+        {"cpw4mirror", "r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1",
+         {6, 264, 9467, 422333, 15833292}},
+        {"cpw5", "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", {44, 1486, 62379, 2103487, 89941194}},
+        {"cpw6", "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
+         {46, 2079, 89890, 3894594, 164075551}},
+        {"castling", "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", {26, 568, 13744, 314346, 7594526}},
+        {"promotions", "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1", {24, 496, 9483, 182838, 3605103}},
     };
     return suite;
 }
@@ -130,6 +144,21 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
         mismatches++;
         std::fprintf(stderr, "BITBOARD MISMATCH at depth=%d\n", depth);
     }
+    {
+        // toFEN must read back (tryFromFEN may drop an en passant square no pawn can use, so the
+        // comparison stops after the castling field).
+        const std::string fen = board.toFEN();
+        Board again;
+        const auto head = [](const std::string& f) { return f.substr(0, f.find(' ', f.find(' ', f.find(' ') + 1) + 1)); };
+        if (!Board::tryFromFEN(fen, again) || head(again.toFEN()) != head(fen)) {
+            mismatches++;
+            std::fprintf(stderr, "FEN ROUND-TRIP MISMATCH at depth=%d: %s\n", depth, fen.c_str());
+        }
+    }
+    if (!board.nnueMatchesScratch()) {
+        mismatches++;
+        std::fprintf(stderr, "NETWORK ACCUMULATOR MISMATCH at depth=%d\n", depth);
+    }
     if (depth == 0) return 1;
     long long nodes = 0;
     for (const Move& m : board.legalMoves(color)) {
@@ -141,17 +170,38 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
     return nodes;
 }
 
+// Both sides' views of a piece must be each other's mirror images, or the network could not be colour-symmetric.
+bool networkFeaturesSymmetric() {
+    for (int color = 0; color < 2; color++)
+        for (int type = 1; type <= 6; type++)
+            for (int x = 0; x < 8; x++)
+                for (int y = 0; y < 8; y++)
+                    if (nnue::featureIndex(0, color, type, x, y) != nnue::featureIndex(1, 1 - color, type, x, 7 - y))
+                        return false;
+    return true;
+}
+
 int runVerifyEval(int maxDepth) {
     bool allPass = true;
-    for (const PerftCase& tc : perftSuite()) {
-        Board board = Board::fromFEN(tc.fen);
-        long long mismatches = 0;
-        long long nodes = verifyEvalNode(board, maxDepth, board.sideToMove(), mismatches);
-        bool pass = mismatches == 0;
-        allPass &= pass;
-        std::printf("%-10s depth=%d nodesChecked=%-12lld mismatches=%lld %s\n", tc.name, maxDepth, nodes, mismatches,
-                    pass ? "OK" : "FAIL");
+    // Once with the hand-crafted evaluation (the incremental terms against a recompute), once with a network of
+    // random weights (the incrementally updated accumulators against a recompute).
+    const bool hadNetwork = nnue::active();
+    for (int round = 0; round < 2; round++) {
+        if (round == 1) nnue::loadRandom(12345);
+        for (const PerftCase& tc : perftSuite()) {
+            Board board = Board::fromFEN(tc.fen);
+            long long mismatches = 0;
+            long long nodes = verifyEvalNode(board, maxDepth, board.sideToMove(), mismatches);
+            const bool pass = mismatches == 0;
+            allPass &= pass;
+            std::printf("%-10s depth=%d nodesChecked=%-12lld mismatches=%lld %s%s\n", tc.name, maxDepth, nodes,
+                        mismatches, pass ? "OK" : "FAIL", round == 1 ? "  (random network)" : "");
+        }
     }
+    if (!hadNetwork) nnue::unload();
+    const bool symmetric = networkFeaturesSymmetric();
+    allPass &= symmetric;
+    std::printf("network features colour-symmetric: %s\n", symmetric ? "OK" : "FAIL");
     std::printf(allPass ? "EVAL VERIFICATION: ALL PASS\n" : "EVAL VERIFICATION: FAILURES\n");
     return allPass ? 0 : 1;
 }
@@ -173,17 +223,22 @@ const std::vector<BenchPosition>& benchPositions() {
 
 int runBench(int depth) {
     long long totalNodes = 0;
+    double totalSecs = 0;
     for (const BenchPosition& bp : benchPositions()) {
         Board board = bp.fen ? Board::fromFEN(bp.fen) : Board();
-        auto start = std::chrono::steady_clock::now();
         BenchResult r = benchSearch(board, board.sideToMove(), depth);
-        double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        double secs = r.seconds;
         double nps = secs > 0 ? r.nodes / secs : 0;
         std::string mv = squareStr(r.move.fromX, r.move.fromY) + squareStr(r.move.toX, r.move.toY);
         std::printf("%-22s depth=%d nodes=%-10lld time=%.3fs nps=%.0f score=%d move=%s\n", bp.name, depth, r.nodes,
                      secs, nps, r.score, mv.c_str());
         totalNodes += r.nodes;
+        totalSecs += secs;
     }
+    // Speed over all positions together, search time only (the 64 MiB table's allocation is outside the
+    // clock). Depth 6 is far too short to time (a tenth of a second): use `--bench 12` or more.
+    std::printf("BENCH SPEED: nodes=%lld time=%.3fs nps=%.0f\n", totalNodes, totalSecs,
+                totalSecs > 0 ? totalNodes / totalSecs : 0.0);
     // Stable, single-line summary for scripted regression checks: a pure
     // speedup commit must reproduce this line byte-for-byte across builds
     // (same tree, same node count); anything else means search behavior
@@ -199,6 +254,7 @@ int runBench(int depth) {
 int runVerifyBook() {
     Board board;
     std::vector<BookEntry> replies = lookupBook(board);
+    std::printf("Generated book: %zu position(s) (0: none compiled in).\n", generatedBookPositions());
     std::printf("Book has %zu known first move(s) for White.\n", replies.size());
     for (const BookEntry& be : replies) {
         std::string mv = squareStr(be.move.fromX, be.move.fromY) + squareStr(be.move.toX, be.move.toY);
@@ -287,9 +343,44 @@ int runReplay(const std::string& path, const std::string& side) {
     return 0;
 }
 
+void printUsage(std::FILE* out, const char* program) {
+    std::fprintf(out,
+                 "ChessGame %s\n"
+                 "usage: %s [mode]\n"
+                 "  (no mode)                       open the GUI\n"
+                 "  --uci                           UCI engine on stdin/stdout\n"
+                 "  --bench [depth]                 fixed-depth search benchmark (default 6)\n"
+                 "  --perft [depth]                 node count from the start position\n"
+                 "  --perft-suite [depth]           perft against published counts\n"
+                 "  --verify-eval [depth]           incremental eval/hash/bitboards vs from-scratch\n"
+                 "  --verify-book                   list the opening book's first moves\n"
+                 "  --build-book <lines> <out> [min]  make the generated book (tools/book/extract_lines.py)\n"
+                 "  --replay <pgn> [white|black|both]   re-search the positions of a game\n"
+                 "  --selfplay <games> [levelA] [levelB]   bot matches, levels easy|medium|hard|expert\n"
+                 "  --datagen --out <file> [--games N] [--nodes N] [--seed N] [--net <file>]   training data\n"
+                 "  --version, --help\n",
+                 CHESS_VERSION, program);
+}
+
 } // namespace
 
+#ifdef CHESS_NO_GUI
+int runGui() {
+    std::fprintf(stderr, "this build has no GUI (CHESS_GUI=OFF); run it with --uci\n");
+    return 1;
+}
+#endif
+
 int main(int argc, char** argv) {
+    nnue::loadBuiltin(); // the network compiled into this binary, if there is one
+    if (argc >= 2 && (std::strcmp(argv[1], "--version") == 0 || std::strcmp(argv[1], "-v") == 0)) {
+        std::printf("ChessGame %s\n", CHESS_VERSION);
+        return 0;
+    }
+    if (argc >= 2 && (std::strcmp(argv[1], "--help") == 0 || std::strcmp(argv[1], "-h") == 0)) {
+        printUsage(stdout, argv[0]);
+        return 0;
+    }
     if (argc >= 2 && std::strcmp(argv[1], "--perft") == 0) {
         int depth = argc >= 3 ? std::atoi(argv[2]) : 4;
         return runPerft(depth);
@@ -309,8 +400,18 @@ int main(int argc, char** argv) {
     if (argc >= 2 && std::strcmp(argv[1], "--verify-book") == 0) {
         return runVerifyBook();
     }
+    if (argc >= 4 && std::strcmp(argv[1], "--build-book") == 0) {
+        const int minCount = argc >= 5 ? std::atoi(argv[4]) : 20;
+        std::string message;
+        const bool ok = buildBookFile(argv[2], argv[3], minCount, message);
+        std::fprintf(ok ? stdout : stderr, "build-book: %s\n", message.c_str());
+        return ok ? 0 : 1;
+    }
     if (argc >= 2 && std::strcmp(argv[1], "--uci") == 0) {
         return runUci();
+    }
+    if (argc >= 2 && std::strcmp(argv[1], "--datagen") == 0) {
+        return runDatagen(argc, argv);
     }
     if (argc >= 3 && std::strcmp(argv[1], "--replay") == 0) {
         std::string side = argc >= 4 ? argv[3] : "both";
@@ -332,6 +433,11 @@ int main(int argc, char** argv) {
             return 1;
         }
         return runSelfplay(games, levelA, levelB);
+    }
+    if (argc >= 2) { // an unknown option must not silently open a window
+        std::fprintf(stderr, "unknown option '%s'\n", argv[1]);
+        printUsage(stderr, argv[0]);
+        return 2;
     }
     return runGui();
 }

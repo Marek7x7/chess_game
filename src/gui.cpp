@@ -7,6 +7,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <ctime>
+#include <fstream>
 #include <filesystem>
 #include <future>
 #include <optional>
@@ -16,6 +18,7 @@
 #include "ai.hpp"
 #include "board.hpp"
 #include "match.hpp"
+#include "pgn.hpp"
 #include "move.hpp"
 #include "piece.hpp"
 
@@ -190,6 +193,8 @@ Glyph glyphFor(char c) {
         case '+': return {{{0.5f, 0.2f}, {0.5f, 0.8f}}, {{0.2f, 0.5f}, {0.8f, 0.5f}}};
         case '/': return {{{0.8f, 0}, {0.1f, 1}}};
         case '_': return {{{0, 1}, {0.85f, 1}}};
+        case '.': return {{{0.3f, 0.92f}, {0.3f, 1}}};
+        case ':': return {{{0.3f, 0.25f}, {0.3f, 0.33f}}, {{0.3f, 0.82f}, {0.3f, 0.9f}}};
         case '(': return {{{0.6f, 0}, {0.35f, 0.25f}, {0.3f, 0.5f}, {0.35f, 0.75f}, {0.6f, 1}}};
         case ')': return {{{0.25f, 0}, {0.5f, 0.25f}, {0.55f, 0.5f}, {0.5f, 0.75f}, {0.25f, 1}}};
         default: return {};
@@ -382,6 +387,9 @@ std::string colorName(Color c) { return c == Color::White ? "WHITE" : "BLACK"; }
 enum class Screen { MenuMain, MenuColor, MenuDifficulty, CustomSetup, BotSetup, Game };
 enum class DragState { None, Selected, Dragging };
 
+// The human game's table: a long think at EXPERT fills the 64 MiB the bot matches use.
+constexpr size_t kHumanGameTTSize = size_t(1) << 24;
+
 struct App {
     SDL_Renderer* renderer;
     Screen screen = Screen::MenuMain;
@@ -399,7 +407,7 @@ struct App {
     // opponent's moves), rather than being rebuilt per move: a search often
     // benefits from what a previous search already learned about the same
     // subtrees, especially when the opponent plays a predicted response.
-    TranspositionTable tt{kTTSize};
+    TranspositionTable tt{kHumanGameTTSize};
 
     DragState dragState = DragState::None;
     int selX = -1, selY = -1;
@@ -412,6 +420,17 @@ struct App {
     // vs-computer), passed to the AI's search so it knows which moves would
     // repeat a position. Bot matches keep their own in botGame.
     std::vector<uint64_t> positionHistory;
+
+    // The rest of the current human game: the position before each move (for undo), the moves in
+    // SAN (for the PGN, which can only start from the standard position), each side's clock and
+    // a short message for the status bar.
+    std::vector<Board> undoStack;
+    std::vector<std::string> sanMoves;
+    bool fromStart = true;
+    long long clockMs[2] = {0, 0};
+    std::chrono::steady_clock::time_point lastTick = std::chrono::steady_clock::now();
+    std::string notice;
+    std::chrono::steady_clock::time_point noticeUntil{};
 
     bool promotionPending = false;
     int promoFromX = -1, promoFromY = -1, promoToX = -1, promoToY = -1;
@@ -442,13 +461,23 @@ struct App {
     bool running = true;
 };
 
-void startGame(App& app) {
-    app.board = Board();
+// Starts the human game from `start`: a standard game can be saved as a PGN, a position from the
+// custom setup or the clipboard cannot (the PGN writer starts from the initial position).
+void resetHumanGame(App& app, const Board& start, bool standardStart) {
+    app.board = start;
     app.positionHistory.assign(1, app.board.hashKey());
-    app.flipped = app.vsAi && app.humanColor == Color::Black;
+    app.undoStack.clear();
+    app.sanMoves.clear();
+    app.fromStart = standardStart;
+    app.clockMs[0] = app.clockMs[1] = 0;
     app.dragState = DragState::None;
     app.hasLastMove = false;
     app.promotionPending = false;
+}
+
+void startGame(App& app) {
+    resetHumanGame(app, Board(), true);
+    app.flipped = app.vsAi && app.humanColor == Color::Black;
     app.aiFuture.reset();
     app.screen = Screen::Game;
 }
@@ -529,12 +558,8 @@ void finishCustomSetup(App& app, Color sideToMoveFirst) {
         app.customErrorMsg = "OPPONENT KING ALREADY IN CHECK";
         return;
     }
-    app.board = candidate;
-    app.positionHistory.assign(1, app.board.hashKey());
+    resetHumanGame(app, candidate, false);
     app.flipped = app.humanColor == Color::Black;
-    app.dragState = DragState::None;
-    app.hasLastMove = false;
-    app.promotionPending = false;
     app.aiFuture.reset();
     app.customMode = false;
     app.customDragActive = false;
@@ -545,10 +570,104 @@ void finishCustomSetup(App& app, Color sideToMoveFirst) {
 // Plays a legal move in the human game (either player's, or the AI's),
 // recording it for the last-move highlight and the AI's repetition detection.
 void playMove(App& app, const Move& m) {
+    app.sanMoves.push_back(moveToSan(app.board, m));
+    app.undoStack.push_back(app.board);
     app.board.makeMove(m);
     app.hasLastMove = true;
     app.lastMove = m;
     app.positionHistory.push_back(app.board.hashKey());
+}
+
+// Why the human game is drawn, or nullptr: Board knows stalemate only, so repetition, the fifty-move
+// rule and dead material are checked here (as GameRecord does for the bot matches).
+const char* drawReason(const App& app) {
+    if (app.board.status() == GameStatus::Stalemate) return "STALEMATE";
+    if (std::count(app.positionHistory.begin(), app.positionHistory.end(), app.board.hashKey()) >= 3)
+        return "THREEFOLD REPETITION";
+    if (app.board.halfmoveClock() >= 100) return "FIFTY-MOVE RULE";
+    if (isInsufficientMaterial(app.board)) return "INSUFFICIENT MATERIAL";
+    return nullptr;
+}
+
+bool gameIsOver(const App& app) { return app.board.status() == GameStatus::Checkmate || drawReason(app); }
+
+void setNotice(App& app, const std::string& text) {
+    app.notice = text;
+    app.noticeUntil = std::chrono::steady_clock::now() + std::chrono::seconds(4);
+}
+
+// Takes back the last move, or in a game against the computer its reply and the move before it, so
+// it is the human's turn again. Not while the computer is thinking.
+void undoMove(App& app) {
+    if (app.aiFuture || app.promotionPending || app.undoStack.empty()) return;
+    size_t plies = 1;
+    if (app.vsAi && app.undoStack.back().sideToMove() != app.humanColor) plies = 2;
+    if (plies > app.undoStack.size()) {
+        setNotice(app, "NOTHING TO TAKE BACK");
+        return;
+    }
+    for (size_t i = 0; i < plies; i++) {
+        app.board = app.undoStack.back();
+        app.undoStack.pop_back();
+        app.sanMoves.pop_back();
+        app.positionHistory.pop_back();
+    }
+    app.hasLastMove = false;
+    app.dragState = DragState::None;
+}
+
+void copyFen(App& app) {
+    SDL_SetClipboardText(app.board.toFEN().c_str());
+    setNotice(app, "FEN COPIED");
+}
+
+void pasteFen(App& app) {
+    if (app.aiFuture) {
+        setNotice(app, "WAIT FOR THE COMPUTER");
+        return;
+    }
+    char* text = SDL_GetClipboardText();
+    std::string fen = text ? text : "";
+    SDL_free(text);
+    const size_t first = fen.find_first_not_of(" \t\r\n");
+    const size_t last = fen.find_last_not_of(" \t\r\n");
+    fen = first == std::string::npos ? "" : fen.substr(first, last - first + 1);
+    Board loaded;
+    if (!Board::tryFromFEN(fen, loaded)) {
+        setNotice(app, "CLIPBOARD HAS NO VALID FEN");
+        return;
+    }
+    resetHumanGame(app, loaded, false);
+    setNotice(app, "POSITION LOADED");
+}
+
+void savePgn(App& app) {
+    if (!app.fromStart || app.sanMoves.empty()) {
+        setNotice(app, app.fromStart ? "NO MOVES TO SAVE" : "NO PGN FROM A CUSTOM POSITION");
+        return;
+    }
+    std::string result = "*";
+    if (app.board.status() == GameStatus::Checkmate) result = app.board.sideToMove() == Color::White ? "0-1" : "1-0";
+    else if (drawReason(app)) result = "1/2-1/2";
+    const bool humanWhite = app.humanColor == Color::White;
+    const std::string white = !app.vsAi ? "Player 1" : (humanWhite ? "Human" : "Chess AI");
+    const std::string black = !app.vsAi ? "Player 2" : (humanWhite ? "Chess AI" : "Human");
+    char date[16], stamp[32];
+    const std::time_t now = std::time(nullptr);
+    std::strftime(date, sizeof date, "%Y.%m.%d", std::localtime(&now));
+    std::strftime(stamp, sizeof stamp, "%Y%m%d_%H%M%S", std::localtime(&now));
+    const std::string pgn = formatPgn({{"Event", "Human Game"}, {"Site", "Local"}, {"Date", date}, {"Round", "-"},
+                                       {"White", white}, {"Black", black}, {"Result", result}},
+                                      app.sanMoves, result);
+    const std::filesystem::path path = std::filesystem::path("games") / (std::string("game_") + stamp + ".pgn");
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+    std::ofstream out(path);
+    if (!out || !(out << pgn)) {
+        setNotice(app, "COULD NOT SAVE THE PGN");
+        return;
+    }
+    setNotice(app, "SAVED " + path.generic_string());
 }
 
 // Attempts a move between two squares. If it's a promotion, opens the
@@ -828,7 +947,7 @@ void renderGame(App& app, Button& quitBtn, Button& newGameBtn, Button& botMenuBt
 
     Color turn = app.board.sideToMove();
     GameStatus status = app.board.status();
-    bool gameOver = status == GameStatus::Checkmate || status == GameStatus::Stalemate;
+    bool gameOver = gameIsOver(app);
 
     // Board squares.
     for (int x = 0; x < 8; x++) {
@@ -928,8 +1047,8 @@ void renderGame(App& app, Button& quitBtn, Button& newGameBtn, Button& botMenuBt
         std::string statusText;
         if (status == GameStatus::Checkmate) {
             statusText = "CHECKMATE - " + colorName(opponent(turn)) + " WINS";
-        } else if (status == GameStatus::Stalemate) {
-            statusText = "STALEMATE - DRAW";
+        } else if (const char* draw = drawReason(app)) {
+            statusText = std::string("DRAW - ") + draw;
         } else if (app.vsAi && turn != app.humanColor) {
             statusText = colorName(turn) + " (AI) IS THINKING...";
         } else if (status == GameStatus::Check) {
@@ -938,7 +1057,20 @@ void renderGame(App& app, Button& quitBtn, Button& newGameBtn, Button& botMenuBt
             statusText = colorName(turn) + " TO MOVE";
         }
         drawText(r, 16, static_cast<float>(kBoardPx + 18), 22, kTitleColor, statusText);
-        if (gameOver) drawButton(r, newGameBtn, kButtonBg, kButtonFg, 16);
+        auto clockText = [](long long ms) {
+            char buf[16];
+            std::snprintf(buf, sizeof buf, "%02lld:%02lld", ms / 60000, ms / 1000 % 60);
+            return std::string(buf);
+        };
+        if (gameOver) {
+            drawButton(r, newGameBtn, kButtonBg, kButtonFg, 16);
+        } else {
+            drawText(r, 16, static_cast<float>(kBoardPx + 62), 14, kTitleColor,
+                     "WHITE " + clockText(app.clockMs[0]) + "   BLACK " + clockText(app.clockMs[1]));
+        }
+        const bool showNotice = std::chrono::steady_clock::now() < app.noticeUntil;
+        drawText(r, 16, static_cast<float>(kBoardPx + 94), 11, showNotice ? kTitleColor : kHintColor,
+                 showNotice ? app.notice : "U UNDO  F FLIP  C COPY FEN  V PASTE FEN  P SAVE PGN");
     }
     drawButton(r, quitBtn, kButtonBg, kButtonFg, 16);
 
@@ -1161,11 +1293,20 @@ int runGui() {
                     app.customDragFromY = -1;
                 }
             } else if (app.screen == Screen::Game) {
-                GameStatus status = app.board.status();
-                bool gameOver = status == GameStatus::Checkmate || status == GameStatus::Stalemate;
+                bool gameOver = gameIsOver(app);
                 bool humansTurn = !app.vsAi || app.board.sideToMove() == app.humanColor;
 
-                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                if (e.type == SDL_KEYDOWN) {
+                    switch (e.key.keysym.sym) {
+                        case SDLK_f: app.flipped = !app.flipped; break;
+                        case SDLK_u:
+                        case SDLK_BACKSPACE: if (!app.match) undoMove(app); break;
+                        case SDLK_c: if (!app.match) copyFen(app); break;
+                        case SDLK_v: if (!app.match) pasteFen(app); break;
+                        case SDLK_p: if (!app.match) savePgn(app); break;
+                        default: break;
+                    }
+                } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
                     if (pointInRect(e.button.x, e.button.y, quitBtn.rect)) {
                         app.running = false;
                     } else if (app.match) { // bots play both sides: the board takes no input
@@ -1217,11 +1358,17 @@ int runGui() {
             }
         }
 
+        const auto tickNow = std::chrono::steady_clock::now();
+        const long long dtMs = std::min<long long>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(tickNow - app.lastTick).count(), 1000);
+        app.lastTick = tickNow;
+        if (app.screen == Screen::Game && !app.match && !gameIsOver(app))
+            app.clockMs[app.board.sideToMove() == Color::White ? 0 : 1] += dtMs;
+
         if (app.screen == Screen::Game && app.match) {
             driveBotMatch(app);
         } else if (app.screen == Screen::Game && !app.promotionPending) {
-            GameStatus status = app.board.status();
-            bool gameOver = status == GameStatus::Checkmate || status == GameStatus::Stalemate;
+            bool gameOver = gameIsOver(app);
             if (!gameOver && app.vsAi && app.board.sideToMove() != app.humanColor) {
                 if (!app.aiFuture) {
                     Board snapshot = app.board;

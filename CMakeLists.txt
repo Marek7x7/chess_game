@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
 project(ChessGame LANGUAGES CXX)
 
+if(MSVC)
+    message(FATAL_ERROR "MSVC is not supported (the code uses GCC/Clang builtins). "
+                        "Use MinGW-w64 or llvm-mingw: see cmake/mingw-w64.cmake and cmake/llvm-mingw.cmake.")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)           # -std=c++17, not gnu++17
@@ -13,26 +18,25 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # clangd / clang-tidy support
 option(CHESS_NATIVE_ARCH "Build with -march=native (binary may SIGILL on other CPUs)" ON)
 option(CHESS_WERROR      "Treat warnings as errors" ON)
 option(CHESS_LTO         "Link-time optimisation in Release builds" ON)
+option(CHESS_GUI         "Build the SDL2 GUI (OFF: a UCI/command-line engine that needs no SDL2)" ON)
 
-# Distribution builds. Neither needs SDL2 installed on the target machine.
+# Distribution builds. Neither needs SDL2 installed on the target machine (with CHESS_GUI=OFF SDL2 is not used at all).
 #   CHESS_BUNDLE_SDL2: download SDL2 and link it statically into the executable
 #                      (needs network access at configure time).
 #   CHESS_PORTABLE:    runs on any CPU of the baseline level below instead of
 #                      this one, links the C++ runtime statically, and implies
 #                      CHESS_BUNDLE_SDL2. Overrides CHESS_NATIVE_ARCH.
 # Linux:   cmake -S . -B build-portable -DCHESS_PORTABLE=ON
-# Windows: cross-compile from Linux with MinGW-w64:
-#   cmake -S . -B build-windows -DCHESS_PORTABLE=ON \
-#         -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake
-#   or with MSVC, from a Developer prompt:  cmake -S . -B build -DCHESS_PORTABLE=ON
+# Windows: cross-compile from Linux (GCC MinGW-w64, or the self-contained llvm-mingw clang toolchain):
+#   cmake -S . -B build-windows -DCHESS_PORTABLE=ON -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake
+#   cmake -S . -B build-windows -DCHESS_PORTABLE=ON -DCMAKE_TOOLCHAIN_FILE=cmake/llvm-mingw.cmake
+# (MSVC is not supported: the code uses the GCC/Clang builtins __builtin_popcountll, __builtin_prefetch, ...)
 option(CHESS_BUNDLE_SDL2 "Build SDL2 from source and link it statically" OFF)
 option(CHESS_PORTABLE    "Self-contained executable for machines without SDL2" OFF)
 set(CHESS_PORTABLE_ARCH "x86-64-v2" CACHE STRING
     "-march baseline for CHESS_PORTABLE on x86-64 (x86-64-v3 = AVX2/BMI2, 2013+ CPUs)")
 if(CHESS_PORTABLE)
     set(CHESS_BUNDLE_SDL2 ON)
-    # Static C runtime for MSVC (must be set before the targets are created).
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 # ---- Default build type (single-config generators only) --------------------
@@ -59,34 +63,48 @@ endif()
 
 # ---- Shared compile flags (applied per target, not globally) ---------------
 add_library(chess_flags INTERFACE)
-if(MSVC)
-    target_compile_options(chess_flags INTERFACE /W4
-        $<$<BOOL:${CHESS_WERROR}>:/WX>)
-else()
-    target_compile_options(chess_flags INTERFACE -Wall -Wextra
-        $<$<BOOL:${CHESS_WERROR}>:-Werror>)
-    if(CHESS_PORTABLE)
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
-            target_compile_options(chess_flags INTERFACE -march=${CHESS_PORTABLE_ARCH})
-        endif()
-        # No libstdc++/libgcc .so to ship; MinGW also drops libwinpthread-1.dll.
-        if(MINGW)
-            target_link_options(chess_flags INTERFACE -static)
-        else()
-            target_link_options(chess_flags INTERFACE -static-libstdc++ -static-libgcc)
-        endif()
-    elseif(CHESS_NATIVE_ARCH)
-        target_compile_options(chess_flags INTERFACE -march=native)
+target_compile_options(chess_flags INTERFACE -Wall -Wextra
+    $<$<BOOL:${CHESS_WERROR}>:-Werror>)
+if(CHESS_PORTABLE)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+        target_compile_options(chess_flags INTERFACE -march=${CHESS_PORTABLE_ARCH})
     endif()
+    # No libstdc++/libgcc .so to ship; MinGW also drops libwinpthread-1.dll.
+    if(MINGW)
+        target_link_options(chess_flags INTERFACE -static)
+    else()
+        target_link_options(chess_flags INTERFACE -static-libstdc++ -static-libgcc)
+    endif()
+elseif(CHESS_NATIVE_ARCH)
+    target_compile_options(chess_flags INTERFACE -march=native)
 endif()
 
+if(NOT CHESS_GUI)
+    target_compile_definitions(chess_flags INTERFACE CHESS_NO_GUI)
+endif()
+
+# `git describe` at configure time, shown by --version and in the UCI id.
+set(CHESS_VERSION "unknown")
+find_package(Git QUIET)
+if(Git_FOUND)
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --always --dirty
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE CHESS_GIT_DESCRIBE
+                    OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET RESULT_VARIABLE CHESS_GIT_RESULT)
+    if(CHESS_GIT_RESULT EQUAL 0 AND CHESS_GIT_DESCRIBE)
+        set(CHESS_VERSION "${CHESS_GIT_DESCRIBE}")
+    endif()
+endif()
+target_compile_definitions(chess_flags INTERFACE CHESS_VERSION="${CHESS_VERSION}")
+
 function(chess_configure tgt)
-    target_include_directories(${tgt} PRIVATE include)
+    target_include_directories(${tgt} PRIVATE include third_party/fathom)
     target_link_libraries(${tgt} PRIVATE chess_flags)
 endfunction()
 
 # ---- Sources ---------------------------------------------------------------
-if(CHESS_BUNDLE_SDL2)
+if(NOT CHESS_GUI)
+    message(STATUS "CHESS_GUI=OFF: building without the SDL2 GUI")
+elseif(CHESS_BUNDLE_SDL2)
     include(FetchContent)
     set(SDL_SHARED OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC ON  CACHE BOOL "" FORCE)
@@ -107,19 +125,81 @@ else()
     set(CHESS_SDL2_TARGET SDL2::SDL2)
 endif()
 file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS "src/*.cpp")
+if(NOT CHESS_GUI)
+    list(FILTER SRC_FILES EXCLUDE REGEX ".*/gui\\.cpp$")
+endif()
+
+# ---- Syzygy tablebases -----------------------------------------------------
+# Fathom (third_party/fathom, MIT) is compiled as C++ without our warning flags. Without the option the
+# UCI options SyzygyPath/SyzygyProbeDepth are still accepted but no table can be loaded.
+option(CHESS_SYZYGY "Syzygy tablebase probing (Fathom)" ON)
+if(CHESS_SYZYGY)
+    set(FATHOM_SRC "${CMAKE_SOURCE_DIR}/third_party/fathom/tbprobe.c")
+    set_source_files_properties("${FATHOM_SRC}" PROPERTIES LANGUAGE CXX COMPILE_OPTIONS "-w")
+    list(APPEND SRC_FILES "${FATHOM_SRC}")
+    target_compile_definitions(chess_flags INTERFACE CHESS_SYZYGY)
+endif()
+
+# ---- Built-in network ------------------------------------------------------
+# The evaluation network nnue/default.nnue (if the file exists) is compiled into the executable, so a single
+# file is all there is to ship. -DCHESS_NNUE_FILE=<path> uses another one, -DCHESS_NNUE=OFF none (the
+# hand-crafted evaluation; the UCI option EvalFile can still load a network at run time).
+option(CHESS_NNUE "Compile the network into the executable" ON)
+set(CHESS_NNUE_FILE "${CMAKE_SOURCE_DIR}/nnue/default.nnue" CACHE FILEPATH "The network to compile in")
+set(CHESS_NNUE_SOURCES "")
+if(CHESS_NNUE AND EXISTS "${CHESS_NNUE_FILE}")
+    set(CHESS_NNUE_CPP "${CMAKE_BINARY_DIR}/nnue_builtin.cpp")
+    add_custom_command(
+        OUTPUT "${CHESS_NNUE_CPP}"
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${CHESS_NNUE_FILE} -DOUTPUT=${CHESS_NNUE_CPP} -DSYMBOL=chess_nnue_builtin
+                -P ${CMAKE_SOURCE_DIR}/tools/embed_file.cmake
+        DEPENDS "${CHESS_NNUE_FILE}" "${CMAKE_SOURCE_DIR}/tools/embed_file.cmake"
+        COMMENT "Embedding ${CHESS_NNUE_FILE}")
+    set(CHESS_NNUE_SOURCES "${CHESS_NNUE_CPP}")
+    message(STATUS "Built-in network: ${CHESS_NNUE_FILE}")
+endif()
+
+# ---- Built-in opening book -------------------------------------------------
+# book/default.book (made by tools/book/extract_lines.py and `chess --build-book`) is compiled in the same
+# way; without it, or with -DCHESS_BOOK=OFF, only the hand-written lines of src/opening_book.cpp are known.
+option(CHESS_BOOK "Compile the generated opening book into the executable" ON)
+set(CHESS_BOOK_FILE "${CMAKE_SOURCE_DIR}/book/default.book" CACHE FILEPATH "The generated opening book to compile in")
+set(CHESS_BOOK_SOURCES "")
+if(CHESS_BOOK AND EXISTS "${CHESS_BOOK_FILE}")
+    set(CHESS_BOOK_CPP "${CMAKE_BINARY_DIR}/book_builtin.cpp")
+    add_custom_command(
+        OUTPUT "${CHESS_BOOK_CPP}"
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${CHESS_BOOK_FILE} -DOUTPUT=${CHESS_BOOK_CPP} -DSYMBOL=chess_book_builtin
+                -P ${CMAKE_SOURCE_DIR}/tools/embed_file.cmake
+        DEPENDS "${CHESS_BOOK_FILE}" "${CMAKE_SOURCE_DIR}/tools/embed_file.cmake"
+        COMMENT "Embedding ${CHESS_BOOK_FILE}")
+    set(CHESS_BOOK_SOURCES "${CHESS_BOOK_CPP}")
+    target_compile_definitions(chess_flags INTERFACE CHESS_BOOK_BUILTIN)
+    message(STATUS "Built-in opening book: ${CHESS_BOOK_FILE}")
+endif()
 
 # ---- Main engine -----------------------------------------------------------
-add_executable(chess ${SRC_FILES})
+add_executable(chess ${SRC_FILES} ${CHESS_NNUE_SOURCES} ${CHESS_BOOK_SOURCES})
 chess_configure(chess)
-target_link_libraries(chess PRIVATE ${CHESS_SDL2_TARGET})
+if(CHESS_NNUE_SOURCES)
+    target_compile_definitions(chess PRIVATE CHESS_NNUE_BUILTIN)
+endif()
+if(CHESS_GUI)
+    target_link_libraries(chess PRIVATE ${CHESS_SDL2_TARGET})
+endif()
 
 # ---- SPSA search-constant tuning build (tools/spsa.py) ---------------------
 # The same engine with every SEARCH_PARAM exposed as a UCI spin option.
 # cmake --build <dir> --target chess_spsa
-add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES})
+add_executable(chess_spsa EXCLUDE_FROM_ALL ${SRC_FILES} ${CHESS_NNUE_SOURCES} ${CHESS_BOOK_SOURCES})
 chess_configure(chess_spsa)
+if(CHESS_NNUE_SOURCES)
+    target_compile_definitions(chess_spsa PRIVATE CHESS_NNUE_BUILTIN)
+endif()
 target_compile_definitions(chess_spsa PRIVATE SPSA)
-target_link_libraries(chess_spsa PRIVATE ${CHESS_SDL2_TARGET})
+if(CHESS_GUI)
+    target_link_libraries(chess_spsa PRIVATE ${CHESS_SDL2_TARGET})
+endif()
 
 # ---- Texel tuner (tools/tune.cpp) ------------------------------------------
 # Not part of the default build: cmake --build <dir> --target chess_tune.
@@ -128,8 +208,43 @@ find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
     set(TUNE_SRC ${SRC_FILES})
     list(FILTER TUNE_SRC EXCLUDE REGEX ".*/(main|gui)\\.cpp$")
-    add_executable(chess_tune EXCLUDE_FROM_ALL ${TUNE_SRC} tools/tune.cpp)
+    add_executable(chess_tune EXCLUDE_FROM_ALL ${TUNE_SRC} ${CHESS_BOOK_SOURCES} tools/tune.cpp)
     chess_configure(chess_tune)
     target_compile_definitions(chess_tune PRIVATE TUNING)
     target_link_libraries(chess_tune PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
+# ---- Correctness gates as tests (ctest) -----------------------------------
+# CLAUDE.md rule 3 in one command:  ctest --test-dir <build-dir> --output-on-failure
+# Perft against published node counts, the incremental-eval/hash self-check, the bench signature
+# (tools/bench_signature.txt) and the UCI robustness cases (tools/uci_conformance.py, needs python3).
+option(CHESS_BUILD_TESTS "Register the correctness gates with CTest" ON)
+if(CHESS_BUILD_TESTS)
+    enable_testing()
+    add_test(NAME perft COMMAND chess --perft-suite 5)
+    add_test(NAME verify_eval COMMAND chess --verify-eval 4)
+    set_tests_properties(perft verify_eval PROPERTIES PASS_REGULAR_EXPRESSION "ALL PASS" TIMEOUT 900)
+    add_test(NAME bench_signature
+             COMMAND ${CMAKE_COMMAND} -DCHESS=$<TARGET_FILE:chess>
+                     -DEXPECTED=${CMAKE_SOURCE_DIR}/tools/bench_signature.txt -P ${CMAKE_SOURCE_DIR}/tools/check_bench.cmake)
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_FOUND AND NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME uci_conformance
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/uci_conformance.py $<TARGET_FILE:chess>)
+        set_tests_properties(uci_conformance PROPERTIES TIMEOUT 300)
+    endif()
+endif()
+
+# ---- NNUE tools (tools/nnue/) ----------------------------------------------
+# nnue_data: PGN -> training records; nnue_train: the trainer. Not part of the default build.
+set(NNUE_SRC ${SRC_FILES})
+list(FILTER NNUE_SRC EXCLUDE REGEX ".*/(main|gui)\\.cpp$")
+add_executable(nnue_data EXCLUDE_FROM_ALL ${NNUE_SRC} ${CHESS_BOOK_SOURCES} tools/nnue/pgn2data.cpp)
+chess_configure(nnue_data)
+if(OpenMP_CXX_FOUND)
+    # TUNING exposes the hand-crafted evaluation (tunerEvaluate), which `nnue_train eval --hce` compares against.
+    add_executable(nnue_train EXCLUDE_FROM_ALL ${NNUE_SRC} ${CHESS_BOOK_SOURCES} tools/nnue/train.cpp)
+    chess_configure(nnue_train)
+    target_compile_definitions(nnue_train PRIVATE TUNING)
+    target_link_libraries(nnue_train PRIVATE OpenMP::OpenMP_CXX)
 endif()

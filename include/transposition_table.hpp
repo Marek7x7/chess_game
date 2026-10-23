@@ -50,6 +50,10 @@ public:
     void store(uint64_t key, int depth, int score, TTFlag flag, const Move& best, bool hasMove,
                int eval = kTTNoEval);
 
+    // How full the table is with entries from the current search, in permille (UCI "hashfull"),
+    // estimated from the first 2000 slots.
+    int hashfull() const;
+
     // Starts loading a key's bucket into the cache, for a probe a little later.
     void prefetch(uint64_t key) const { __builtin_prefetch(&table[key & bucketMask]); }
 

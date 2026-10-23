@@ -27,6 +27,9 @@ constexpr DifficultyPreset kDifficultyPresets[4] = {
 // "EXPERT"), or -1 if there's no such preset.
 int presetIndexByName(const std::string& name);
 
+// Only kings plus at most one knight or bishop in total: nobody can ever deliver mate.
+bool isInsufficientMaterial(const Board& board);
+
 struct GameOutcome {
     bool over = false;
     std::string result = "*"; // "1-0", "0-1", "1/2-1/2"; "*" while still in progress
