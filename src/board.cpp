@@ -350,11 +350,12 @@ void Board::recomputeEval() {
 
 void Board::refreshNnue() {
     if (!nnue::active()) return;
-    nnue::reset(nnueAcc);
+    nnue::Accumulator& acc = nnueStack.current();
+    nnue::reset(acc);
     for (int x = 0; x < 8; x++)
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
-            if (!p.isEmpty()) nnue::add(nnueAcc, p.color, p.type, x, y);
+            if (!p.isEmpty()) nnue::add(acc, p.color, p.type, x, y);
         }
 }
 
@@ -362,7 +363,7 @@ bool Board::nnueMatchesScratch() const {
     if (!nnue::active()) return true;
     Board copy = *this;
     copy.refreshNnue();
-    return std::memcmp(&copy.nnueAcc, &nnueAcc, sizeof nnueAcc) == 0;
+    return std::memcmp(&copy.nnueStack.current(), &nnueStack.current(), sizeof(nnue::Accumulator)) == 0;
 }
 
 int Board::kingTerm() const {
@@ -955,7 +956,9 @@ MoveList Board::filterLegal(const MoveList& pseudo, Color color) const {
     return result;
 }
 
-void Board::makeMove(const Move& m) {
+void Board::makeMove(const Move& m) { makeMoveImpl(m, false); }
+
+void Board::makeMoveImpl(const Move& m, bool newAccumulator) {
     const ZobristKeys& z = zobrist();
     auto togglePiece = [&](Color c, PieceType t, int x, int y) {
         uint64_t key = z.piece[colorIndex(c)][pieceTypeIndex(t)][x][y];
@@ -965,15 +968,16 @@ void Board::makeMove(const Move& m) {
     // Kings are excluded from nonKingScore (see kingTerm()); non-king pieces
     // are summed incrementally at exactly the points their placement changes.
     const bool network = nnue::active();
+    nnue::Change change; // the network's feature changes, applied in one pass once the move is made
     auto addEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore += pieceContribution(t, c, x, y);
         egShift += egShiftFor(t, c, x, y);
-        if (network) nnue::add(nnueAcc, c, t, x, y);
+        if (network) change.add(c, t, x, y);
     };
     auto removeEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore -= pieceContribution(t, c, x, y);
         egShift -= egShiftFor(t, c, x, y);
-        if (network) nnue::sub(nnueAcc, c, t, x, y);
+        if (network) change.sub(c, t, x, y);
     };
 
     Piece moving = squares[m.fromX][m.fromY];
@@ -1055,6 +1059,16 @@ void Board::makeMove(const Move& m) {
 
     hash ^= z.sideToMove;
     turn = opponent(color);
+
+    if (network) {
+        if (newAccumulator) {
+            nnueStack.push();
+            nnue::apply(nnueStack.current(), nnueStack.below(), change);
+        } else {
+            const nnue::Accumulator before = nnueStack.current();
+            nnue::apply(nnueStack.current(), before, change);
+        }
+    }
 }
 
 void Board::makeMove(const Move& m, UndoState& undo) {
@@ -1076,12 +1090,11 @@ void Board::makeMove(const Move& m, UndoState& undo) {
     undo.prevBishopCount[1] = bishopCount[1];
     undo.prevEgShift = egShift;
     undo.prevHalfmoveCount = halfmoveCount;
-    if (nnue::active()) undo.prevAcc = nnueAcc;
     const Piece& moving = squares[m.fromX][m.fromY];
     undo.movedType = moving.type;
     undo.movedColor = moving.color;
 
-    makeMove(m);
+    makeMoveImpl(m, true);
 }
 
 void Board::unmakeMove(const Move& m, const UndoState& undo) {
@@ -1128,7 +1141,7 @@ void Board::unmakeMove(const Move& m, const UndoState& undo) {
     bishopCount[1] = undo.prevBishopCount[1];
     egShift = undo.prevEgShift;
     halfmoveCount = undo.prevHalfmoveCount;
-    if (nnue::active()) nnueAcc = undo.prevAcc;
+    if (nnue::active()) nnueStack.pop();
     turn = color;
 }
 

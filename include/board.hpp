@@ -73,7 +73,7 @@ public:
     // The neural-network accumulator for the current position. Kept up to date by makeMove()/unmakeMove() while a
     // network is loaded (nnue::active()); refreshNnue() rebuilds it, which is needed after a network gets loaded
     // for a board that already exists. nnueMatchesScratch() is verification only.
-    const nnue::Accumulator& nnueAccumulator() const { return nnueAcc; }
+    const nnue::Accumulator& nnueAccumulator() const { return nnueStack.current(); }
     void refreshNnue();
     bool nnueMatchesScratch() const;
 
@@ -137,7 +137,6 @@ public:
         int prevBishopCount[2];
         int prevEgShift;
         int prevHalfmoveCount;
-        nnue::Accumulator prevAcc; // only filled while a network is loaded
     };
 
     // Same as makeMove(const Move&), but also records enough state in `undo`
@@ -196,7 +195,11 @@ private:
     int kingX[2], kingY[2]; // [White, Black]
     int bishopCount[2];     // [White, Black], for the bishop-pair bonus
     int egShift;            // sum of egShiftFor() over all pieces, blended in by phase
-    nnue::Accumulator nnueAcc; // see nnueAccumulator()
+    nnue::AccumulatorStack nnueStack; // see nnueAccumulator(); a move pushes, unmakeMove() pops (only while a network is loaded)
+
+    // makeMove() for both overloads: with `newAccumulator` the network's accumulator is written to a fresh stack
+    // slot (to be popped by unmakeMove()), otherwise it is updated where it is.
+    void makeMoveImpl(const Move& m, bool newAccumulator);
 
     static int colorIndex(Color c) { return c == Color::White ? 0 : 1; }
 

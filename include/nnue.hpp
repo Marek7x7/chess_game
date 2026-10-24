@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "nnue_arch.hpp"
 #include "piece.hpp"
@@ -16,6 +17,49 @@ namespace nnue {
 struct alignas(64) Accumulator { // a cache line, so that 512-bit loads never straddle two
     int16_t v[2][kHidden];
 };
+
+// The feature changes of one move: pieces that left a square (subs) and pieces that arrived (adds). A move changes
+// at most two of each (castling: king and rook; a capture or en passant: the mover and the victim).
+struct Change {
+    struct Feature {
+        int color, type, x, y; // colour 0 White / 1 Black, type as PieceType
+    };
+    Feature adds[2], subs[2];
+    int numAdds = 0, numSubs = 0;
+    void add(Color c, PieceType t, int x, int y) { adds[numAdds++] = {c == Color::White ? 0 : 1, static_cast<int>(t), x, y}; }
+    void sub(Color c, PieceType t, int x, int y) { subs[numSubs++] = {c == Color::White ? 0 : 1, static_cast<int>(t), x, y}; }
+};
+
+// The accumulators along the line of moves being played: the top slot belongs to the current position. A move
+// steps up and writes the new slot from the one below it; taking the move back just steps down, with no copying.
+// Copying a stack copies only the slots in use.
+class AccumulatorStack {
+public:
+    AccumulatorStack() : slots(1) {}
+    AccumulatorStack(const AccumulatorStack& o) : slots(o.slots.begin(), o.slots.begin() + o.top + 1), top(o.top) {}
+    AccumulatorStack& operator=(const AccumulatorStack& o) {
+        if (this != &o) {
+            slots.assign(o.slots.begin(), o.slots.begin() + o.top + 1);
+            top = o.top;
+        }
+        return *this;
+    }
+    Accumulator& current() { return slots[top]; }
+    const Accumulator& current() const { return slots[top]; }
+    const Accumulator& below() const { return slots[top - 1]; } // after push()
+    void push() { // invalidates references to the slots
+        if (top + 1 == static_cast<int>(slots.size())) slots.resize(slots.size() * 2);
+        ++top;
+    }
+    void pop() { --top; }
+
+private:
+    std::vector<Accumulator> slots;
+    int top = 0;
+};
+
+// dst = src with `change` applied. They must be different accumulators.
+void apply(Accumulator& dst, const Accumulator& src, const Change& change);
 
 // True while a network is loaded and in use.
 bool active();

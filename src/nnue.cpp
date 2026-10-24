@@ -146,6 +146,35 @@ inline void update(Accumulator& acc, Color c, PieceType t, int x, int y) {
 
 } // namespace
 
+void apply(Accumulator& dst, const Accumulator& src, const Change& change) {
+    for (int p = 0; p < 2; p++) {
+        const int16_t* __restrict add[2];
+        const int16_t* __restrict sub[2];
+        for (int i = 0; i < change.numAdds; i++) {
+            const Change::Feature& f = change.adds[i];
+            add[i] = g_net->featureWeights[featureIndex(p, f.color, f.type, f.x, f.y)];
+        }
+        for (int i = 0; i < change.numSubs; i++) {
+            const Change::Feature& f = change.subs[i];
+            sub[i] = g_net->featureWeights[featureIndex(p, f.color, f.type, f.x, f.y)];
+        }
+        int16_t* __restrict d = dst.v[p];
+        const int16_t* __restrict s = src.v[p];
+        // One pass for the usual moves (quiet, promotion: one of each; capture, en passant: one add, two subs).
+        if (change.numAdds == 1 && change.numSubs == 1) {
+            for (int i = 0; i < kHidden; i++) d[i] = static_cast<int16_t>(s[i] + add[0][i] - sub[0][i]);
+        } else if (change.numAdds == 1 && change.numSubs == 2) {
+            for (int i = 0; i < kHidden; i++) d[i] = static_cast<int16_t>(s[i] + add[0][i] - sub[0][i] - sub[1][i]);
+        } else { // castling
+            std::memcpy(d, s, sizeof(int16_t) * kHidden);
+            for (int a = 0; a < change.numAdds; a++)
+                for (int i = 0; i < kHidden; i++) d[i] = static_cast<int16_t>(d[i] + add[a][i]);
+            for (int a = 0; a < change.numSubs; a++)
+                for (int i = 0; i < kHidden; i++) d[i] = static_cast<int16_t>(d[i] - sub[a][i]);
+        }
+    }
+}
+
 void add(Accumulator& acc, Color c, PieceType t, int x, int y) { update<+1>(acc, c, t, x, y); }
 void sub(Accumulator& acc, Color c, PieceType t, int x, int y) { update<-1>(acc, c, t, x, y); }
 
