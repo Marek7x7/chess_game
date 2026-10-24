@@ -5,6 +5,10 @@
 #include <new>
 #include <stdexcept>
 
+#ifdef __linux__
+#include <sys/mman.h>
+#endif
+
 namespace {
 
 // Entry layout in one 64-bit word: bits 0-20 score (21 bits, signed: a mate
@@ -65,7 +69,15 @@ TranspositionTable::TranspositionTable(size_t sizePowerOfTwo) : bucketMask((size
 #ifdef _WIN32
     void* memory = _aligned_malloc(bytes, 64); // the Windows C runtime has no aligned_alloc
 #else
-    void* memory = std::aligned_alloc(64, bytes);
+    // A big table is probed at random, so with 4 KiB pages nearly every probe misses the TLB as well as the cache.
+    // 2 MiB alignment plus a transparent-huge-page hint (the usual kernel default is "madvise") avoids that.
+    constexpr size_t kHugePage = size_t(2) << 20;
+    const size_t alignment = bytes >= kHugePage ? kHugePage : 64;
+    bytes = (bytes + alignment - 1) & ~(alignment - 1);
+    void* memory = std::aligned_alloc(alignment, bytes);
+#ifdef __linux__
+    if (memory && alignment == kHugePage) madvise(memory, bytes, MADV_HUGEPAGE); // before the first touch below
+#endif
 #endif
     if (!memory) throw std::bad_alloc();
     table.reset(static_cast<Slot*>(memory));
