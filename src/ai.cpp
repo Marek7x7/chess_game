@@ -1399,6 +1399,22 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             moveIndex++;
             continue;
         }
+        // Late-move pruning: at shallow depth in a non-PV node, the quiet moves ordered
+        // after the first few are very unlikely to matter. Together with futility pruning this skips
+        // every quiet move after the first that gives no check.
+        const bool lateQuiet = !pvNode && !inCheck && depth <= spLmpMaxDepth && moveIndex >= spLmpBase + depth * depth &&
+                               best > -kMateThreshold;
+        const bool prunable = (futile || lateQuiet) && moveIndex > 0 && m.captured == PieceType::None &&
+                              m.promotion == PieceType::None;
+        // A move that cannot be illegal is skipped without making it when it gives no check.
+        if (prunable && !mayBeIllegal(m) && !board.givesCheck(m)) {
+            anyLegal = true;
+            // (Quiescence never writes prevMove, so a nested quiescence node reads what the last main-search move
+            // left here, pruned or not: keep writing it, or the search tree changes.)
+            if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
+            moveIndex++;
+            continue;
+        }
         Board::UndoState undo;
         board.makeMove(m, undo);
         if (mayBeIllegal(m) && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
@@ -1409,13 +1425,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         ctx.tt.prefetch(board.hashKey());
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
         const int extension = sameMove(m, ttMove) ? singularExtension : 0;
-
-        // Late-move pruning: at shallow depth in a non-PV node, the quiet moves ordered
-        // after the first few are very unlikely to matter.
-        const bool lateQuiet = !pvNode && !inCheck && depth <= spLmpMaxDepth && moveIndex >= spLmpBase + depth * depth &&
-                               best > -kMateThreshold;
-        if ((futile || lateQuiet) && moveIndex > 0 && m.captured == PieceType::None &&
-            m.promotion == PieceType::None && !board.isInCheck(opponent(color))) {
+        if (prunable && !board.isInCheck(opponent(color))) { // the moves that might be illegal, made to find out
             board.unmakeMove(m, undo);
             moveIndex++;
             continue;

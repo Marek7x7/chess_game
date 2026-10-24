@@ -162,8 +162,14 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
     if (depth == 0) return 1;
     long long nodes = 0;
     for (const Move& m : board.legalMoves(color)) {
+        const bool predictedCheck = board.givesCheck(m);
         Board::UndoState undo;
         board.makeMove(m, undo);
+        if (predictedCheck != board.isInCheck(opponent(color))) {
+            mismatches++;
+            std::fprintf(stderr, "GIVES-CHECK MISMATCH at depth=%d: %s%s predicted %d\n", depth,
+                         squareStr(m.fromX, m.fromY).c_str(), squareStr(m.toX, m.toY).c_str(), predictedCheck);
+        }
         nodes += verifyEvalNode(board, depth - 1, opponent(color), mismatches);
         board.unmakeMove(m, undo);
     }

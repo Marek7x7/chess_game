@@ -110,6 +110,9 @@ public:
 
     bool isSquareAttacked(int x, int y, Color byColor) const;
     bool isInCheck(Color color) const;
+    // Whether `m` (a legal move of the side whose piece stands on its from-square) would leave the enemy king in
+    // check, without making it. Checked against makeMove() + isInCheck() by --verify-eval.
+    bool givesCheck(const Move& m) const;
 
     // Applies a move produced by legalMoves(); does not re-validate legality.
     void makeMove(const Move& m);

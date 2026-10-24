@@ -834,6 +834,36 @@ bool Board::isInCheck(Color color) const {
     return isSquareAttacked(kingX[ci], kingY[ci], opponent(color));
 }
 
+bool Board::givesCheck(const Move& m) const {
+    // The enemy king is not attacked before the move (the mover is to move), so a check comes either from the
+    // piece that lands (directly) or from a slider whose line the move opens (discovered). The position after the
+    // move is described by its occupancy and the mover's slider sets; nothing is made.
+    const Piece& moving = squares[m.fromX][m.fromY];
+    const int c = colorIndex(moving.color), e = 1 - c;
+    const int ksq = kingX[e] * 8 + kingY[e], to = m.toX * 8 + m.toY;
+    const uint64_t kingBit = uint64_t(1) << ksq;
+    const uint64_t fromBit = bb::bit(m.fromX, m.fromY), toBit = bb::bit(m.toX, m.toY);
+    const uint64_t queens = pieceBB[c][static_cast<int>(PieceType::Queen)];
+    uint64_t occupied = ((occBB[0] | occBB[1]) & ~fromBit) | toBit;
+    uint64_t diagonal = (pieceBB[c][static_cast<int>(PieceType::Bishop)] | queens) & ~fromBit;
+    uint64_t straight = (pieceBB[c][static_cast<int>(PieceType::Rook)] | queens) & ~fromBit;
+    if (m.isEnPassant) occupied &= ~bb::bit(m.toX, m.fromY); // the captured pawn leaves its square
+    if (m.isCastle) { // the rook moves too (see makeMove())
+        const uint64_t rookFrom = bb::bit(m.toX == 6 ? 7 : 0, m.fromY), rookTo = bb::bit(m.toX == 6 ? 5 : 3, m.fromY);
+        occupied = (occupied & ~rookFrom) | rookTo;
+        straight = (straight & ~rookFrom) | rookTo;
+    }
+    switch (m.promotion != PieceType::None ? m.promotion : moving.type) {
+    case PieceType::Pawn: if (bb::pawnAttacks[c][to] & kingBit) return true; break;
+    case PieceType::Knight: if (bb::knightAttacks[to] & kingBit) return true; break;
+    case PieceType::Bishop: diagonal |= toBit; break;
+    case PieceType::Rook: straight |= toBit; break;
+    case PieceType::Queen: diagonal |= toBit; straight |= toBit; break;
+    default: break; // a king never gives check itself
+    }
+    return ((bb::bishopAttacks(ksq, occupied) & diagonal) | (bb::rookAttacks(ksq, occupied) & straight)) != 0;
+}
+
 MoveList Board::legalMoves(Color color) const { return filterLegal(pseudoLegalMoves(color, false), color); }
 
 MoveList Board::legalNoisyMoves(Color color) const { return filterLegal(pseudoLegalMoves(color, true), color); }
