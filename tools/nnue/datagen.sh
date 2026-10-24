@@ -21,6 +21,8 @@ for i in $(seq 1 "$PROCS"); do
     seed=$((SEED_BASE + i))
     args=(--datagen --out "$OUT/data-$seed.bin" --games "$GAMES" --nodes "$NODES" --seed "$seed")
     [ -n "$NET" ] && args+=(--net "$NET")
+    # shellcheck disable=SC2206  # DATAGEN_ARGS is a list of arguments on purpose, e.g. "--book-plies 20 --random-plies 2"
+    args+=(${DATAGEN_ARGS:-})
     nice -n 10 "$BIN" "${args[@]}" > "$OUT/log-$seed.txt" 2>&1 &
     pids+=($!)
 done

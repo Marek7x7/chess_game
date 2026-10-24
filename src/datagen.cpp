@@ -13,6 +13,7 @@
 #include "board.hpp"
 #include "nnue.hpp"
 #include "nnue_record.hpp"
+#include "opening_book.hpp"
 #include "transposition_table.hpp"
 
 // Self-play for training data: games between two copies of the engine, each move searched to a fixed number of
@@ -27,6 +28,7 @@ struct Config {
     long long games = 1000;
     int nodes = 5000;
     int randomPlies = 8;
+    int bookPlies = 0; // plies taken from the opening book first (weighted at random), before the random ones
     uint64_t seed = 1;
 };
 
@@ -69,6 +71,17 @@ Move search(const Board& board, const Config& cfg, TranspositionTable& tt, const
 bool playGame(const Config& cfg, std::mt19937_64& rng, std::vector<nnue::data::Record>& records, int& result) {
     Board board;
     std::vector<uint64_t> history{board.hashKey()};
+    for (int i = 0; i < cfg.bookPlies; i++) {
+        const std::vector<BookEntry> book = lookupBook(board);
+        if (book.empty()) break;
+        int total = 0;
+        for (const BookEntry& e : book) total += e.weight;
+        int pick = static_cast<int>(rng() % static_cast<uint64_t>(total));
+        const BookEntry* chosen = &book.back();
+        for (const BookEntry& e : book) if ((pick -= e.weight) < 0) { chosen = &e; break; }
+        board.makeMove(chosen->move);
+        history.push_back(board.hashKey());
+    }
     for (int i = 0; i < cfg.randomPlies; i++) {
         MoveList moves = board.legalMoves(board.sideToMove());
         if (moves.empty()) return false;
@@ -90,7 +103,7 @@ bool playGame(const Config& cfg, std::mt19937_64& rng, std::vector<nnue::data::R
     std::vector<nnue::data::Record> game;
     int decisive = 0, quiet = 0; // consecutive plies of a lopsided / of a dead-level score
     int adjudicated = 0;         // +1 White wins, -1 Black wins by the lopsided score
-    for (int ply = cfg.randomPlies; ply < 600; ply++) {
+    for (int ply = static_cast<int>(history.size()) - 1; ply < 600; ply++) {
         const Color stm = board.sideToMove();
         MoveList legal = board.legalMoves(stm);
         if (legal.empty()) {
@@ -147,6 +160,7 @@ int runDatagen(int argc, char** argv) {
         else if (arg == "--games") cfg.games = std::atoll(value());
         else if (arg == "--nodes") cfg.nodes = std::atoi(value());
         else if (arg == "--random-plies") cfg.randomPlies = std::atoi(value());
+        else if (arg == "--book-plies") cfg.bookPlies = std::atoi(value());
         else if (arg == "--seed") cfg.seed = static_cast<uint64_t>(std::atoll(value()));
         else {
             std::fprintf(stderr, "unknown datagen option %s\n", arg.c_str());
@@ -154,7 +168,7 @@ int runDatagen(int argc, char** argv) {
         }
     }
     if (cfg.out.empty()) {
-        std::fprintf(stderr, "usage: chess --datagen --out <file> [--games N] [--nodes N] [--random-plies N] [--seed N] [--net <file>]\n");
+        std::fprintf(stderr, "usage: chess --datagen --out <file> [--games N] [--nodes N] [--random-plies N] [--book-plies N] [--seed N] [--net <file>]\n");
         return 2;
     }
     if (!cfg.net.empty()) {
