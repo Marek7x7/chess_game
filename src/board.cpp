@@ -834,6 +834,41 @@ bool Board::isInCheck(Color color) const {
     return isSquareAttacked(kingX[ci], kingY[ci], opponent(color));
 }
 
+uint64_t Board::hashAfter(const Move& m) const {
+    // The same toggles as makeMove(), in the same cases.
+    const ZobristKeys& z = zobrist();
+    const Piece& moving = squares[m.fromX][m.fromY];
+    const Piece& captured = squares[m.toX][m.toY];
+    const int ci = colorIndex(moving.color);
+    const PieceType placed = m.promotion != PieceType::None ? m.promotion : moving.type;
+    uint64_t h = hash ^ z.sideToMove ^ z.piece[ci][pieceTypeIndex(moving.type)][m.fromX][m.fromY] ^
+                 z.piece[ci][pieceTypeIndex(placed)][m.toX][m.toY];
+    if (m.isEnPassant) h ^= z.piece[1 - ci][pieceTypeIndex(PieceType::Pawn)][m.toX][m.fromY];
+    else if (!captured.isEmpty()) h ^= z.piece[colorIndex(captured.color)][pieceTypeIndex(captured.type)][m.toX][m.toY];
+    if (m.isCastle) {
+        const int rookFrom = m.toX == 6 ? 7 : 0, rookTo = m.toX == 6 ? 5 : 3;
+        h ^= z.piece[ci][pieceTypeIndex(PieceType::Rook)][rookFrom][m.fromY] ^
+             z.piece[ci][pieceTypeIndex(PieceType::Rook)][rookTo][m.fromY];
+    }
+    if (moving.type == PieceType::King) {
+        if (castleKingside[ci]) h ^= z.castle[ci][0];
+        if (castleQueenside[ci]) h ^= z.castle[ci][1];
+    }
+    if (moving.type == PieceType::Rook) {
+        const int homeY = moving.color == Color::White ? 0 : 7;
+        if (m.fromY == homeY && m.fromX == 0 && castleQueenside[ci]) h ^= z.castle[ci][1];
+        if (m.fromY == homeY && m.fromX == 7 && castleKingside[ci]) h ^= z.castle[ci][0];
+    }
+    if (captured.type == PieceType::Rook && (m.toX == 0 || m.toX == 7) && (m.toY == 0 || m.toY == 7)) {
+        const int rci = colorIndex(m.toY == 0 ? Color::White : Color::Black);
+        if (m.toX == 0 && castleQueenside[rci]) h ^= z.castle[rci][1];
+        else if (m.toX == 7 && castleKingside[rci]) h ^= z.castle[rci][0];
+    }
+    if (enPassantX != -1) h ^= z.enPassantFile[enPassantX];
+    if (moving.type == PieceType::Pawn && std::abs(m.toY - m.fromY) == 2) h ^= z.enPassantFile[m.fromX];
+    return h;
+}
+
 bool Board::givesCheck(const Move& m) const {
     // The enemy king is not attacked before the move (the mover is to move), so a check comes either from the
     // piece that lands (directly) or from a slider whose line the move opens (discovered). The position after the

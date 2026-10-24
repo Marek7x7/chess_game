@@ -49,6 +49,9 @@ public:
     // Plies since the last capture or pawn move (the fifty-move-rule count).
     int halfmoveClock() const { return halfmoveCount; }
     uint64_t hashKey() const { return hash; }
+    // What hashKey() will be after makeMove(m), without making it: lets the search start loading the
+    // transposition-table bucket before the (long) make. Checked against makeMove() by --verify-eval.
+    uint64_t hashAfter(const Move& m) const;
     // Zobrist hash of the pawns alone (both colors), for caching evaluation
     // terms that depend only on where the pawns are.
     uint64_t pawnKey() const { return pawnHash; }

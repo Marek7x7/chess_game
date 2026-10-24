@@ -163,8 +163,14 @@ long long verifyEvalNode(Board& board, int depth, Color color, long long& mismat
     long long nodes = 0;
     for (const Move& m : board.legalMoves(color)) {
         const bool predictedCheck = board.givesCheck(m);
+        const uint64_t predictedHash = board.hashAfter(m);
         Board::UndoState undo;
         board.makeMove(m, undo);
+        if (predictedHash != board.hashKey()) {
+            mismatches++;
+            std::fprintf(stderr, "HASH-AFTER MISMATCH at depth=%d: %s%s\n", depth, squareStr(m.fromX, m.fromY).c_str(),
+                         squareStr(m.toX, m.toY).c_str());
+        }
         if (predictedCheck != board.isInCheck(opponent(color))) {
             mismatches++;
             std::fprintf(stderr, "GIVES-CHECK MISMATCH at depth=%d: %s%s predicted %d\n", depth,

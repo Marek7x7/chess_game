@@ -1124,6 +1124,7 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
         // A capture that loses material once the exchange plays out can't
         // raise the stand-pat score, so it isn't worth searching.
         if (!inCheck && !seeNonNegative(board, m)) continue;
+        ctx.tt.prefetch(board.hashAfter(m)); // the make below overlaps the memory access
         Board::UndoState undo;
         board.makeMove(m, undo);
         {
@@ -1135,7 +1136,6 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
             }
         }
         anyLegal = true;
-        ctx.tt.prefetch(board.hashKey());
         int score = -quiescence(board, -beta, -alpha, opponent(color), ply + 1, ctx);
         board.unmakeMove(m, undo);
         if (score > best) {
@@ -1415,6 +1415,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             moveIndex++;
             continue;
         }
+        ctx.tt.prefetch(board.hashAfter(m)); // the make below overlaps the memory access
         Board::UndoState undo;
         board.makeMove(m, undo);
         if (mayBeIllegal(m) && board.isInCheck(color)) { // illegal: leaves the mover's king attacked
@@ -1422,7 +1423,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             continue;
         }
         anyLegal = true;
-        ctx.tt.prefetch(board.hashKey());
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
         const int extension = sameMove(m, ttMove) ? singularExtension : 0;
         if (prunable && !board.isInCheck(opponent(color))) { // the moves that might be illegal, made to find out
