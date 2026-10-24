@@ -149,3 +149,4 @@ Head to head at 10+0.1 over 200 games, the same two builds: +463.16 ±
 4. KEPT: commit stays. REVERTED: `git revert` the commit -- log the row
    anyway; a documented negative result is exactly as valuable as a
    positive one here.
+| 2026-10-23 | Speed bundle, identical search tree: AVX-512(+VNNI) network kernel and 64-byte aligned accumulator, skip make/unmake for pruned quiet moves (`givesCheck`), TT bucket prefetched before the make (`hashAfter`), 2 MiB huge-page TT, accumulator stack with fused updates; 3.45M -> 4.28M nps at --bench 14 (+24.1%) | `dcac65f`..`e19a5a3` vs `a8aa409` | TC=5+0.05, Hash=64MB, Threads=1, book=off, concurrency=20, elo0=0/elo1=10 (nElo), suite=8moves_v3 | Elo +30.32 ± 14.87, nElo +47.89 ± 23.36 (850 games: 230 W, 156 L, 464 D; LLR 2.95) | KEPT (H1 accepted after about 13 min) |
