@@ -149,6 +149,18 @@ inline void update(Accumulator& acc, Color c, PieceType t, int x, int y) {
 void add(Accumulator& acc, Color c, PieceType t, int x, int y) { update<+1>(acc, c, t, x, y); }
 void sub(Accumulator& acc, Color c, PieceType t, int x, int y) { update<-1>(acc, c, t, x, y); }
 
+const char* kernelName() {
+#if defined(__AVX512VNNI__) && defined(__AVX512BW__)
+    return "avx512-vnni";
+#elif defined(__AVX512BW__)
+    return "avx512";
+#elif defined(__AVX2__)
+    return "avx2";
+#else
+    return "scalar";
+#endif
+}
+
 int evaluate(const Accumulator& acc, Color sideToMove, int pieceCount) {
     const int us = sideToMove == Color::White ? 0 : 1;
     const int bucket = bucketOf(pieceCount);
@@ -159,7 +171,28 @@ int evaluate(const Accumulator& acc, Color sideToMove, int pieceCount) {
     // sum over the two accumulators of  clip(a, 0, kQA)^2 * w , computed as ((a * w) * a) like the vector code
     // below so that both give the same integers: (a * w) fits 16 bits for |w| <= 128.
     int32_t sum = 0;
-#if defined(__AVX2__)
+#if defined(__AVX512BW__)
+    // 32 lanes per step. Integer additions wrap identically in any order, so the sum equals the other branches'.
+    static_assert(kHidden % 32 == 0, "the 512-bit loop takes 32 lanes at a time");
+    const __m512i zero = _mm512_setzero_si512();
+    const __m512i qa = _mm512_set1_epi16(kQA);
+    __m512i acc32 = _mm512_setzero_si512();
+    for (int half = 0; half < 2; half++) {
+        const int16_t* a = half == 0 ? mine : theirs;
+        const int16_t* ww = w + half * kHidden;
+        for (int i = 0; i < kHidden; i += 32) {
+            __m512i x = _mm512_loadu_si512(a + i);
+            x = _mm512_min_epi16(_mm512_max_epi16(x, zero), qa);
+            const __m512i p = _mm512_mullo_epi16(x, _mm512_loadu_si512(ww + i));
+#if defined(__AVX512VNNI__)
+            acc32 = _mm512_dpwssd_epi32(acc32, p, x); // multiply-add and accumulate in one instruction
+#else
+            acc32 = _mm512_add_epi32(acc32, _mm512_madd_epi16(p, x));
+#endif
+        }
+    }
+    sum = _mm512_reduce_add_epi32(acc32);
+#elif defined(__AVX2__)
     const __m256i zero = _mm256_setzero_si256();
     const __m256i qa = _mm256_set1_epi16(kQA);
     __m256i acc32 = _mm256_setzero_si256();

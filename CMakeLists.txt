@@ -16,6 +16,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # clangd / clang-tidy support
 # SIGILL on a different CPU. Fine (and wanted) for this project's actual use
 # case -- building and SPRT-testing on the same machine.
 option(CHESS_NATIVE_ARCH "Build with -march=native (binary may SIGILL on other CPUs)" ON)
+option(CHESS_AVX512      "With -march=native, use AVX-512 where the CPU has it (OFF: AVX2 only, for A/B speed tests)" ON)
 option(CHESS_WERROR      "Treat warnings as errors" ON)
 option(CHESS_LTO         "Link-time optimisation in Release builds" ON)
 option(CHESS_GUI         "Build the SDL2 GUI (OFF: a UCI/command-line engine that needs no SDL2)" ON)
@@ -34,7 +35,7 @@ option(CHESS_GUI         "Build the SDL2 GUI (OFF: a UCI/command-line engine tha
 option(CHESS_BUNDLE_SDL2 "Build SDL2 from source and link it statically" OFF)
 option(CHESS_PORTABLE    "Self-contained executable for machines without SDL2" OFF)
 set(CHESS_PORTABLE_ARCH "x86-64-v2" CACHE STRING
-    "-march baseline for CHESS_PORTABLE on x86-64 (x86-64-v3 = AVX2/BMI2, 2013+ CPUs)")
+    "-march baseline for CHESS_PORTABLE on x86-64 (x86-64-v3 = AVX2/BMI2, 2013+ CPUs; x86-64-v4 = AVX-512)")
 if(CHESS_PORTABLE)
     set(CHESS_BUNDLE_SDL2 ON)
 endif()
@@ -77,6 +78,9 @@ if(CHESS_PORTABLE)
     endif()
 elseif(CHESS_NATIVE_ARCH)
     target_compile_options(chess_flags INTERFACE -march=native)
+    if(NOT CHESS_AVX512)
+        target_compile_options(chess_flags INTERFACE -mno-avx512f) # after -march=native, so it wins; drops every AVX-512 subset
+    endif()
 endif()
 
 if(NOT CHESS_GUI)

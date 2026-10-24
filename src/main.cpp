@@ -374,7 +374,7 @@ int runGui() {
 int main(int argc, char** argv) {
     nnue::loadBuiltin(); // the network compiled into this binary, if there is one
     if (argc >= 2 && (std::strcmp(argv[1], "--version") == 0 || std::strcmp(argv[1], "-v") == 0)) {
-        std::printf("ChessGame %s\n", CHESS_VERSION);
+        std::printf("ChessGame %s\nnetwork kernel: %s\n", CHESS_VERSION, nnue::kernelName());
         return 0;
     }
     if (argc >= 2 && (std::strcmp(argv[1], "--help") == 0 || std::strcmp(argv[1], "-h") == 0)) {

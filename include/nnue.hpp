@@ -13,7 +13,7 @@ namespace nnue {
 
 // The accumulator: both sides' views of the position, [0] White's and [1] Black's. Board keeps one up to date
 // as moves are made (only while a network is loaded).
-struct alignas(32) Accumulator {
+struct alignas(64) Accumulator { // a cache line, so that 512-bit loads never straddle two
     int16_t v[2][kHidden];
 };
 
@@ -39,5 +39,7 @@ void sub(Accumulator& acc, Color c, PieceType t, int x, int y);
 // The evaluation, in centipawns from the point of view of `sideToMove`, for a position with the given
 // accumulator and number of pieces on the board.
 int evaluate(const Accumulator& acc, Color sideToMove, int pieceCount);
+// Which instruction set evaluate() was compiled for: "avx512-vnni", "avx512", "avx2" or "scalar".
+const char* kernelName();
 
 } // namespace nnue
