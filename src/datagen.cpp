@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <random>
-#include <unordered_set>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -237,7 +237,23 @@ int processFiles(const Config& cfg, const std::vector<std::string>& inputs) {
         std::fprintf(stderr, "cannot write %s\n", cfg.out.c_str());
         return 1;
     }
-    std::unordered_set<uint64_t> seen;
+    // The hashes seen so far in a flat open-addressing table (8 bytes a slot instead of ~40 for a node-based
+    // set), sized for at most half full if every input record were new; 0 marks an empty slot.
+    size_t total = 0;
+    for (const std::string& name : inputs) {
+        std::error_code ec;
+        total += static_cast<size_t>(std::filesystem::file_size(name, ec)) / sizeof(nnue::data::Record);
+    }
+    size_t slots = 1 << 16;
+    while (slots < 2 * total) slots <<= 1;
+    std::vector<uint64_t> seen(slots, 0);
+    auto insertNew = [&](uint64_t h) {
+        h |= 1; // never 0
+        for (size_t i = ((h * 0x9E3779B97F4A7C15ULL) >> 20) & (slots - 1);; i = (i + 1) & (slots - 1)) {
+            if (seen[i] == h) return false;
+            if (seen[i] == 0) return seen[i] = h, true;
+        }
+    };
     long long read = 0, kept = 0, relabelled = 0, changed = 0;
     std::vector<nnue::data::Record> chunk(1 << 16);
     for (const std::string& name : inputs) {
@@ -255,7 +271,7 @@ int processFiles(const Config& cfg, const std::vector<std::string>& inputs) {
                 uint64_t h = r.occupancy * 0x9E3779B97F4A7C15ULL ^ (r.stm + 1ULL);
                 for (int k = 0; k < 16; k++) h = (h ^ r.pieces[k]) * 0x100000001B3ULL;
                 h ^= h >> 29;
-                if (!seen.insert(h).second) continue;
+                if (!insertNew(h)) continue;
                 if (syzygy::tableSize() > 0 && nnue::data::pieceCount(r) <= syzygy::tableSize()) {
                     Board board;
                     if (Board::tryFromFEN(nnue::data::toFen(r), board)) {
