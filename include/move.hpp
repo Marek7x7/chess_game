@@ -30,9 +30,15 @@ struct Move {
 };
 static_assert(sizeof(Move) == 8, "Move is meant to fit in 8 bytes");
 
+// The five fields that identify a move (squares and promotion) are its first five bytes: one 8-byte compare under a mask.
+static_assert(offsetof(Move, fromX) == 0 && offsetof(Move, toY) == 3 && offsetof(Move, promotion) == 4,
+              "sameMove() compares the first five bytes");
+static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "sameMove() masks the low five bytes");
 inline bool sameMove(const Move& a, const Move& b) {
-    return a.fromX == b.fromX && a.fromY == b.fromY && a.toX == b.toX && a.toY == b.toY &&
-           a.promotion == b.promotion;
+    uint64_t x, y;
+    std::memcpy(&x, &a, sizeof x);
+    std::memcpy(&y, &b, sizeof y);
+    return ((x ^ y) & 0xFF'FFFF'FFFFull) == 0;
 }
 
 // Fixed-capacity move list: a stack array instead of a per-node heap
