@@ -732,11 +732,11 @@ void Board::addKingMoves(MoveList& moves, int x, int y, Color color, bool noisyO
         }
     }
 
-    if (noisyOnly || isInCheck(color)) return;
+    if (noisyOnly) return;
     int homeY = (color == Color::White) ? 0 : 7;
-    if (x != 4 || y != homeY) return;
-    Color enemy = opponent(color);
     int ci = colorIndex(color);
+    if (x != 4 || y != homeY || !(castleKingside[ci] || castleQueenside[ci]) || isInCheck(color)) return;
+    Color enemy = opponent(color);
 
     if (castleKingside[ci] && squares[5][homeY].isEmpty() && squares[6][homeY].isEmpty() &&
         squares[7][homeY].type == PieceType::Rook && squares[7][homeY].color == color &&
