@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <numeric>
 #include <random>
 #include <string>
@@ -149,6 +150,13 @@ bool keep(const Record& r, const Options& o) {
 
 bool loadData(const Options& o, std::vector<Record>& train, std::vector<Record>& valid) {
     size_t block = 0, total = 0;
+    size_t expected = 0; // reserve up front: growing by doubling would peak at about twice the final size
+    for (const std::string& path : o.inputs) {
+        std::error_code ec;
+        expected += static_cast<size_t>(std::filesystem::file_size(path, ec)) / sizeof(Record);
+    }
+    train.reserve(expected);
+    valid.reserve(expected / 8);
     for (const std::string& path : o.inputs) {
         std::FILE* f = std::fopen(path.c_str(), "rb");
         if (!f) {
