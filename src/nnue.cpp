@@ -217,7 +217,7 @@ const char* kernelName() {
 }
 
 // The two-layer head (kL2 > 0). Plain loops: all integer, so any compiler vectorization gives the same result.
-static int evaluateL2(const Accumulator& acc, int us, int bucket) {
+[[maybe_unused]] static int evaluateL2(const Accumulator& acc, int us, int bucket) {
     alignas(64) uint8_t y[2 * kHidden];
     for (int half = 0; half < 2; half++) {
         const int16_t* a = acc.v[half == 0 ? us : 1 - us];

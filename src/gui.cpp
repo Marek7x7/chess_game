@@ -1058,7 +1058,7 @@ void renderGame(App& app, Button& quitBtn, Button& newGameBtn, Button& botMenuBt
         }
         drawText(r, 16, static_cast<float>(kBoardPx + 18), 22, kTitleColor, statusText);
         auto clockText = [](long long ms) {
-            char buf[16];
+            char buf[32];
             std::snprintf(buf, sizeof buf, "%02lld:%02lld", ms / 60000, ms / 1000 % 60);
             return std::string(buf);
         };
