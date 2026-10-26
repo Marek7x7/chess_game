@@ -189,6 +189,16 @@ per change in `STRENGTH_LOG.md`:
   8 random plies), and Stockfish-relabelled data (-7% loss against Stockfish) costs 16-18 Elo in self-play, which
   cannot show a transfer gain (an anchor resolves only about +/-17 for two nets). Profile first: a gdb-sampling script
   found the TT probe stall (16% of time) that perf would have shown.
+- **Done 2026-10-26 (phase9-nnue-arch, row in `STRENGTH_LOG.md`; applied, not committed):** speed bundle 2 with an
+  identical search tree (bench signature unchanged), +15% nps on real game positions, SPRT at 5+0.05 +18.2 +/- 7.6 (H1 after
+  2822 games): lazy NNUE accumulator (a move records its feature changes, the slot is computed when its position or a
+  descendant's is evaluated: 53.5% of the updates were never read), `hasNonPawnMaterial` through the bitboards, castling
+  tested before `isInCheck` in king move generation, one masked compare in `sameMove`, `MovePicker` first pick found while
+  scoring + AVX-512 first-maximum scan, per-piece material/PST/endgame-shift terms from tables, `setSquare` inline.
+  Elo per speed is logarithmic: about 1.2 Elo per 1% now, not 2. Measured for the roadmap: the 768 -> 256 net is
+  data-limited, not width-limited (same steps: 25% / 50% / 100% of the 107M positions -> validation loss 0.012177 /
+  0.011505 / 0.011187; 16 epochs from scratch beat 6 by 3.1%).
+  Then doubling the data (94M new positions, 199M pool) and fine-tuning `q1` shipped as `r1`: +10.3 +/- 6.0 (5210 games).
 - Tried and not kept (flat or negative; do not retry blindly): contempt;
   internal iterative reduction + an 'improving' flag; quiescence without the
   transposition table (-20); ordering quiet checking moves early (-38);
@@ -199,6 +209,13 @@ per change in `STRENGTH_LOG.md`:
   `isSquareAttacked` (slower). (SEE pruning of captures in the main search was
   rejected at first and kept on 2026-10-16, +18.6, commit `0c80606`.) Lazy evaluation in quiescence and the history
   term in LMR tested neutral by ablation and stay.
+- Measured 2026-10-26, flat or negative (do not retry): profile-guided build (`tools/build_pgo.sh`: 4.5% SLOWER on GCC 16),
+  clang (12% slower, and no LTO here), LTO itself (+0.5% only), `int16_t` history, `orderMoves` insertion-sort fast path
+  (+0.3%), lazy slider lookups in SEE (+0.2%), prefetching the TT move's child at node entry (-0.9%) or the next
+  quiescence capture (0); king-bucketed NNUE inputs on the existing data (from scratch, 6 epochs, validation loss
+  0.011187 for 768 inputs vs 0.011514 / 0.011819 for 4 / 8 buckets, 0.011298 / 0.011504 factorized: they overfit),
+  left-right mirror augmentation (0.010832 vs 0.010842 at 16 epochs). Staged move generation, table move first (-3.7 +/- 5.6, 5866 games). Release builds use `-march=x86-64-v2`: 20% slower
+  than v3 (11% software `pext`, 10% no AVX2), build v3 as well.
 - Checked and left as is: the GUI keeps a fixed time per move -- with no
   clock known to the engine, using the whole budget is strongest; the
   endgame depth bonus in `findBestMove()` only matters when the depth cap
@@ -210,9 +227,12 @@ Ideas for next time, not started:
    paid off (endgame scaling, safe checks). Candidates: a better king-safety
    model, space, unstoppable passers (needs mate-free labels), more endgame
    scaling cases (rook endings, pawns on one wing).
-2. Speed keeps paying at fast time controls (about 2 Elo per 1% at
-   5+0.05): the remaining profile is evaluation (~30%), move ordering with
-   SEE (~14%) and pseudo-legal generation (~11%).
+2. Speed keeps paying at fast time controls (about 1.2 Elo per 1% at
+   5+0.05). Profile on real positions after speed bundle 2: TT probe ~10% (DRAM misses: an 8 MB table is 8.5% faster
+   than 64 MB), negamax ~10%, move scoring + picking ~13%, SEE ~7%, pseudo-legal generation ~10%, accumulator updates
+   ~5%. Staged generation was tried 2026-10-26 (table move searched before generating anything): +2% speed but
+   -3.7 +/- 5.6 Elo, reverted -- the picker then scores after that subtree, with fresher history. Only an
+   identical-tree variant (score first) is left, and it saves little.
 3. The GUI's presets cap the depth (HARD = 10), so the engine's added
    speed does not make HARD stronger; EXPERT and clock games benefit.
 4. The bundles above were accepted whole, so which parts of the search
