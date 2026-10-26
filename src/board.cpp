@@ -289,7 +289,7 @@ const ZobristKeys& zobrist() {
 
 } // namespace
 
-void Board::setSquare(int x, int y, Piece piece) {
+inline __attribute__((always_inline)) void Board::setSquare(int x, int y, Piece piece) {
     const uint64_t b = bb::bit(x, y);
     const Piece old = squares[x][y];
     if (!old.isEmpty()) {
