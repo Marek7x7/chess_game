@@ -22,44 +22,73 @@ struct alignas(64) Accumulator { // a cache line, so that 512-bit loads never st
 // at most two of each (castling: king and rook; a capture or en passant: the mover and the victim).
 struct Change {
     struct Feature {
-        int color, type, x, y; // colour 0 White / 1 Black, type as PieceType
+        int8_t color, type, x, y; // colour 0 White / 1 Black, type as PieceType
     };
     Feature adds[2], subs[2];
-    int numAdds = 0, numSubs = 0;
-    void add(Color c, PieceType t, int x, int y) { adds[numAdds++] = {c == Color::White ? 0 : 1, static_cast<int>(t), x, y}; }
-    void sub(Color c, PieceType t, int x, int y) { subs[numSubs++] = {c == Color::White ? 0 : 1, static_cast<int>(t), x, y}; }
-};
-
-// The accumulators along the line of moves being played: the top slot belongs to the current position. A move
-// steps up and writes the new slot from the one below it; taking the move back just steps down, with no copying.
-// Copying a stack copies only the slots in use.
-class AccumulatorStack {
-public:
-    AccumulatorStack() : slots(1) {}
-    AccumulatorStack(const AccumulatorStack& o) : slots(o.slots.begin(), o.slots.begin() + o.top + 1), top(o.top) {}
-    AccumulatorStack& operator=(const AccumulatorStack& o) {
-        if (this != &o) {
-            slots.assign(o.slots.begin(), o.slots.begin() + o.top + 1);
-            top = o.top;
-        }
-        return *this;
+    int8_t numAdds = 0, numSubs = 0;
+    void add(Color c, PieceType t, int x, int y) {
+        adds[numAdds++] = {static_cast<int8_t>(c == Color::White ? 0 : 1), static_cast<int8_t>(t), static_cast<int8_t>(x), static_cast<int8_t>(y)};
     }
-    Accumulator& current() { return slots[top]; }
-    const Accumulator& current() const { return slots[top]; }
-    const Accumulator& below() const { return slots[top - 1]; } // after push()
-    void push() { // invalidates references to the slots
-        if (top + 1 == static_cast<int>(slots.size())) slots.resize(slots.size() * 2);
-        ++top;
+    void sub(Color c, PieceType t, int x, int y) {
+        subs[numSubs++] = {static_cast<int8_t>(c == Color::White ? 0 : 1), static_cast<int8_t>(t), static_cast<int8_t>(x), static_cast<int8_t>(y)};
     }
-    void pop() { --top; }
-
-private:
-    std::vector<Accumulator> slots;
-    int top = 0;
 };
 
 // dst = src with `change` applied. They must be different accumulators.
 void apply(Accumulator& dst, const Accumulator& src, const Change& change);
+
+// The accumulators along the line of moves being played: the top slot belongs to the current position. A move
+// steps up and only records its feature changes; a slot is computed (from the one below it) when something asks
+// for the current accumulator, so a move that is taken back, or a node that returns before it evaluates, costs no
+// vector work (about half of all moves in a search). Taking a move back just steps down, with no copying.
+// Copying a stack copies only the slots in use.
+class AccumulatorStack {
+public:
+    AccumulatorStack() : slots(1), changes(1) {}
+    AccumulatorStack(const AccumulatorStack& o)
+        : slots(o.slots.begin(), o.slots.begin() + o.top + 1),
+          changes(o.changes.begin(), o.changes.begin() + o.top + 1),
+          top(o.top),
+          clean(o.clean) {}
+    AccumulatorStack& operator=(const AccumulatorStack& o) {
+        if (this != &o) {
+            slots.assign(o.slots.begin(), o.slots.begin() + o.top + 1);
+            changes.assign(o.changes.begin(), o.changes.begin() + o.top + 1);
+            top = o.top;
+            clean = o.clean;
+        }
+        return *this;
+    }
+    // The current position's accumulator, computed first if it is still pending.
+    Accumulator& current() {
+        while (clean < top) {
+            ++clean;
+            apply(slots[clean], slots[clean - 1], changes[clean]);
+        }
+        return slots[top];
+    }
+    // The record for the next move, cleared, to be filled in before push() (so that no copy is needed).
+    // Invalidates references to the slots.
+    Change& next() {
+        if (top + 1 == static_cast<int>(slots.size())) {
+            slots.resize(slots.size() * 2);
+            changes.resize(changes.size() * 2);
+        }
+        Change& c = changes[top + 1];
+        c.numAdds = c.numSubs = 0;
+        return c;
+    }
+    void push() { ++top; }
+    void pop() {
+        if (--top < clean) clean = top;
+    }
+
+private:
+    std::vector<Accumulator> slots;
+    std::vector<Change> changes; // changes[i] turns slot i - 1 into slot i
+    int top = 0;
+    int clean = 0; // slots 0..clean are computed; the ones above are still pending
+};
 
 // True while a network is loaded and in use.
 bool active();

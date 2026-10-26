@@ -968,7 +968,10 @@ void Board::makeMoveImpl(const Move& m, bool newAccumulator) {
     // Kings are excluded from nonKingScore (see kingTerm()); non-king pieces
     // are summed incrementally at exactly the points their placement changes.
     const bool network = nnue::active();
-    nnue::Change change; // the network's feature changes, applied in one pass once the move is made
+    // The network's feature changes, applied in one pass once the move is made. A search move writes them straight
+    // into the stack's next slot, to be applied only if the accumulator is ever asked for.
+    nnue::Change scratch;
+    nnue::Change& change = network && newAccumulator ? nnueStack.next() : scratch;
     auto addEval = [&](Color c, PieceType t, int x, int y) {
         if (t != PieceType::King) nonKingScore += pieceContribution(t, c, x, y);
         egShift += egShiftFor(t, c, x, y);
@@ -1062,11 +1065,11 @@ void Board::makeMoveImpl(const Move& m, bool newAccumulator) {
 
     if (network) {
         if (newAccumulator) {
-            nnueStack.push();
-            nnue::apply(nnueStack.current(), nnueStack.below(), change);
+            nnueStack.push(); // computed when something asks for it
         } else {
-            const nnue::Accumulator before = nnueStack.current();
-            nnue::apply(nnueStack.current(), before, change);
+            nnue::Accumulator& now = nnueStack.current();
+            const nnue::Accumulator before = now;
+            nnue::apply(now, before, change);
         }
     }
 }

@@ -195,7 +195,9 @@ private:
     int kingX[2], kingY[2]; // [White, Black]
     int bishopCount[2];     // [White, Black], for the bishop-pair bonus
     int egShift;            // sum of egShiftFor() over all pieces, blended in by phase
-    nnue::AccumulatorStack nnueStack; // see nnueAccumulator(); a move pushes, unmakeMove() pops (only while a network is loaded)
+    // see nnueAccumulator(); a move pushes, unmakeMove() pops (only while a network is loaded). Mutable: asking for the
+    // accumulator of a position computes it first if its moves were only recorded.
+    mutable nnue::AccumulatorStack nnueStack;
 
     // makeMove() for both overloads: with `newAccumulator` the network's accumulator is written to a fresh stack
     // slot (to be popped by unmakeMove()), otherwise it is updated where it is.
