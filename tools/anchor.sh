@@ -21,6 +21,6 @@ for L in $LEVELS; do
         -each tc=60+0.6 \
         -openings file="$REPO/tools/openings/8moves_v3.pgn" format=pgn order=random \
         -rounds $((GAMES / 2)) -games 2 -repeat -concurrency "$CONCURRENCY" -recover \
-        -pgnout file="$OUT/anchor-$L.pgn" -log level=warn \
+        -pgnout file="$OUT/anchor-$L.pgn" -config outname="$OUT/config.json" -log level=warn \
         2>"$OUT/anchor-$L.err" | grep -E '^(Elo|Games|Results of)' | tee "$OUT/anchor-$L.txt" | sed "s/^/[$L] /"
 done
