@@ -639,7 +639,8 @@ TUNE_INT(kMopEdge, 20);   // per step the bare king is nearer the board's edge
 TUNE_INT(kMopKing, 15);   // per step the two kings are nearer each other
 TUNE_INT(kMopCorner, 120); // bishop and knight: per step nearer the right corner
 
-int mopUp(const Board& board) {
+// `applies`, if given, says whether the position is a bare king against mating material at all.
+int mopUp(const Board& board, bool* applies = nullptr) {
     for (int side = 0; side < 2; side++) {
         const Color winner = side == 0 ? Color::White : Color::Black;
         const Color loser = opponent(winner);
@@ -664,6 +665,7 @@ int mopUp(const Board& board) {
             const int fromCentre = (lx < 4 ? 3 - lx : lx - 4) + (ly < 4 ? 3 - ly : ly - 4);
             bonus += kMopEdge * fromCentre;
         }
+        if (applies) *applies = true;
         return side == 0 ? bonus : -bonus;
     }
     return 0;
@@ -698,9 +700,18 @@ int evaluateNetwork(const Board& board, Color color) {
     if (!(board.pieces(Color::White, PieceType::Pawn) | board.pieces(Color::Black, PieceType::Pawn)) &&
         !hasMatingMaterial(board, Color::White) && !hasMatingMaterial(board, Color::Black))
         return 0;
+    // A bare king against mating material: the network has no data worth the name for these (its games end long
+    // before), and its noise swamps the mop-up gradient that walks the king to the edge. Material, piece-square
+    // tables and mop-up decide, as in the hand-crafted evaluation.
+    bool bareKing = false;
+    const int mop = mopUp(board, &bareKing);
+    if (bareKing) {
+        const int hand = board.rawEval() + mop + (board.sideToMove() == Color::White ? kTempo : -kTempo);
+        return color == Color::White ? hand : -hand;
+    }
     int score = nnue::evaluate(board.nnueAccumulator(), board.sideToMove(), bb::popcount(board.occupancy()));
     if (board.sideToMove() == Color::Black) score = -score; // White's point of view, as in evaluate() below
-    score += mopUp(board);
+    score += mop;
     return color == Color::White ? score : -score;
 }
 
