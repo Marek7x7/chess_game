@@ -1167,14 +1167,9 @@ void Board::unmakeNullMove(const NullMoveUndo& undo) {
 }
 
 bool Board::hasNonPawnMaterial(Color color) const {
-    for (int x = 0; x < 8; x++) {
-        for (int y = 0; y < 8; y++) {
-            const Piece& p = squares[x][y];
-            if (p.color != color) continue;
-            if (p.type != PieceType::Pawn && p.type != PieceType::King) return true;
-        }
-    }
-    return false;
+    const int c = colorIndex(color);
+    return (pieceBB[c][static_cast<int>(PieceType::Knight)] | pieceBB[c][static_cast<int>(PieceType::Bishop)] |
+            pieceBB[c][static_cast<int>(PieceType::Rook)] | pieceBB[c][static_cast<int>(PieceType::Queen)]) != 0;
 }
 
 // Piece-placement and king-tracking only -- no hash, no eval, no castling
