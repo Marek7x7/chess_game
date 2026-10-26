@@ -230,6 +230,36 @@ int pieceContribution(PieceType type, Color color, int x, int y) {
     return (color == Color::White) ? total : -total;
 }
 
+// pieceContribution() and egShiftFor() for every (colour, type, square): makeMove() asks for them each time a move changes
+// a piece, and the functions go through a switch on the piece type and several tables. (The tuning build changes the
+// weights at run time, so it keeps calling the functions. rawEvalFromScratch() always does, to check the sums.)
+#ifndef TUNING
+struct PieceTerms {
+    int16_t contribution[2][7][8][8];
+    int16_t egShift[2][7][8][8];
+    PieceTerms() {
+        for (int c = 0; c < 2; c++)
+            for (int t = 0; t < 7; t++)
+                for (int x = 0; x < 8; x++)
+                    for (int y = 0; y < 8; y++) {
+                        const Color color = c == 0 ? Color::White : Color::Black;
+                        contribution[c][t][x][y] = static_cast<int16_t>(pieceContribution(static_cast<PieceType>(t), color, x, y));
+                        egShift[c][t][x][y] = static_cast<int16_t>(egShiftFor(static_cast<PieceType>(t), color, x, y));
+                    }
+    }
+};
+const PieceTerms kPieceTerms;
+int contributionOf(PieceType t, Color c, int x, int y) {
+    return kPieceTerms.contribution[c == Color::White ? 0 : 1][static_cast<int>(t)][x][y];
+}
+int egShiftOf(PieceType t, Color c, int x, int y) {
+    return kPieceTerms.egShift[c == Color::White ? 0 : 1][static_cast<int>(t)][x][y];
+}
+#else
+int contributionOf(PieceType t, Color c, int x, int y) { return pieceContribution(t, c, x, y); }
+int egShiftOf(PieceType t, Color c, int x, int y) { return egShiftFor(t, c, x, y); }
+#endif
+
 // Random keys for incremental Zobrist hashing. Seeded with a fixed constant
 // so hashes (and therefore search/opening-book behavior) are reproducible
 // across runs for debugging.
@@ -973,13 +1003,13 @@ void Board::makeMoveImpl(const Move& m, bool newAccumulator) {
     nnue::Change scratch;
     nnue::Change& change = network && newAccumulator ? nnueStack.next() : scratch;
     auto addEval = [&](Color c, PieceType t, int x, int y) {
-        if (t != PieceType::King) nonKingScore += pieceContribution(t, c, x, y);
-        egShift += egShiftFor(t, c, x, y);
+        if (t != PieceType::King) nonKingScore += contributionOf(t, c, x, y);
+        egShift += egShiftOf(t, c, x, y);
         if (network) change.add(c, t, x, y);
     };
     auto removeEval = [&](Color c, PieceType t, int x, int y) {
-        if (t != PieceType::King) nonKingScore -= pieceContribution(t, c, x, y);
-        egShift -= egShiftFor(t, c, x, y);
+        if (t != PieceType::King) nonKingScore -= contributionOf(t, c, x, y);
+        egShift -= egShiftOf(t, c, x, y);
         if (network) change.sub(c, t, x, y);
     };
 
