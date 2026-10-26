@@ -19,6 +19,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(__AVX512F__)
+#include <immintrin.h>
+#endif
+
 #include "bitboard.hpp"
 #include "nnue.hpp"
 #include "opening_book.hpp"
@@ -950,6 +954,31 @@ bool seeNonNegative(const Board& board, const Move& m) {
     return see(board, m) >= 0;
 }
 
+// The index of the first largest value in a[from, n) (from < n): the same pick as scanning for the first element
+// that nothing after it beats.
+int firstMax(const int* a, int from, int n) {
+#if defined(__AVX512F__)
+    __m512i best = _mm512_set1_epi32(INT_MIN);
+    int i = from;
+    for (; i + 16 <= n; i += 16) best = _mm512_max_epi32(best, _mm512_loadu_si512(a + i));
+    if (i < n) {
+        const __mmask16 tail = static_cast<__mmask16>((1u << (n - i)) - 1);
+        best = _mm512_mask_max_epi32(best, tail, best, _mm512_maskz_loadu_epi32(tail, a + i));
+    }
+    const __m512i top = _mm512_set1_epi32(_mm512_reduce_max_epi32(best));
+    for (i = from;; i += 16) {
+        const __mmask16 live = i + 16 <= n ? static_cast<__mmask16>(0xFFFF) : static_cast<__mmask16>((1u << (n - i)) - 1);
+        const __mmask16 hit = _mm512_mask_cmpeq_epi32_mask(live, _mm512_maskz_loadu_epi32(live, a + i), top);
+        if (hit) return i + __builtin_ctz(hit);
+    }
+#else
+    int bestIdx = from;
+    for (int i = from + 1; i < n; i++)
+        if (a[i] > a[bestIdx]) bestIdx = i;
+    return bestIdx;
+#endif
+}
+
 // Hands out a node's moves best-first without sorting them all: most nodes cut off after
 // a move or two, so picking the best remaining move each time costs less than a full
 // sort, and a capture's exchange (SEE) is only worked out when the capture comes up,
@@ -964,6 +993,7 @@ public:
         : board_(board), moves_(moves), n_(static_cast<int>(moves.size())) {
         for (int i = 0; i < n_; i++) {
             scores_[i] = moveScore(board, moves[i], ttMove, ctx, ply, color, false);
+            if (scores_[i] > scores_[first_]) first_ = i; // (the first largest, as firstMax() finds it)
             see_[i] = kSeeUnknown;
             // Only a capture scored by MVV-LVA (not the TT move) has its exchange still to check.
             unchecked_[i] = scores_[i] >= 100'000 && scores_[i] < 1'000'000 && moves[i].promotion == PieceType::None;
@@ -973,9 +1003,8 @@ public:
     // The next move, or null when none is left. The pointer stays valid until the next call.
     const Move* next() {
         while (next_ < n_) {
-            int bestIdx = next_;
-            for (int i = next_ + 1; i < n_; i++)
-                if (scores_[i] > scores_[bestIdx]) bestIdx = i;
+            const int bestIdx = first_ >= 0 ? first_ : firstMax(scores_, next_, n_);
+            first_ = -1; // good for the first pick only: a demoted capture changes the scores
             if (unchecked_[bestIdx]) {
                 unchecked_[bestIdx] = false;
                 const Move& m = moves_[bestIdx];
@@ -987,10 +1016,12 @@ public:
                     }
                 }
             }
-            std::swap(moves_[bestIdx], moves_[next_]);
-            std::swap(scores_[bestIdx], scores_[next_]);
-            std::swap(see_[bestIdx], see_[next_]);
-            std::swap(unchecked_[bestIdx], unchecked_[next_]);
+            if (bestIdx != next_) {
+                std::swap(moves_[bestIdx], moves_[next_]);
+                std::swap(scores_[bestIdx], scores_[next_]);
+                std::swap(see_[bestIdx], see_[next_]);
+                std::swap(unchecked_[bestIdx], unchecked_[next_]);
+            }
             lastSee_ = see_[next_];
             return &moves_[next_++];
         }
@@ -1004,6 +1035,7 @@ private:
     const Board& board_;
     MoveList& moves_;
     int n_;
+    int first_ = 0; // the best move's index while no move has been handed out, then -1
     int next_ = 0;
     int lastSee_ = kSeeUnknown;
     int scores_[MoveList::kCapacity];
