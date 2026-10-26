@@ -15,8 +15,15 @@ enum class Wdl { Loss, BlessedLoss, Draw, CursedWin, Win }; // for the side to m
 // `message` says what was found. False only if the library failed to start.
 bool init(const std::string& path, std::string& message);
 
-// The most pieces any loaded table covers (0: none).
+// The most pieces any loaded table covers (0: none, also while the search is switched off from them).
 int largest();
+// For training-data generation: hide the tables from the search (largest() reports 0) and use them only through
+// tableSize() and probeLabel().
+void setSearchUse(bool on);
+int tableSize();
+// The theoretical result of the position for the side to move, ignoring the fifty-move clock; cursed wins and
+// blessed losses count as draws. False if there is no table for it (or castling rights remain).
+bool probeLabel(const Board& board, Wdl& wdl);
 // Probes only below this many remaining plies of depth (UCI "SyzygyProbeDepth").
 int probeDepth();
 void setProbeDepth(int depth);

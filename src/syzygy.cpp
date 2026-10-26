@@ -15,10 +15,12 @@ namespace syzygy {
 namespace {
 std::atomic<long long> g_hits{0};
 int g_probeDepth = 1;
+bool g_searchUse = true;
 } // namespace
 
 int probeDepth() { return g_probeDepth; }
 void setProbeDepth(int depth) { g_probeDepth = depth; }
+void setSearchUse(bool on) { g_searchUse = on; }
 long long hits() { return g_hits.load(std::memory_order_relaxed); }
 void resetHits() { g_hits.store(0, std::memory_order_relaxed); }
 
@@ -87,7 +89,19 @@ bool init(const std::string& path, std::string& message) {
     return true;
 }
 
-int largest() { return static_cast<int>(TB_LARGEST); }
+int largest() { return g_searchUse ? static_cast<int>(TB_LARGEST) : 0; }
+int tableSize() { return static_cast<int>(TB_LARGEST); }
+
+bool probeLabel(const Board& board, Wdl& wdl) {
+    if (board.hasCastlingRights() || bb::popcount(board.occupancy()) > static_cast<int>(TB_LARGEST)) return false;
+    const Position p = convert(board);
+    const unsigned r = tb_probe_wdl(p.white, p.black, p.kings, p.queens, p.rooks, p.bishops, p.knights, p.pawns, 0, 0,
+                                    p.ep, p.whiteToMove);
+    if (r == TB_RESULT_FAILED) return false;
+    wdl = toWdl(r);
+    if (wdl == Wdl::CursedWin || wdl == Wdl::BlessedLoss) wdl = Wdl::Draw;
+    return true;
+}
 
 bool probeWdl(const Board& board, Wdl& wdl) {
     if (board.hasCastlingRights() || board.halfmoveClock() != 0) return false;
@@ -135,6 +149,8 @@ bool init(const std::string&, std::string& message) {
     return false;
 }
 int largest() { return 0; }
+int tableSize() { return 0; }
+bool probeLabel(const Board&, Wdl&) { return false; }
 bool probeWdl(const Board&, Wdl&) { return false; }
 bool probeRoot(const Board&, Move&, Wdl&) { return false; }
 
