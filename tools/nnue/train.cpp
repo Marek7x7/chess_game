@@ -64,7 +64,13 @@ struct Layout {
     static constexpr size_t ftB = ftW + size_t(nnue::kInputs) * H;
     static constexpr size_t ow = ftB + H;
     static constexpr size_t ob = ow + size_t(nnue::kBuckets) * 2 * H;
-    static constexpr size_t total = ob + nnue::kBuckets;
+    // second layer (nnue::kL2 > 0; the single-layer output weights above are then unused)
+    static constexpr size_t L = nnue::kL2;
+    static constexpr size_t w1 = ob + nnue::kBuckets;
+    static constexpr size_t b1 = w1 + size_t(nnue::kBuckets) * L * 2 * H;
+    static constexpr size_t w2 = b1 + size_t(nnue::kBuckets) * L;
+    static constexpr size_t b2 = w2 + size_t(nnue::kBuckets) * L;
+    static constexpr size_t total = b2 + nnue::kBuckets;
 };
 
 struct Active {
@@ -85,6 +91,8 @@ struct Forward {
     float h[2][H];
     float out;
     int bucket;
+    float x[2 * H]; // second layer: screlu of both accumulators, side to move first
+    float z[Layout::L > 0 ? Layout::L : 1];
 };
 
 inline void forward(const std::vector<float>& th, const Record& r, const Active& a, Forward& fw) {
@@ -99,8 +107,27 @@ inline void forward(const std::vector<float>& th, const Record& r, const Active&
         }
     }
     fw.bucket = nnue::bucketOf(nnue::data::pieceCount(r));
-    const float* ow = th.data() + Layout::ow + size_t(fw.bucket) * 2 * H;
     const int us = r.stm, them = 1 - r.stm;
+    if constexpr (Layout::L > 0) {
+        for (int i = 0; i < H; i++) {
+            const float a1 = std::min(std::max(fw.h[us][i], 0.0f), 1.0f);
+            const float a2 = std::min(std::max(fw.h[them][i], 0.0f), 1.0f);
+            fw.x[i] = a1 * a1;
+            fw.x[H + i] = a2 * a2;
+        }
+        float out = th[Layout::b2 + fw.bucket];
+        for (int j = 0; j < nnue::kL2; j++) {
+            const float* w = th.data() + Layout::w1 + (size_t(fw.bucket) * Layout::L + j) * 2 * H;
+            float z = th[Layout::b1 + size_t(fw.bucket) * Layout::L + j];
+            for (int i = 0; i < 2 * H; i++) z += w[i] * fw.x[i];
+            fw.z[j] = z;
+            const float c = std::min(std::max(z, 0.0f), 1.0f);
+            out += th[Layout::w2 + size_t(fw.bucket) * Layout::L + j] * c * c;
+        }
+        fw.out = out;
+        return;
+    }
+    const float* ow = th.data() + Layout::ow + size_t(fw.bucket) * 2 * H;
     float out = th[Layout::ob + fw.bucket];
     for (int i = 0; i < H; i++) {
         const float a1 = std::min(std::max(fw.h[us][i], 0.0f), 1.0f);
@@ -189,6 +216,25 @@ bool writeNet(const std::vector<float>& th, const std::string& path) {
     std::vector<int16_t> b(H);
     for (int i = 0; i < H; i++) b[i] = q16(th[Layout::ftB + i], nnue::kQA);
     std::fwrite(b.data(), 2, b.size(), f);
+    if constexpr (Layout::L > 0) {
+        auto q8 = [](float v) { return static_cast<int8_t>(std::min<long>(127, std::max<long>(-127, std::lround(v * nnue::kQB)))); };
+        for (int bk = 0; bk < nnue::kBuckets; bk++) {
+            std::vector<int8_t> w1(Layout::L * 2 * H), w2(Layout::L);
+            std::vector<int32_t> b1(Layout::L);
+            for (size_t i = 0; i < w1.size(); i++) w1[i] = q8(th[Layout::w1 + size_t(bk) * w1.size() + i]);
+            for (int j = 0; j < nnue::kL2; j++) {
+                b1[j] = static_cast<int32_t>(std::lround(th[Layout::b1 + size_t(bk) * Layout::L + j] * nnue::kZ));
+                w2[j] = q8(th[Layout::w2 + size_t(bk) * Layout::L + j]);
+            }
+            const int32_t b2 = static_cast<int32_t>(std::lround(th[Layout::b2 + bk] * nnue::kH * nnue::kQB));
+            std::fwrite(w1.data(), 1, w1.size(), f);
+            std::fwrite(b1.data(), 4, b1.size(), f);
+            std::fwrite(w2.data(), 1, w2.size(), f);
+            std::fwrite(&b2, 4, 1, f);
+        }
+        std::fclose(f);
+        return true;
+    }
     std::vector<int16_t> ow(size_t(nnue::kBuckets) * 2 * H);
     for (size_t i = 0; i < ow.size(); i++) {
         // |w| <= 127 / 64 keeps (a * w) inside 16 bits for a <= 255, which the vector code relies on
@@ -210,6 +256,27 @@ bool readNet(const std::string& path, std::vector<float>& th) {
     bool ok = std::fread(&h, sizeof h, 1, f) == 1 && std::memcmp(h.magic, "CGNN", 4) == 0 && h.hidden == nnue::kHidden &&
               h.inputs == nnue::kInputs && h.buckets == nnue::kBuckets;
     th.assign(Layout::total, 0.0f);
+    if constexpr (Layout::L > 0) {
+        std::vector<int16_t> w(size_t(nnue::kInputs) * H), b(H);
+        ok = ok && std::fread(w.data(), 2, w.size(), f) == w.size() && std::fread(b.data(), 2, b.size(), f) == b.size();
+        for (size_t i = 0; ok && i < w.size(); i++) th[Layout::ftW + i] = w[i] / float(nnue::kQA);
+        for (int i = 0; ok && i < H; i++) th[Layout::ftB + i] = b[i] / float(nnue::kQA);
+        for (int bk = 0; ok && bk < nnue::kBuckets; bk++) {
+            std::vector<int8_t> w1(Layout::L * 2 * H), w2(Layout::L);
+            std::vector<int32_t> b1(Layout::L);
+            int32_t b2 = 0;
+            ok = std::fread(w1.data(), 1, w1.size(), f) == w1.size() && std::fread(b1.data(), 4, b1.size(), f) == b1.size() &&
+                 std::fread(w2.data(), 1, w2.size(), f) == w2.size() && std::fread(&b2, 4, 1, f) == 1;
+            for (size_t i = 0; ok && i < w1.size(); i++) th[Layout::w1 + size_t(bk) * w1.size() + i] = w1[i] / float(nnue::kQB);
+            for (int j = 0; ok && j < nnue::kL2; j++) {
+                th[Layout::b1 + size_t(bk) * Layout::L + j] = b1[j] / float(nnue::kZ);
+                th[Layout::w2 + size_t(bk) * Layout::L + j] = w2[j] / float(nnue::kQB);
+            }
+            if (ok) th[Layout::b2 + bk] = b2 / float(nnue::kH * nnue::kQB);
+        }
+        std::fclose(f);
+        return ok;
+    }
     if (ok) {
         std::vector<int16_t> w(size_t(nnue::kInputs) * H), b(H), ow(size_t(nnue::kBuckets) * 2 * H);
         std::vector<int32_t> ob(nnue::kBuckets);
@@ -243,6 +310,14 @@ int train(Options o) { // (by value: the batch size may be lowered)
         for (size_t i = 0; i < size_t(nnue::kInputs) * H; i++) th[Layout::ftW + i] = gw(rng);
         for (int i = 0; i < H; i++) th[Layout::ftB + i] = 0.5f;
         for (size_t i = 0; i < size_t(nnue::kBuckets) * 2 * H; i++) th[Layout::ow + i] = go(rng);
+        if constexpr (Layout::L > 0) {
+            std::normal_distribution<float> g1(0.0f, 0.05f);
+            for (size_t i = 0; i < size_t(nnue::kBuckets) * Layout::L * 2 * H; i++) th[Layout::w1 + i] = g1(rng);
+            for (size_t i = 0; i < size_t(nnue::kBuckets) * Layout::L; i++) {
+                th[Layout::b1 + i] = 0.3f;
+                th[Layout::w2 + i] = go(rng);
+            }
+        }
     }
     std::vector<float> m(Layout::total, 0.0f), v(Layout::total, 0.0f);
     const int threads = omp_get_max_threads();
@@ -288,6 +363,30 @@ int train(Options o) { // (by value: the batch size may be lowered)
                     batchLoss += err * err;
                     const float dout = 2.0f * err * pred * (1.0f - pred) * scaleOut;
                     const int us = r.stm, them = 1 - r.stm;
+                    if constexpr (Layout::L > 0) {
+                        float dx[2 * H] = {};
+                        grad[Layout::b2 + fw.bucket] += dout;
+                        for (int j = 0; j < nnue::kL2; j++) {
+                            const size_t jb = size_t(fw.bucket) * Layout::L + j;
+                            const float z = fw.z[j], c = std::min(std::max(z, 0.0f), 1.0f);
+                            grad[Layout::w2 + jb] += dout * c * c;
+                            if (!(z > 0.0f && z < 1.0f)) continue;
+                            const float dz = dout * th[Layout::w2 + jb] * 2.0f * c;
+                            grad[Layout::b1 + jb] += dz;
+                            const float* w = th.data() + Layout::w1 + jb * 2 * H;
+                            float* gw1 = grad + Layout::w1 + jb * 2 * H;
+                            for (int i = 0; i < 2 * H; i++) {
+                                gw1[i] += dz * fw.x[i];
+                                dx[i] += dz * w[i];
+                            }
+                        }
+                        for (int i = 0; i < H; i++) {
+                            const float hu = fw.h[us][i], ht = fw.h[them][i];
+                            const float au = std::min(std::max(hu, 0.0f), 1.0f), at = std::min(std::max(ht, 0.0f), 1.0f);
+                            dh[us][i] = (hu > 0.0f && hu < 1.0f) ? dx[i] * 2.0f * au : 0.0f;
+                            dh[them][i] = (ht > 0.0f && ht < 1.0f) ? dx[H + i] * 2.0f * at : 0.0f;
+                        }
+                    } else {
                     const float* ow = th.data() + Layout::ow + size_t(fw.bucket) * 2 * H;
                     float* gow = grad + Layout::ow + size_t(fw.bucket) * 2 * H;
                     grad[Layout::ob + fw.bucket] += dout;
@@ -298,6 +397,7 @@ int train(Options o) { // (by value: the batch size may be lowered)
                         gow[H + i] += dout * at * at;
                         dh[us][i] = (hu > 0.0f && hu < 1.0f) ? dout * ow[i] * 2.0f * au : 0.0f;
                         dh[them][i] = (ht > 0.0f && ht < 1.0f) ? dout * ow[H + i] * 2.0f * at : 0.0f;
+                    }
                     }
                     float* gb = grad + Layout::ftB;
                     for (int i = 0; i < H; i++) gb[i] += dh[0][i] + dh[1][i];
@@ -327,6 +427,10 @@ int train(Options o) { // (by value: the batch size may be lowered)
             }
             // The integer code needs these ranges (see writeNet).
             for (size_t j = Layout::ow; j < Layout::ob; j++) th[j] = std::min(1.98f, std::max(-1.98f, th[j]));
+            if constexpr (Layout::L > 0) { // int8 weights
+                for (size_t j = Layout::w1; j < Layout::b1; j++) th[j] = std::min(1.98f, std::max(-1.98f, th[j]));
+                for (size_t j = Layout::w2; j < Layout::b2; j++) th[j] = std::min(1.98f, std::max(-1.98f, th[j]));
+            }
         }
         const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
         const double trainLoss = epochLoss / static_cast<double>(batchesPerEpoch * static_cast<size_t>(o.batch));

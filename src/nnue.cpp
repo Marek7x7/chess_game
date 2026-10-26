@@ -28,6 +28,11 @@ struct Net {
     alignas(64) int16_t featureBias[kHidden];
     alignas(64) int16_t outputWeights[kBuckets][2 * kHidden];
     int32_t outputBias[kBuckets];
+    // second layer (used when kL2 > 0)
+    alignas(64) int8_t w1[kBuckets][kL2 > 0 ? kL2 : 1][2 * kHidden];
+    int32_t b1[kBuckets][kL2 > 0 ? kL2 : 1];
+    int8_t w2[kBuckets][kL2 > 0 ? kL2 : 1];
+    int32_t b2[kBuckets];
 };
 
 // The network in use. Replaced only while no search is running (UCI setoption stops the search first).
@@ -53,9 +58,22 @@ bool parse(const unsigned char* data, uint64_t size, std::unique_ptr<Net>& out, 
     p += sizeof net->featureWeights;
     std::memcpy(net->featureBias, p, sizeof net->featureBias);
     p += sizeof net->featureBias;
-    std::memcpy(net->outputWeights, p, sizeof net->outputWeights);
-    p += sizeof net->outputWeights;
-    std::memcpy(net->outputBias, p, sizeof net->outputBias);
+    if constexpr (kL2 == 0) {
+        std::memcpy(net->outputWeights, p, sizeof net->outputWeights);
+        p += sizeof net->outputWeights;
+        std::memcpy(net->outputBias, p, sizeof net->outputBias);
+    } else {
+        for (int b = 0; b < kBuckets; b++) {
+            std::memcpy(net->w1[b], p, sizeof net->w1[b]);
+            p += sizeof net->w1[b];
+            std::memcpy(net->b1[b], p, sizeof net->b1[b]);
+            p += sizeof net->b1[b];
+            std::memcpy(net->w2[b], p, sizeof net->w2[b]);
+            p += sizeof net->w2[b];
+            std::memcpy(&net->b2[b], p, sizeof net->b2[b]);
+            p += sizeof net->b2[b];
+        }
+    }
     out = std::move(net);
     return true;
 }
@@ -116,6 +134,14 @@ void loadRandom(uint64_t seed) {
     for (auto& row : net->outputWeights)
         for (int16_t& w : row) w = static_cast<int16_t>(small(30));
     for (int32_t& b : net->outputBias) b = small(2000);
+    for (auto& m : net->w1)
+        for (auto& row : m)
+            for (int8_t& w : row) w = static_cast<int8_t>(small(8));
+    for (auto& row : net->b1)
+        for (int32_t& b : row) b = small(4000) + 4000;
+    for (auto& row : net->w2)
+        for (int8_t& w : row) w = static_cast<int8_t>(small(30));
+    for (int32_t& b : net->b2) b = small(100000);
     g_net = std::move(net);
     g_name = "random";
 }
@@ -190,9 +216,32 @@ const char* kernelName() {
 #endif
 }
 
+// The two-layer head (kL2 > 0). Plain loops: all integer, so any compiler vectorization gives the same result.
+static int evaluateL2(const Accumulator& acc, int us, int bucket) {
+    alignas(64) uint8_t y[2 * kHidden];
+    for (int half = 0; half < 2; half++) {
+        const int16_t* a = acc.v[half == 0 ? us : 1 - us];
+        for (int i = 0; i < kHidden; i++) {
+            const int c = std::min(std::max<int>(a[i], 0), kQA);
+            y[half * kHidden + i] = static_cast<uint8_t>((c * c) >> 8);
+        }
+    }
+    int64_t out = g_net->b2[bucket];
+    for (int j = 0; j < (kL2 > 0 ? kL2 : 1); j++) {
+        const int8_t* w = g_net->w1[bucket][j];
+        int32_t z = g_net->b1[bucket][j];
+        for (int i = 0; i < 2 * kHidden; i++) z += static_cast<int32_t>(y[i]) * w[i];
+        z = std::min(std::max(z, 0), kZ);
+        out += static_cast<int64_t>((z * z) >> 13) * g_net->w2[bucket][j];
+    }
+    const int cp = static_cast<int>(out * kScale / (static_cast<int64_t>(kH) * kQB));
+    return std::min(std::max(cp, -4000), 4000);
+}
+
 int evaluate(const Accumulator& acc, Color sideToMove, int pieceCount) {
     const int us = sideToMove == Color::White ? 0 : 1;
     const int bucket = bucketOf(pieceCount);
+    if constexpr (kL2 > 0) return evaluateL2(acc, us, bucket);
     const int16_t* mine = acc.v[us];
     const int16_t* theirs = acc.v[1 - us];
     const int16_t* w = g_net->outputWeights[bucket];
