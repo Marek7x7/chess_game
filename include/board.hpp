@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <iosfwd>
 
 #include "nnue.hpp"
 #include "piece.hpp"
@@ -94,13 +93,7 @@ public:
     // All moves for `color` that don't leave that color's own king in check.
     MoveList legalMoves(Color color) const;
 
-    // The subset of legalMoves() that quiescence search looks at -- every
-    // capture (en passant and capture-promotions included) plus non-capture
-    // queen promotions -- in the same relative order legalMoves() lists
-    // them, without paying the legality check for every quiet move.
-    MoveList legalNoisyMoves(Color color) const;
-
-    // legalMoves() / legalNoisyMoves() before the legality filter, same order: outside check
+    // legalMoves() before the legality filter, same order: outside check
     // the extra moves are the few that leave the king attacked (a pinned piece leaving its
     // line, a king stepping onto an attacked square). A caller that tests each move it
     // actually plays (makeMove, then isInCheck of the mover) skips the filter for the
@@ -172,8 +165,6 @@ public:
     // Finds the legal move matching the given squares/promotion, or nullptr fields if none.
     bool findLegalMove(int fromX, int fromY, int toX, int toY, PieceType promotion, Move& out) const;
 
-    void print(std::ostream& os) const;
-
 private:
     Piece squares[8][8];
     uint64_t pieceBB[2][7]; // [color][PieceType]; index 0 (None) is unused
@@ -228,7 +219,7 @@ private:
     void makeMoveLight(const Move& m, LightUndo& undo);
     void unmakeMoveLight(const Move& m, const LightUndo& undo);
 
-    // noisyOnly: generate only what legalNoisyMoves() returns.
+    // noisyOnly: only the captures (en passant and capture-promotions included) plus non-capture queen promotions.
     MoveList pseudoLegalMoves(Color color, bool noisyOnly) const;
     MoveList filterLegal(const MoveList& pseudo, Color color) const;
     // firstDir/numDirs index bb::rays: bishop directions 0-3, rook directions 4-7.

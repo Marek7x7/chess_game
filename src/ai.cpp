@@ -35,42 +35,6 @@ bool g_aiDebugLog = false;
 
 namespace {
 
-std::string sqStr(int x, int y) {
-    std::string s;
-    s += static_cast<char>('a' + x);
-    s += static_cast<char>('1' + y);
-    return s;
-}
-
-char pieceLetter(PieceType t) {
-    switch (t) {
-        case PieceType::Knight: return 'N';
-        case PieceType::Bishop: return 'B';
-        case PieceType::Rook: return 'R';
-        case PieceType::Queen: return 'Q';
-        case PieceType::King: return 'K';
-        default: return '?';
-    }
-}
-
-std::string moveStr(const Move& m) {
-    std::string s = sqStr(m.fromX, m.fromY) + sqStr(m.toX, m.toY);
-    if (m.promotion != PieceType::None) {
-        s += '=';
-        s += pieceLetter(m.promotion);
-    }
-    return s;
-}
-
-std::string movesStr(const std::vector<Move>& moves) {
-    std::string s;
-    for (size_t i = 0; i < moves.size(); i++) {
-        if (i) s += ' ';
-        s += moveStr(moves[i]);
-    }
-    return s;
-}
-
 // ---------------------------------------------------------------------
 // Evaluation. Material + piece-square-table score is maintained
 // incrementally by Board itself (see Board::rawEval()); pawn structure and
@@ -110,7 +74,6 @@ TUNE_ARR(kSupportedEg, 8, {0, 0, 3, 1, 1, 29, 60, 0});
 TUNE_ARR(kPhalanxMg, 8, {0, 1, 4, 11, 25, 42, 112, 0});
 TUNE_ARR(kPhalanxEg, 8, {0, 1, 1, 3, 25, 42, 156, 0});
 
-uint64_t squareBit(int x, int y) { return uint64_t(1) << (x * 8 + y); }
 constexpr uint64_t kFileMask = 0xFF;                  // file a; shift by x * 8 for file x
 constexpr uint64_t kRankMask = 0x0101010101010101ULL; // rank 1; shift by y for rank y
 
@@ -122,7 +85,7 @@ constexpr uint64_t kRankMask = 0x0101010101010101ULL; // rank 1; shift by y for 
 struct PawnInfo {
     uint64_t key;
     int mg, eg;             // pawn structure score (see computePawnInfo), positive = good for White
-    uint64_t pawns[2];      // [White, Black] pawn squares, as squareBit()s
+    uint64_t pawns[2];      // [White, Black] pawn squares, as bb::bit()s
     uint64_t attacks[2];    // squares each side's pawns attack
     uint64_t attackSpan[2]; // squares each side's pawns could ever attack by advancing
     uint64_t passed[2];     // each side's passed pawns
@@ -149,12 +112,12 @@ void computePawnInfo(const Board& board, PawnInfo& info) {
             else blackHighest[x] = std::max(blackHighest[x], y);
             int side = p.color == Color::White ? 0 : 1;
             count[side][x]++;
-            info.pawns[side] |= squareBit(x, y);
+            info.pawns[side] |= bb::bit(x, y);
             int dir = side == 0 ? 1 : -1;
             for (int ax : {x - 1, x + 1}) {
                 if (ax < 0 || ax > 7) continue;
-                info.attacks[side] |= squareBit(ax, y + dir);
-                for (int ty = y + dir; ty >= 0 && ty <= 7; ty += dir) info.attackSpan[side] |= squareBit(ax, ty);
+                info.attacks[side] |= bb::bit(ax, y + dir);
+                for (int ty = y + dir; ty >= 0 && ty <= 7; ty += dir) info.attackSpan[side] |= bb::bit(ax, ty);
             }
         }
     }
@@ -206,7 +169,7 @@ void computePawnInfo(const Board& board, PawnInfo& info) {
                 if (p.color == Color::White ? blackHighest[f] > y : whiteLowest[f] < y) passed = false;
             }
             if (!passed) continue;
-            info.passed[side] |= squareBit(x, y);
+            info.passed[side] |= bb::bit(x, y);
             int rank = p.color == Color::White ? y : 7 - y;
             int sign = p.color == Color::White ? 1 : -1;
             mg += sign * kPassedMg[rank];
@@ -297,7 +260,7 @@ bool isOutpost(const PawnInfo& pawns, int x, int y, Color color) {
     if (rank < 3 || rank > 5) return false;
     int side = color == Color::White ? 0 : 1;
     // Defended by an own pawn, and no enemy pawn could ever advance to attack it.
-    return (pawns.attacks[side] & squareBit(x, y)) && !(pawns.attackSpan[1 - side] & squareBit(x, y));
+    return (pawns.attacks[side] & bb::bit(x, y)) && !(pawns.attackSpan[1 - side] & bb::bit(x, y));
 }
 
 // A bishop hemmed in by its own pawns: a penalty per own pawn standing on squares of
@@ -510,7 +473,7 @@ int kingShelterPenalty(const Board& board, const PawnInfo& pawns, Color color) {
     int kx = board.kingFile(color), ky = board.kingRank(color);
     int side = color == Color::White ? 0 : 1;
     int dir = side == 0 ? 1 : -1;
-    auto ownPawn = [&](int x, int y) { return Board::inBounds(x, y) && (pawns.pawns[side] & squareBit(x, y)); };
+    auto ownPawn = [&](int x, int y) { return Board::inBounds(x, y) && (pawns.pawns[side] & bb::bit(x, y)); };
     int penalty = 0;
     for (int x = std::max(0, kx - 1); x <= std::min(7, kx + 1); x++) {
         if (!ownPawn(x, ky + dir)) penalty += ownPawn(x, ky + 2 * dir) ? kShelterPushedOnce : kShelterMissing;
@@ -834,18 +797,14 @@ constexpr int kHistoryLimit = 16'384;
 
 void updateHistory(int& h, int bonus) { h += bonus - h * std::abs(bonus) / kHistoryLimit; }
 
-bool seeNonNegative(const Board& board, const Move& m); // below
-
 // Score used to order moves before searching them: TT move first, then
-// captures via MVV-LVA, then promotions, then killer moves, then history.
-// With `seeOrder`, a capture that loses material once the exchange plays out
-// goes after all the quiet moves instead of before them.
+// captures via MVV-LVA, then promotions, then killer moves, then history. (MovePicker
+// additionally puts a capture that loses material after the quiet moves.)
 int moveScore(const Board& board, const Move& m, const Move& ttMove, const SearchContext& ctx, int ply,
-              Color color, bool seeOrder = false) {
+              Color color) {
     if (sameMove(m, ttMove)) return 1'000'000;
     if (m.captured != PieceType::None) {
         const int mvvLva = pieceValue(m.captured) * 10 - pieceValue(board.at(m.fromX, m.fromY).type);
-        if (seeOrder && m.promotion == PieceType::None && !seeNonNegative(board, m)) return -50'000 + mvvLva;
         return 100'000 + mvvLva;
     }
     if (m.promotion == PieceType::Queen) return 90'000;
@@ -861,7 +820,7 @@ int moveScore(const Board& board, const Move& m, const Move& ttMove, const Searc
 }
 
 void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx,
-                 int ply, Color color, bool seeOrder = false) {
+                 int ply, Color color) {
     // Score each move once, sort the small (score, index) pairs, then permute
     // the moves. Sorting the moves directly re-scored them on every comparison;
     // the comparison results are the same, so the order is too.
@@ -871,7 +830,7 @@ void orderMoves(const Board& board, MoveList& moves, const Move& ttMove, const S
     };
     Scored scored[MoveList::kCapacity];
     const int n = static_cast<int>(moves.size());
-    for (int i = 0; i < n; i++) scored[i] = {moveScore(board, moves[i], ttMove, ctx, ply, color, seeOrder), i};
+    for (int i = 0; i < n; i++) scored[i] = {moveScore(board, moves[i], ttMove, ctx, ply, color), i};
     std::sort(scored, scored + n, [](const Scored& a, const Scored& b) { return a.score > b.score; });
     alignas(Move) unsigned char sorted[MoveList::kCapacity * sizeof(Move)];
     for (int i = 0; i < n; i++) std::memcpy(sorted + i * sizeof(Move), &moves[scored[i].index], sizeof(Move));
@@ -918,8 +877,8 @@ bool leastValuableAttacker(const Board& board, int tx, int ty, Color color, uint
 int see(const Board& board, const Move& m) {
     const int tx = m.toX, ty = m.toY;
     Piece mover = board.at(m.fromX, m.fromY);
-    uint64_t removed = squareBit(m.fromX, m.fromY);
-    if (m.isEnPassant) removed |= squareBit(tx, m.fromY);
+    uint64_t removed = bb::bit(m.fromX, m.fromY);
+    if (m.isEnPassant) removed |= bb::bit(tx, m.fromY);
 
     int gain[32];
     int d = 0;
@@ -932,13 +891,13 @@ int see(const Board& board, const Move& m) {
         // A king can only recapture if nothing defends the square anymore.
         int ox, oy;
         if (board.at(ax, ay).type == PieceType::King &&
-            leastValuableAttacker(board, tx, ty, opponent(side), removed | squareBit(ax, ay), ox, oy))
+            leastValuableAttacker(board, tx, ty, opponent(side), removed | bb::bit(ax, ay), ox, oy))
             break;
         d++;
         gain[d] = onSquare - gain[d - 1];
         if (std::max(-gain[d - 1], gain[d]) < 0) break; // neither side can come out ahead by continuing
         onSquare = pieceValue(board.at(ax, ay).type);
-        removed |= squareBit(ax, ay);
+        removed |= bb::bit(ax, ay);
         side = opponent(side);
     }
     for (; d > 0; d--) gain[d - 1] = -std::max(-gain[d - 1], gain[d]);
@@ -984,7 +943,7 @@ int firstMax(const int* a, int from, int n) {
 // sort, and a capture's exchange (SEE) is only worked out when the capture comes up,
 // rather than for every capture at move generation. A capture that loses material is
 // demoted behind the quiet moves at that point, so the order is moveScore()'s, with
-// seeOrder, throughout.
+// that demotion, throughout.
 class MovePicker {
 public:
     static constexpr int kSeeUnknown = INT_MIN;
@@ -992,7 +951,7 @@ public:
     MovePicker(const Board& board, MoveList& moves, const Move& ttMove, const SearchContext& ctx, int ply, Color color)
         : board_(board), moves_(moves), n_(static_cast<int>(moves.size())) {
         for (int i = 0; i < n_; i++) {
-            scores_[i] = moveScore(board, moves[i], ttMove, ctx, ply, color, false);
+            scores_[i] = moveScore(board, moves[i], ttMove, ctx, ply, color);
             if (scores_[i] > scores_[first_]) first_ = i; // (the first largest, as firstMax() finds it)
             see_[i] = kSeeUnknown;
             // Only a capture scored by MVV-LVA (not the TT move) has its exchange still to check.
@@ -1980,7 +1939,7 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     }
 
     if (g_aiDebugLog) {
-        std::fprintf(stderr, "[ai] numThreads=%zu rootMoves: %s\n", numThreads, movesStr(rootMoves).c_str());
+        std::fprintf(stderr, "[ai] numThreads=%zu rootMoves: %s\n", numThreads, formatUciMoveList(rootMoves).c_str());
     }
 
     if (g_persistedOwner != tt.instanceId()) {
@@ -2031,7 +1990,7 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
         RootSearchResult r = futures[t].get();
         if (g_aiDebugLog) {
             std::fprintf(stderr, "[ai]   thread[%zu] depthReached=%d nodes=%lld score=%d move=%s\n", t,
-                         r.depthReached, r.nodes, r.score, moveStr(r.move).c_str());
+                         r.depthReached, r.nodes, r.score, formatUciMove(r.move).c_str());
         }
         results.push_back(r);
     }
@@ -2042,7 +2001,7 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
     const RootSearchResult& main = results.front();
     if (g_aiDebugLog && main.depthReached == 0) {
         std::fprintf(stderr, "[ai] FALLBACK: thread 0 completed no depth; returning rootMoves.front()=%s\n",
-                     moveStr(rootMoves.front()).c_str());
+                     formatUciMove(rootMoves.front()).c_str());
     }
     return main.depthReached > 0 ? main.move : rootMoves.front();
 }

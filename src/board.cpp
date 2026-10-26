@@ -932,8 +932,6 @@ bool Board::givesCheck(const Move& m) const {
 
 MoveList Board::legalMoves(Color color) const { return filterLegal(pseudoLegalMoves(color, false), color); }
 
-MoveList Board::legalNoisyMoves(Color color) const { return filterLegal(pseudoLegalMoves(color, true), color); }
-
 MoveList Board::filterLegal(const MoveList& pseudo, Color color) const {
     // Logically const (this queries, never mutates, the position from the
     // caller's perspective), but avoiding a per-candidate Board copy means
@@ -1302,15 +1300,4 @@ bool Board::findLegalMove(int fromX, int fromY, int toX, int toY, PieceType prom
         return true;
     }
     return false;
-}
-
-void Board::print(std::ostream& os) const {
-    for (int y = 7; y >= 0; y--) {
-        os << (y + 1) << " ";
-        for (int x = 0; x < 8; x++) {
-            os << squares[x][y].symbol() << " ";
-        }
-        os << "\n";
-    }
-    os << "  a b c d e f g h\n";
 }

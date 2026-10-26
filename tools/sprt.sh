@@ -9,7 +9,7 @@
 #   Environment overrides: CONCURRENCY (games in parallel, default
 #     nproc/2 - 1) and THREADS (each engine's Threads option, default 1);
 #     NEW_CMAKE_ARGS / BASE_CMAKE_ARGS (extra cmake arguments for building
-#     each side, e.g. -DCHESS_PGO=ON, so a build-flag change can be tested);
+#     each side, e.g. -DCHESS_LTO=OFF, so a build-flag change can be tested);
 #     NEW_OPTIONS / BASE_OPTIONS (extra fastchess engine arguments for each side,
 #     e.g. "option.EvalFile=nets/b.nnue": the same binary against itself with two
 #     different networks);

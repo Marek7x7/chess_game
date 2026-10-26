@@ -30,15 +30,13 @@ std::string localTime(const char* format) {
 // deliver mate. (Rarer dead positions, like same-colored bishops only, are
 // left for the 50-move rule to end.)
 bool insufficientMaterial(const Board& board) {
-    int minors = 0;
-    for (int x = 0; x < 8; x++) {
-        for (int y = 0; y < 8; y++) {
-            PieceType t = board.at(x, y).type;
-            if (t == PieceType::Pawn || t == PieceType::Rook || t == PieceType::Queen) return false;
-            if (t == PieceType::Knight || t == PieceType::Bishop) minors++;
-        }
-    }
-    return minors <= 1;
+    const uint64_t heavy = board.pieces(Color::White, PieceType::Pawn) | board.pieces(Color::Black, PieceType::Pawn) |
+                           board.pieces(Color::White, PieceType::Rook) | board.pieces(Color::Black, PieceType::Rook) |
+                           board.pieces(Color::White, PieceType::Queen) | board.pieces(Color::Black, PieceType::Queen);
+    if (heavy) return false;
+    const uint64_t minors = board.pieces(Color::White, PieceType::Knight) | board.pieces(Color::White, PieceType::Bishop) |
+                            board.pieces(Color::Black, PieceType::Knight) | board.pieces(Color::Black, PieceType::Bishop);
+    return __builtin_popcountll(minors) <= 1;
 }
 
 } // namespace
