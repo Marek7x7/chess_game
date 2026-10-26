@@ -23,7 +23,7 @@ build-release/chess            # the GUI (needs SDL2 development files: libsdl2-
 | `CHESS_WERROR` | ON | warnings are errors (`-Wall -Wextra`) |
 | `CHESS_LTO` | ON | link-time optimisation in Release builds |
 | `CHESS_GUI` | ON | OFF builds a UCI/command-line engine that needs no SDL2 |
-| `CHESS_PORTABLE` | OFF | self-contained executable: no `-march=native` (uses `CHESS_PORTABLE_ARCH`, default `x86-64-v2`; `x86-64-v3` is 10-15% faster on CPUs from 2013 on, `x86-64-v4` needs AVX-512), static C++ runtime, SDL2 built in |
+| `CHESS_PORTABLE` | OFF | self-contained executable: no `-march=native` (uses `CHESS_PORTABLE_ARCH`, default `x86-64-v2`; `x86-64-v3` is about 24% faster on CPUs from 2013 on (v2 has no BMI2, so every sliding-piece lookup is a software loop, and no AVX2; the release workflow builds both), `x86-64-v4` needs AVX-512), static C++ runtime, SDL2 built in |
 | `CHESS_BUNDLE_SDL2` | OFF | download SDL2 and link it statically (needs network at configure time) |
 | `CHESS_BUILD_TESTS` | ON | register the correctness gates with CTest |
 
