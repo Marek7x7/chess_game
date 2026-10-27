@@ -14,13 +14,14 @@ struct DifficultyPreset {
     const char* label;
     int depthCap;
     int timeBudgetMs;
+    int softTimeMs; // 0 = none; else stop deepening past this (scaled by search stability)
 };
 
 constexpr DifficultyPreset kDifficultyPresets[4] = {
-    {"EASY", 3, 300},
-    {"MEDIUM", 6, 1200},
-    {"HARD", 10, 3000},
-    {"EXPERT", 20, 6000},
+    {"EASY", 3, 300, 0},
+    {"MEDIUM", 6, 1200, 0},
+    {"HARD", 10, 3000, 0},
+    {"EXPERT", 40, 6000, 3500},
 };
 
 // Index into kDifficultyPresets for a label, case-insensitively ("hard",

@@ -160,6 +160,7 @@ int runSelfplay(int games, int levelA, int levelB) {
             const DifficultyPreset& preset = kDifficultyPresets[match.level[bot]];
             SearchOptions options;
             options.gameHistory = game.positionHashes();
+            options.softTimeMs = preset.softTimeMs;
             game.play(findBestMove(game.board(), side, preset.depthCap, preset.timeBudgetMs, tt[bot], options));
         }
 
