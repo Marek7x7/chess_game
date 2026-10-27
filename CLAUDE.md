@@ -189,7 +189,7 @@ per change in `STRENGTH_LOG.md`:
   8 random plies), and Stockfish-relabelled data (-7% loss against Stockfish) costs 16-18 Elo in self-play, which
   cannot show a transfer gain (an anchor resolves only about +/-17 for two nets). Profile first: a gdb-sampling script
   found the TT probe stall (16% of time) that perf would have shown.
-- **Done 2026-10-26 (phase9-nnue-arch, row in `STRENGTH_LOG.md`; applied, not committed):** speed bundle 2 with an
+- **Done 2026-10-26 (phase9-nnue-arch, rows in `STRENGTH_LOG.md`):** speed bundle 2 with an
   identical search tree (bench signature unchanged), +15% nps on real game positions, SPRT at 5+0.05 +18.2 +/- 7.6 (H1 after
   2822 games): lazy NNUE accumulator (a move records its feature changes, the slot is computed when its position or a
   descendant's is evaluated: 53.5% of the updates were never read), `hasNonPawnMaterial` through the bitboards, castling
@@ -199,6 +199,9 @@ per change in `STRENGTH_LOG.md`:
   data-limited, not width-limited (same steps: 25% / 50% / 100% of the 107M positions -> validation loss 0.012177 /
   0.011505 / 0.011187; 16 epochs from scratch beat 6 by 3.1%).
   Then doubling the data (94M new positions, 199M pool) and fine-tuning `q1` shipped as `r1`: +10.3 +/- 6.0 (5210 games).
+  Then again (186M new positions of `r1` self-play, 367M pool): fine-tuning `r1` for 20 epochs at lr 3e-4 shipped: +12.1 +/- 6.5 (4440 games), bench
+  signature 50706. Training screen on the same held-out blocks: lr 1e-4 / 3e-4 / 1e-3, batch 8192 and 16384 all within 0.2% validation loss
+  (the recipe has plateaued; 20 epochs beat 6), from scratch 0.6% worse. Training runs at 22 threads (24 is 40% slower).
 - Tried and not kept (flat or negative; do not retry blindly): contempt;
   internal iterative reduction + an 'improving' flag; quiescence without the
   transposition table (-20); ordering quiet checking moves early (-38);
