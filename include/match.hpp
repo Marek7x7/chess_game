@@ -21,7 +21,7 @@ constexpr DifficultyPreset kDifficultyPresets[4] = {
     {"EASY", 3, 300, 0},
     {"MEDIUM", 6, 1200, 0},
     {"HARD", 10, 3000, 0},
-    {"EXPERT", 60, 6400, 3500},
+    {"EXPERT", 60, 6400, 4500},
 };
 
 // Index into kDifficultyPresets for a label, case-insensitively ("hard",
