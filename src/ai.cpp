@@ -1445,6 +1445,8 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         // would simply be lost (or lose more than a margin) is skipped.
         if (!pvNode && !inCheck && moveIndex > 0 && depth <= spQuietSeeDepth && best > -kMateThreshold &&
             m.captured == PieceType::None && m.promotion == PieceType::None &&
+            // (A quiet move loses at most the piece it moves, so SEE cannot fall below the margin for a cheaper one.)
+            pieceValue(board.at(m.fromX, m.fromY).type) > spQuietSeeMargin * depth &&
             see(board, m) < -spQuietSeeMargin * depth) {
             moveIndex++;
             continue;
