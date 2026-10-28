@@ -1428,7 +1428,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         // already searched, since moveIndex > 0 and best is not a mate score).
         if (!pvNode && !inCheck && moveIndex > 0 && depth <= spSeePruneDepth && best > -kMateThreshold &&
             m.captured != PieceType::None && m.promotion == PieceType::None &&
-            (picker.lastSee() != MovePicker::kSeeUnknown ? picker.lastSee() : see(board, m)) <
+            (picker.lastSee() != MovePicker::kSeeUnknown
+                 ? picker.lastSee()
+                 // (The picker skips the exchange when the victim is worth at least the capturer, which cannot lose.)
+                 : pieceValue(m.captured) >= pieceValue(board.at(m.fromX, m.fromY).type) ? 0 : see(board, m)) <
                 -spSeePruneMargin * depth) {
             moveIndex++;
             continue;
