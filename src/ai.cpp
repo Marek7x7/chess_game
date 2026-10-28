@@ -1008,7 +1008,7 @@ public:
             if (scores_[i] > scores_[first_]) first_ = i; // (the first largest, as firstMax() finds it)
             see_[i] = kSeeUnknown;
             // Only a capture scored by MVV-LVA (not the TT move) has its exchange still to check.
-            unchecked_[i] = scores_[i] >= 100'000 && scores_[i] < 1'000'000 && moves[i].promotion == PieceType::None;
+            unchecked_[i] = moves[i].captured != PieceType::None && scores_[i] < 1'000'000 && moves[i].promotion == PieceType::None;
         }
     }
 
