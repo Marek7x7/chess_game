@@ -403,6 +403,20 @@ struct App {
     std::optional<std::future<Move>> aiFuture;
     std::atomic<bool> aiStop{false}; // aborts the search behind aiFuture (quitting, leaving a bot match)
 
+    // Pondering: while the human thinks, the computer searches the reply it expects (its own search's best
+    // continuation) on a copy of the position, for up to twice its usual move time. If the human plays that
+    // move, this search simply becomes the computer's real search: it answers once the usual move time has
+    // passed since the pondering began (at once if the human thought longer); otherwise it is dropped (what
+    // it learned stays in `tt`).
+    std::optional<std::future<Move>> ponderFuture;
+    std::atomic<bool> ponderStop{false};
+    Move ponderExpected{}; // the human move being pondered on (valid while ponderFuture is set)
+    std::chrono::steady_clock::time_point ponderStart;
+    bool ponderHit = false; // the pondered move was played: aiFuture now holds this search, ended at ponderStopAt
+    std::chrono::steady_clock::time_point ponderStopAt;
+    std::atomic<int> ponderDepth{0};
+    std::atomic<long long> ponderNodes{0};
+
     // Persists across the whole session (and across games, and across the
     // opponent's moves), rather than being rebuilt per move: a search often
     // benefits from what a previous search already learned about the same
@@ -461,9 +475,48 @@ struct App {
     bool running = true;
 };
 
+// Ends the ponder search (if any) and waits for it; `hit` says whether the human played the pondered move.
+void stopPonder(App& app, const Move* played = nullptr) {
+    if (!app.ponderFuture) return;
+    app.ponderStop = true;
+    app.ponderFuture.reset(); // blocks until the search thread has returned
+    app.ponderStop = false;
+    if (played)
+        std::printf("[ponder] %s: pondered %s, reached depth %d, %lld nodes\n",
+                    sameMove(*played, app.ponderExpected) ? "hit" : "miss", formatUciMove(app.ponderExpected).c_str(),
+                    app.ponderDepth.load(), app.ponderNodes.load());
+}
+
+// After the computer has moved: searches the human reply the table expects, until stopPonder().
+void startPonder(App& app) {
+    const std::vector<Move> pv = extractPV(app.board, app.tt, 1, app.positionHistory);
+    if (pv.empty()) { std::printf("[ponder] no expected reply in the table\n"); return; }
+    Board after = app.board;
+    after.makeMove(pv.front());
+    SearchOptions options;
+    options.stopFlag = &app.ponderStop;
+    options.useOpeningBook = false; // a book move would end the search at once
+    options.gameHistory = app.positionHistory;
+    options.gameHistory.push_back(after.hashKey());
+    app.ponderExpected = pv.front();
+    std::printf("[ponder] start: expecting %s\n", formatUciMove(pv.front()).c_str());
+    app.ponderDepth = 0;
+    app.ponderNodes = 0;
+    options.onDepthComplete = [&app](const SearchProgress& p) {
+        app.ponderDepth = p.depth;
+        app.ponderNodes = p.nodes;
+    };
+    const int depth = app.aiDepthCap;
+    app.ponderStart = std::chrono::steady_clock::now();
+    app.ponderFuture = std::async(std::launch::async, [after, depth, budget = 2 * app.aiTimeBudgetMs, options, &tt = app.tt] {
+        return findBestMove(after, after.sideToMove(), depth, budget, tt, options);
+    });
+}
+
 // Starts the human game from `start`: a standard game can be saved as a PGN, a position from the
 // custom setup or the clipboard cannot (the PGN writer starts from the initial position).
 void resetHumanGame(App& app, const Board& start, bool standardStart) {
+    stopPonder(app);
     app.board = start;
     app.positionHistory.assign(1, app.board.hashKey());
     app.undoStack.clear();
@@ -478,7 +531,10 @@ void resetHumanGame(App& app, const Board& start, bool standardStart) {
 void startGame(App& app) {
     resetHumanGame(app, Board(), true);
     app.flipped = app.vsAi && app.humanColor == Color::Black;
+    app.ponderStop = true; // a pondering search that has become the real one must not be waited out
     app.aiFuture.reset();
+    app.ponderStop = false;
+    app.ponderHit = false;
     app.screen = Screen::Game;
 }
 
@@ -560,7 +616,10 @@ void finishCustomSetup(App& app, Color sideToMoveFirst) {
     }
     resetHumanGame(app, candidate, false);
     app.flipped = app.humanColor == Color::Black;
+    app.ponderStop = true;
     app.aiFuture.reset();
+    app.ponderStop = false;
+    app.ponderHit = false;
     app.customMode = false;
     app.customDragActive = false;
     app.customErrorMsg.clear();
@@ -600,6 +659,7 @@ void setNotice(App& app, const std::string& text) {
 // it is the human's turn again. Not while the computer is thinking.
 void undoMove(App& app) {
     if (app.aiFuture || app.promotionPending || app.undoStack.empty()) return;
+    stopPonder(app);
     size_t plies = 1;
     if (app.vsAi && app.undoStack.back().sideToMove() != app.humanColor) plies = 2;
     if (plies > app.undoStack.size()) {
@@ -703,6 +763,7 @@ void resolvePromotion(App& app, PieceType chosen) {
 // Puts game `round` of app.match on the board, with a fresh transposition
 // table for each bot (see runSelfplay for why they're per bot, per game).
 void startBotGame(App& app, int round) {
+    stopPonder(app);
     app.aiFuture.reset(); // never searching here, but the tables must not be replaced under a search
     app.botRound = round;
     app.botGame = GameRecord();
@@ -1370,7 +1431,19 @@ int runGui() {
         } else if (app.screen == Screen::Game && !app.promotionPending) {
             bool gameOver = gameIsOver(app);
             if (!gameOver && app.vsAi && app.board.sideToMove() != app.humanColor) {
-                if (!app.aiFuture) {
+                if (app.ponderHit && std::chrono::steady_clock::now() >= app.ponderStopAt) app.ponderStop = true;
+                if (!app.aiFuture && app.ponderFuture && sameMove(app.lastMove, app.ponderExpected)) {
+                    // The pondered move: keep that search as the real one, to end once the usual move time has passed.
+                    std::printf("[ponder] hit: pondered %s, reached depth %d, %lld nodes\n",
+                                formatUciMove(app.ponderExpected).c_str(), app.ponderDepth.load(),
+                                app.ponderNodes.load());
+                    app.aiFuture = std::move(app.ponderFuture);
+                    app.ponderFuture.reset();
+                    app.ponderHit = true;
+                    app.ponderStopAt = std::max(std::chrono::steady_clock::now(),
+                                                app.ponderStart + std::chrono::milliseconds(app.aiTimeBudgetMs));
+                } else if (!app.aiFuture) {
+                    stopPonder(app, &app.lastMove); // any other move ends the ponder search
                     Board snapshot = app.board;
                     Color aiColor = app.board.sideToMove();
                     int depth = app.aiDepthCap, budget = app.aiTimeBudgetMs;
@@ -1384,7 +1457,10 @@ int runGui() {
                 } else if (app.aiFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
                     Move m = app.aiFuture->get();
                     app.aiFuture.reset();
+                    app.ponderHit = false;
+                    app.ponderStop = false;
                     playMove(app, m);
+                    if (!gameIsOver(app)) startPonder(app);
                 }
             }
         }
@@ -1405,7 +1481,9 @@ int runGui() {
     // destroyed in reverse order, so its transposition tables would
     // otherwise be freed while that search thread is still using them.
     app.aiStop = true;
+    app.ponderStop = true;
     app.aiFuture.reset();
+    app.ponderFuture.reset();
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
