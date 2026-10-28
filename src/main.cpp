@@ -321,9 +321,7 @@ int runReplay(const std::string& path, const std::string& side) {
                 lastProgress = p;
                 searched = true;
             };
-            const DifficultyPreset& expert = kDifficultyPresets[3];
-            opts.softTimeMs = expert.softTimeMs;
-            Move suggested = findBestMove(board, toMove, expert.depthCap, expert.timeBudgetMs, tt, opts);
+            Move suggested = findBestMove(board, toMove, 20, 6000, tt, opts);
             g_aiDebugLog = false;
             bool match = suggested.fromX == actual.fromX && suggested.fromY == actual.fromY &&
                          suggested.toX == actual.toX && suggested.toY == actual.toY &&

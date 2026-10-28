@@ -400,7 +400,6 @@ struct App {
 
     int aiDepthCap = kDifficultyPresets[1].depthCap;
     int aiTimeBudgetMs = kDifficultyPresets[1].timeBudgetMs;
-    int aiSoftTimeMs = kDifficultyPresets[1].softTimeMs;
     std::optional<std::future<Move>> aiFuture;
     std::atomic<bool> aiStop{false}; // aborts the search behind aiFuture (quitting, leaving a bot match)
 
@@ -752,7 +751,6 @@ void driveBotMatch(App& app) {
         SearchOptions options;
         options.stopFlag = &app.aiStop;
         options.gameHistory = app.botGame.positionHashes();
-        options.softTimeMs = preset.softTimeMs;
         app.aiFuture = std::async(std::launch::async,
                                   [board = app.botGame.board(), side, preset, options, &tt = *app.botTT[bot]] {
                                       return findBestMove(board, side, preset.depthCap, preset.timeBudgetMs, tt,
@@ -1236,7 +1234,6 @@ int runGui() {
                     if (pointInRect(e.button.x, e.button.y, difficultyBtns[i].rect)) {
                         app.aiDepthCap = kDifficultyPresets[i].depthCap;
                         app.aiTimeBudgetMs = kDifficultyPresets[i].timeBudgetMs;
-                        app.aiSoftTimeMs = kDifficultyPresets[i].softTimeMs;
                         if (app.customMode) {
                             resetCustomSetup(app);
                             app.screen = Screen::CustomSetup;
@@ -1380,7 +1377,6 @@ int runGui() {
                     SearchOptions options;
                     options.stopFlag = &app.aiStop;
                     options.gameHistory = app.positionHistory;
-                    options.softTimeMs = app.aiSoftTimeMs;
                     app.aiFuture = std::async(std::launch::async,
                                               [snapshot, aiColor, depth, budget, options, &tt = app.tt] {
                                                   return findBestMove(snapshot, aiColor, depth, budget, tt, options);
