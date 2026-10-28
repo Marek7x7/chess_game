@@ -64,6 +64,7 @@ public:
     void push_back(const Move& m) { std::memcpy(raw_ + bytes(count_++), &m, sizeof(Move)); }
     size_t size() const { return static_cast<size_t>(count_); }
     bool empty() const { return count_ == 0; }
+    void shrinkTo(size_t n) { count_ = static_cast<int>(n); } // keeps the first n moves
     const Move& front() const { return (*this)[0]; }
     const Move& operator[](size_t i) const { return data()[i]; }
     Move& operator[](size_t i) { return data()[i]; }

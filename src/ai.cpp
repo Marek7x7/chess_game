@@ -924,6 +924,48 @@ bool seeNonNegative(const Board& board, const Move& m) {
     return see(board, m) >= 0;
 }
 
+// What answers a check: a double check allows only king moves; a single check allows a king move, a capture of the
+// checker (en passant included) or, against a slider, a move onto a square between it and the king. allows() is
+// false only for a move that is certainly illegal, so a caller can skip it without making it; the moves that pass are
+// still tested once made (a pinned piece, a king stepping onto an attacked square).
+struct Evasions {
+    int kingSq = 0;
+    int checker = 0;
+    bool doubleCheck = false;
+    uint64_t answers = ~uint64_t(0); // single check: the checker's square and the squares between it and the king
+
+    Evasions() = default;
+    Evasions(const Board& board, Color color) {
+        const Color them = opponent(color);
+        kingSq = board.kingFile(color) * 8 + board.kingRank(color);
+        const uint64_t occupied = board.occupancy();
+        const uint64_t checkers =
+            (bb::pawnAttacks[color == Color::White ? 0 : 1][kingSq] & board.pieces(them, PieceType::Pawn)) |
+            (bb::knightAttacks[kingSq] & board.pieces(them, PieceType::Knight)) |
+            (bb::bishopAttacks(kingSq, occupied) & (board.pieces(them, PieceType::Bishop) | board.pieces(them, PieceType::Queen))) |
+            (bb::rookAttacks(kingSq, occupied) & (board.pieces(them, PieceType::Rook) | board.pieces(them, PieceType::Queen)));
+        if (!checkers) return; // (not in check after all: everything passes)
+        doubleCheck = (checkers & (checkers - 1)) != 0;
+        checker = bb::lsb(checkers);
+        answers = checkers | bb::between[kingSq][checker];
+    }
+
+    bool allows(const Move& m) const {
+        if (m.fromX * 8 + m.fromY == kingSq) return true;
+        if (doubleCheck) return false;
+        return ((answers >> (m.toX * 8 + m.toY)) & 1) || (m.isEnPassant && m.toX * 8 + m.fromY == checker);
+    }
+};
+
+// Removes the moves that allows() rules out, keeping the order of the rest.
+void dropNonEvasions(const Board& board, Color color, MoveList& moves) {
+    const Evasions evasions(board, color);
+    size_t kept = 0;
+    for (size_t i = 0; i < moves.size(); i++)
+        if (evasions.allows(moves[i])) moves[kept++] = moves[i];
+    moves.shrinkTo(kept);
+}
+
 // The index of the first largest value in a[from, n) (from < n): the same pick as scanning for the first element
 // that nothing after it beats.
 int firstMax(const int* a, int from, int n) {
@@ -1110,6 +1152,7 @@ int quiescence(Board& board, int alpha, int beta, Color color, int ply, SearchCo
     }
     bool anyLegal = false;
     orderMoves(board, candidates, ttMove, ctx, ply, color);
+    if (inCheck) dropNonEvasions(board, color, candidates); // after the sort: its order among equal scores depends on the list
 
     int origAlpha = alpha;
     Move bestMove{};
@@ -1349,6 +1392,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         return from == ownKingSq || mv.isEnPassant || ((pinnedMask >> from) & 1);
     };
     MoveList moves = board.pseudoLegal(color, false);
+    const Evasions evasions = inCheck ? Evasions(board, color) : Evasions();
     MovePicker picker(board, moves, ttMove, ctx, ply, color);
 
     const int kLmrStartIndex = spLmrStart; // first 4 moves (index 0-3) always searched at full depth
@@ -1375,6 +1419,9 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             anyLegal = true; // the excluded move is legal by construction
             continue;
         }
+        // (Skipping a move that cannot answer the check changes nothing but the make/test/unmake it would cost:
+        // an illegal move does not count as searched.)
+        if (inCheck && !evasions.allows(m)) continue;
         // SEE pruning: at shallow depth in a non-PV node, a capture that loses more
         // than spSeePruneMargin cp per remaining ply is skipped (a legal move was
         // already searched, since moveIndex > 0 and best is not a mate score).
