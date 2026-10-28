@@ -1327,6 +1327,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         beta > -kMateThreshold && board.hasNonPawnMaterial(color)) {
         Board::NullMoveUndo nu;
         board.makeNullMove(nu);
+        ctx.tt.prefetch(board.hashKey()); // the child's table entry loads while its first steps run
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = -1;
         int nullScore =
             -negamax(board, depth - 1 - nullMoveReduction, ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
