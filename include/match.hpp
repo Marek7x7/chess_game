@@ -20,7 +20,7 @@ constexpr DifficultyPreset kDifficultyPresets[4] = {
     {"EASY", 3, 300},
     {"MEDIUM", 6, 1200},
     {"HARD", 10, 3000},
-    {"EXPERT", 20, 6000},
+    {"EXPERT", 60, 6000}, // the cap leaves room for the +4 endgame bonus inside the 64-ply search limit
 };
 
 // Index into kDifficultyPresets for a label, case-insensitively ("hard",
