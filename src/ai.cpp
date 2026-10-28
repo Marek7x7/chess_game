@@ -1330,7 +1330,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         ctx.tt.prefetch(board.hashKey()); // the child's table entry loads while its first steps run
         if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = -1;
         int nullScore =
-            -negamax(board, depth - 1 - nullMoveReduction, ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
+            -negamax(board, depth - 1 - nullMoveReduction - std::min(3, (staticEval - beta) / 200), ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
         board.unmakeNullMove(nu);
         if (nullScore >= beta) return beta;
     }
