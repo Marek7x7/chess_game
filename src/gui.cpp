@@ -414,8 +414,6 @@ struct App {
     std::chrono::steady_clock::time_point ponderStart;
     bool ponderHit = false; // the pondered move was played: aiFuture now holds this search, ended at ponderStopAt
     std::chrono::steady_clock::time_point ponderStopAt;
-    std::atomic<int> ponderDepth{0};
-    std::atomic<long long> ponderNodes{0};
 
     // Persists across the whole session (and across games, and across the
     // opponent's moves), rather than being rebuilt per move: a search often
@@ -475,22 +473,27 @@ struct App {
     bool running = true;
 };
 
-// Ends the ponder search (if any) and waits for it; `hit` says whether the human played the pondered move.
+// Ends the ponder search (if any) and waits for it; `played`, the human's move, is only for the log line.
 void stopPonder(App& app, const Move* played = nullptr) {
     if (!app.ponderFuture) return;
     app.ponderStop = true;
     app.ponderFuture.reset(); // blocks until the search thread has returned
     app.ponderStop = false;
-    if (played)
-        std::printf("[ponder] %s: pondered %s, reached depth %d, %lld nodes\n",
-                    sameMove(*played, app.ponderExpected) ? "hit" : "miss", formatUciMove(app.ponderExpected).c_str(),
-                    app.ponderDepth.load(), app.ponderNodes.load());
+    if (played) std::printf("[ponder] miss: pondered %s\n", formatUciMove(app.ponderExpected).c_str());
+}
+
+// Drops the computer's search, a pondering one that has become the real search included, without waiting it out.
+void abandonSearch(App& app) {
+    app.ponderStop = true;
+    app.aiFuture.reset();
+    app.ponderStop = false;
+    app.ponderHit = false;
 }
 
 // After the computer has moved: searches the human reply the table expects, until stopPonder().
 void startPonder(App& app) {
     const std::vector<Move> pv = extractPV(app.board, app.tt, 1, app.positionHistory);
-    if (pv.empty()) { std::printf("[ponder] no expected reply in the table\n"); return; }
+    if (pv.empty()) return;
     Board after = app.board;
     after.makeMove(pv.front());
     SearchOptions options;
@@ -500,12 +503,6 @@ void startPonder(App& app) {
     options.gameHistory.push_back(after.hashKey());
     app.ponderExpected = pv.front();
     std::printf("[ponder] start: expecting %s\n", formatUciMove(pv.front()).c_str());
-    app.ponderDepth = 0;
-    app.ponderNodes = 0;
-    options.onDepthComplete = [&app](const SearchProgress& p) {
-        app.ponderDepth = p.depth;
-        app.ponderNodes = p.nodes;
-    };
     const int depth = app.aiDepthCap;
     app.ponderStart = std::chrono::steady_clock::now();
     app.ponderFuture = std::async(std::launch::async, [after, depth, budget = 2 * app.aiTimeBudgetMs, options, &tt = app.tt] {
@@ -531,10 +528,7 @@ void resetHumanGame(App& app, const Board& start, bool standardStart) {
 void startGame(App& app) {
     resetHumanGame(app, Board(), true);
     app.flipped = app.vsAi && app.humanColor == Color::Black;
-    app.ponderStop = true; // a pondering search that has become the real one must not be waited out
-    app.aiFuture.reset();
-    app.ponderStop = false;
-    app.ponderHit = false;
+    abandonSearch(app);
     app.screen = Screen::Game;
 }
 
@@ -616,10 +610,7 @@ void finishCustomSetup(App& app, Color sideToMoveFirst) {
     }
     resetHumanGame(app, candidate, false);
     app.flipped = app.humanColor == Color::Black;
-    app.ponderStop = true;
-    app.aiFuture.reset();
-    app.ponderStop = false;
-    app.ponderHit = false;
+    abandonSearch(app);
     app.customMode = false;
     app.customDragActive = false;
     app.customErrorMsg.clear();
@@ -1434,9 +1425,7 @@ int runGui() {
                 if (app.ponderHit && std::chrono::steady_clock::now() >= app.ponderStopAt) app.ponderStop = true;
                 if (!app.aiFuture && app.ponderFuture && sameMove(app.lastMove, app.ponderExpected)) {
                     // The pondered move: keep that search as the real one, to end once the usual move time has passed.
-                    std::printf("[ponder] hit: pondered %s, reached depth %d, %lld nodes\n",
-                                formatUciMove(app.ponderExpected).c_str(), app.ponderDepth.load(),
-                                app.ponderNodes.load());
+                    std::printf("[ponder] hit: pondered %s\n", formatUciMove(app.ponderExpected).c_str());
                     app.aiFuture = std::move(app.ponderFuture);
                     app.ponderFuture.reset();
                     app.ponderHit = true;
