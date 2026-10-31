@@ -756,7 +756,7 @@ constexpr int kTbWin = 20000;
 // kMateScore/kMateThreshold are declared in ai.hpp (needed there so external
 // callers formatting scores, e.g. UCI's "score mate <n>", don't duplicate
 // these magic numbers).
-constexpr int kMaxCheckExtensions = 16;
+constexpr int kMaxCheckExtensions = 4;
 
 // kTTSize is declared in ai.hpp (needed there so callers can construct the
 // persistent TranspositionTable they now own and pass into findBestMove).
