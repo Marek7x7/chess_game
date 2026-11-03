@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -40,6 +41,7 @@ struct Config {
     int adjudicateCp = 1500;  // a score this lopsided for 6 plies in a row ends the game as won
     double randomMoveProb = 0; // after the random opening plies, each move of the next randomMovePlies plies is random
     int randomMovePlies = 0;   // with this probability (as Stockfish's gensfen does) and is not recorded
+    double minError = 0; // file mode: keep only records where the static eval and the search score differ this much (win-probability units)
     int noAdjudicatePieces = 0; // ...but not in positions with this many pieces or fewer: play the ending out
 };
 
@@ -272,6 +274,14 @@ int processFiles(const Config& cfg, const std::vector<std::string>& inputs) {
                 for (int k = 0; k < 16; k++) h = (h ^ r.pieces[k]) * 0x100000001B3ULL;
                 h ^= h >> 29;
                 if (!insertNew(h)) continue;
+#ifdef CHESS_DATAGEN_FILTER
+                if (cfg.minError > 0) { // hard-example filter: the (loaded) net's static eval against the search score
+                    Board board;
+                    if (!Board::tryFromFEN(nnue::data::toFen(r), board)) continue;
+                    const double a = 1 / (1 + std::exp(-staticEvalStm(board) / 173.7)), b = 1 / (1 + std::exp(-r.score / 173.7));
+                    if (std::abs(a - b) < cfg.minError) continue;
+                }
+#endif
                 if (syzygy::tableSize() > 0 && nnue::data::pieceCount(r) <= syzygy::tableSize()) {
                     Board board;
                     if (Board::tryFromFEN(nnue::data::toFen(r), board)) {
@@ -318,6 +328,9 @@ int runDatagen(int argc, char** argv) {
         else if (arg == "--max-score") cfg.maxScore = std::atoi(value());
         else if (arg == "--adjudicate-cp") cfg.adjudicateCp = std::atoi(value());
         else if (arg == "--no-adjudicate-pieces") cfg.noAdjudicatePieces = std::atoi(value());
+#ifdef CHESS_DATAGEN_FILTER
+        else if (arg == "--min-error") cfg.minError = std::atof(value());
+#endif
         else if (arg == "--seed") cfg.seed = static_cast<uint64_t>(std::atoll(value()));
         else if (arg.rfind("--", 0) != 0) inputs.push_back(arg);
         else {

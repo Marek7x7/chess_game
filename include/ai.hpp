@@ -104,6 +104,11 @@ Move findBestMove(const Board& board, Color aiColor, int maxDepth, int timeBudge
 // early -- an accepted trade-off (the standard technique for this), not a
 // bug. Read-only against `tt` (probes only, never stores); touches nothing
 // in the negamax/quiescence hot path.
+// The static evaluation (network if loaded) in centipawns from the side to move's point of view; for datagen's filter.
+#ifdef CHESS_DATAGEN_FILTER
+int staticEvalStm(const Board& board);
+#endif
+
 std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen = 32,
                             const std::vector<uint64_t>& history = {});
 

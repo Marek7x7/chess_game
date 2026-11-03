@@ -1784,6 +1784,10 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
 int tunerEvaluate(const Board& board) { return evaluate(board, Color::White); }
 #endif
 
+#ifdef CHESS_DATAGEN_FILTER
+int staticEvalStm(const Board& board) { return evaluate(board, board.sideToMove()); }
+#endif
+
 std::vector<Move> extractPV(const Board& rootBoard, const TranspositionTable& tt, int maxLen,
                             const std::vector<uint64_t>& history) {
     std::vector<Move> pv;

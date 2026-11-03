@@ -144,6 +144,14 @@ if(CHESS_SYZYGY)
     target_compile_definitions(chess_flags INTERFACE CHESS_SYZYGY)
 endif()
 
+# ---- Training-data filter --------------------------------------------------
+# `chess --datagen --min-error P <files>` keeps only the records the network gets wrong (needs staticEvalStm).
+# A tool for building training data, not part of the shipped engine: OFF by default.
+option(CHESS_DATAGEN_FILTER "datagen --min-error hard-example filter (tool build only)" OFF)
+if(CHESS_DATAGEN_FILTER)
+    target_compile_definitions(chess_flags INTERFACE CHESS_DATAGEN_FILTER)
+endif()
+
 # ---- Built-in network ------------------------------------------------------
 # The evaluation network nnue/default.nnue (if the file exists) is compiled into the executable, so a single
 # file is all there is to ship. -DCHESS_NNUE_FILE=<path> uses another one, -DCHESS_NNUE=OFF none (the
