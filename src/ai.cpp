@@ -786,6 +786,8 @@ struct SearchContext {
     // pawn structure, by side to move (see kCorrGrain): added to the eval the pruning rules look at.
     int16_t corrHist[2][kCorrSize]{};
     int prevMove[kMaxPly + 1]{};
+    // The corrected static eval of the node at each ply on the current line (INT_MIN: none was computed).
+    int evalStack[kMaxPly + 3]{};
     // Stop (as at the deadline) once this thread has searched this many nodes.
     long long nodeLimit = std::numeric_limits<long long>::max();
     // Where this thread publishes its node count (every 4096 nodes) for the others to add up.
@@ -1281,12 +1283,17 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
     int16_t* corr = haveStaticEval ? &ctx.corrHist[colorIdx(color)][board.pawnKey() & (kCorrSize - 1)] : nullptr;
     const int staticEval = haveStaticEval ? rawEval + *corr / kCorrGrain : 0;
 
+    // "Improving": the side to move stands better than two plies ago, so a fail-high is likelier and
+    // a fail-low less likely (needs both nodes to have computed a static eval).
+    ctx.evalStack[ply] = haveStaticEval ? staticEval : INT_MIN;
+    const bool improving = haveStaticEval && ply >= 2 && ctx.evalStack[ply - 2] != INT_MIN && staticEval > ctx.evalStack[ply - 2];
+
     // Reverse futility pruning: if the static eval beats beta by more than
     // the opponent could plausibly win back in the remaining plies, assume
     // the position holds and cut without searching it.
     const int kReverseFutilityMargin = spRfpMargin; // per remaining ply
     if (haveStaticEval && depth <= spRfpMaxDepth && beta < kMateThreshold && beta > -kMateThreshold &&
-        staticEval - kReverseFutilityMargin * depth >= beta)
+        staticEval - kReverseFutilityMargin * (depth - improving) >= beta)
         return staticEval;
 
     // Razoring: this far below alpha at low depth, only a capture sequence could save the node, so
@@ -1365,6 +1372,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             ctx.path.pop_back();
         }
     }
+
+    // Internal iterative reduction: with no table move to order by, this node's ordering is poor and
+    // a full-depth search of it is mostly wasted; the shallower result (stored below) seeds the next iteration.
+    if (!excluded && !inCheck && !haveTTMove && depth >= 6) depth--;
 
     // Singular extension: if the stored best move is the only one that holds its
     // score -- every other move, searched shallower against a bound just below it,
@@ -1503,7 +1514,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             // into quiescence; a PV node gets one ply less.
             // A move with a good history reduces less, one with a bad history more.
             const int h = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
-            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) - h / spLmrHistDiv, 1, depth - 2);
+            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) - h / spLmrHistDiv + (improving || !haveStaticEval ? 0 : 1), 1, depth - 2);
         }
 
         // PVS: the first move (typically the TT move / best-ordered guess)
