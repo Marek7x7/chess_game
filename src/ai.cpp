@@ -787,7 +787,7 @@ struct SearchContext {
     int16_t corrHist[2][kCorrSize]{};
     int prevMove[kMaxPly + 1]{};
     // The corrected static eval of the node at each ply on the current line (INT_MIN: none was computed).
-    int evalStack[kMaxPly + 3]{};
+    int evalStack[kMaxPly + 1]{};
     // Stop (as at the deadline) once this thread has searched this many nodes.
     long long nodeLimit = std::numeric_limits<long long>::max();
     // Where this thread publishes its node count (every 4096 nodes) for the others to add up.
@@ -1285,8 +1285,10 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
 
     // "Improving": the side to move stands better than two plies ago, so a fail-high is likelier and
     // a fail-low less likely (needs both nodes to have computed a static eval).
-    ctx.evalStack[ply] = haveStaticEval ? staticEval : INT_MIN;
-    const bool improving = haveStaticEval && ply >= 2 && ctx.evalStack[ply - 2] != INT_MIN && staticEval > ctx.evalStack[ply - 2];
+    // (Check extensions can take ply past kMaxPly: such a node records nothing and is never "improving".)
+    if (ply <= kMaxPly) ctx.evalStack[ply] = haveStaticEval ? staticEval : INT_MIN;
+    const bool improving = haveStaticEval && ply >= 2 && ply <= kMaxPly && ctx.evalStack[ply - 2] != INT_MIN &&
+                           staticEval > ctx.evalStack[ply - 2];
 
     // Reverse futility pruning: if the static eval beats beta by more than
     // the opponent could plausibly win back in the remaining plies, assume
