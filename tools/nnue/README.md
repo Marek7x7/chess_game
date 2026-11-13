@@ -34,6 +34,10 @@ Positions in check, moves that capture or promote, mate scores and huge scores a
 build-tools/nnue_train train data.bin --out net.nnue --epochs 20 --lambda 0.7
 ```
 
+The trainer keeps the whole training set in RAM (40 bytes per record). For a pool that does not fit, `--shards N` leaves
+it on disk: each epoch the training blocks are split at random into N shards and one shard at a time is loaded and
+trained on (the held-out 5% stays in RAM). The learning-rate schedule and results are otherwise the same.
+
 The target is `lambda * sigmoid(score / K) + (1 - lambda) * result` with `K = 173.7`, the scale of the hand-crafted
 evaluation's Texel fit, so the network's centipawns mean about the same. 5% of the data (blocks of 4096 consecutive
 records, which keeps games together) is held out and its loss reported after each epoch. At the end the exported

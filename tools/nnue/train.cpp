@@ -1,6 +1,6 @@
 // Trains the evaluation network (nnue_arch.hpp) on records made by nnue_data (or the engine's datagen mode).
 //
-//   nnue_train train <data.bin>... --out net.nnue [--epochs 20] [--batch 16384] [--lr 1e-3] [--lambda 0.7]
+//   nnue_train train <data.bin>... --out net.nnue [--epochs 20] [--batch 16384] [--lr 1e-3] [--lambda 0.7] [--shards N]
 //                    [--k 173.7] [--min-depth N] [--min-ply N] [--max-score N] [--init net.nnue] [--seed N]
 //   nnue_train eval  <data.bin>... (--net net.nnue | --hce) [--valid-only] [--k 173.7] [same filters]
 //
@@ -44,7 +44,7 @@ struct Options {
     std::vector<std::string> inputs;
     std::string out, init, net;
     bool hce = false, validOnly = false;
-    int epochs = 20, batch = 16384, seed = 1;
+    int epochs = 20, batch = 16384, seed = 1, shards = 1; // shards > 1: stream the training data, 1/shards of it in RAM at a time
     double lr = 1e-3, lambda = 0.7, k = 400.0 / std::log(10.0);
     int minDepth = 0, minPly = 0, maxScore = 3000;
 };
@@ -148,14 +148,46 @@ bool keep(const Record& r, const Options& o) {
     return r.depth >= o.minDepth && r.ply >= o.minPly && std::abs(r.score) <= o.maxScore;
 }
 
-bool loadData(const Options& o, std::vector<Record>& train, std::vector<Record>& valid) {
+// With --shards > 1 the training records stay on disk: only the held-out 5% is loaded, and `blocks` lists the global
+// numbers of the training blocks (the numbering of loadData: every kBlock records of all files in order).
+struct Streaming {
+    std::vector<size_t> blocks;
+    std::vector<size_t> fileFirstBlock; // global number of each input file's first block (+ one past the end)
+};
+
+// Loads one shard: reads the given training blocks (sorted, so the disk is read mostly forward) into `out`.
+void loadShard(const Options& o, const Streaming& st, size_t from, size_t to, std::vector<Record>& out) {
+    std::vector<size_t> ids(st.blocks.begin() + static_cast<std::ptrdiff_t>(from), st.blocks.begin() + static_cast<std::ptrdiff_t>(to));
+    std::sort(ids.begin(), ids.end());
+    out.clear();
+    out.reserve(ids.size() * kBlock);
+    std::vector<Record> buf(kBlock);
+    size_t file = 0, open = static_cast<size_t>(-1);
+    std::FILE* f = nullptr;
+    for (size_t id : ids) {
+        while (id >= st.fileFirstBlock[file + 1]) file++;
+        if (open != file) {
+            if (f) std::fclose(f);
+            f = std::fopen(o.inputs[file].c_str(), "rb");
+            open = file;
+        }
+        if (!f) continue;
+        std::fseek(f, static_cast<long>((id - st.fileFirstBlock[file]) * kBlock * sizeof(Record)), SEEK_SET);
+        const size_t got = std::fread(buf.data(), sizeof(Record), kBlock, f);
+        for (size_t i = 0; i < got; i++)
+            if (keep(buf[i], o)) out.push_back(buf[i]);
+    }
+    if (f) std::fclose(f);
+}
+
+bool loadData(const Options& o, std::vector<Record>& train, std::vector<Record>& valid, Streaming* st = nullptr) {
     size_t block = 0, total = 0;
     size_t expected = 0; // reserve up front: growing by doubling would peak at about twice the final size
     for (const std::string& path : o.inputs) {
         std::error_code ec;
         expected += static_cast<size_t>(std::filesystem::file_size(path, ec)) / sizeof(Record);
     }
-    train.reserve(expected);
+    if (!st) train.reserve(expected);
     valid.reserve(expected / 8);
     for (const std::string& path : o.inputs) {
         std::FILE* f = std::fopen(path.c_str(), "rb");
@@ -165,14 +197,25 @@ bool loadData(const Options& o, std::vector<Record>& train, std::vector<Record>&
         }
         std::vector<Record> buf(kBlock);
         size_t got;
+        if (st) st->fileFirstBlock.push_back(block);
         while ((got = std::fread(buf.data(), sizeof(Record), kBlock, f)) > 0) {
-            auto& dst = isValidationBlock(block) ? valid : train;
-            for (size_t i = 0; i < got; i++)
-                if (keep(buf[i], o)) dst.push_back(buf[i]);
+            if (st && !isValidationBlock(block)) {
+                st->blocks.push_back(block);
+            } else {
+                auto& dst = isValidationBlock(block) ? valid : train;
+                for (size_t i = 0; i < got; i++)
+                    if (keep(buf[i], o)) dst.push_back(buf[i]);
+            }
             total += got;
             block++;
         }
         std::fclose(f);
+    }
+    if (st) {
+        st->fileFirstBlock.push_back(block);
+        std::printf("%zu records read, %zu training blocks streamed from disk in %d shards, %zu held out\n", total, st->blocks.size(),
+                    o.shards, valid.size());
+        return !st->blocks.empty();
     }
     std::printf("%zu records read, %zu for training, %zu held out\n", total, train.size(), valid.size());
     return !train.empty();
@@ -303,7 +346,9 @@ bool readNet(const std::string& path, std::vector<float>& th) {
 
 int train(Options o) { // (by value: the batch size may be lowered)
     std::vector<Record> data, valid;
-    if (!loadData(o, data, valid)) return 1;
+    Streaming stream;
+    const bool streaming = o.shards > 1;
+    if (!loadData(o, data, valid, streaming ? &stream : nullptr)) return 1;
 
     std::vector<float> th(Layout::total, 0.0f);
     if (!o.init.empty()) {
@@ -335,11 +380,13 @@ int train(Options o) { // (by value: the batch size may be lowered)
     std::iota(order.begin(), order.end(), size_t(0));
     std::mt19937_64 shuffler(static_cast<uint64_t>(o.seed) * 7919u);
 
-    if (data.size() < static_cast<size_t>(o.batch)) { // fewer positions than one batch: a batch is all of them
+    if (!streaming && data.size() < static_cast<size_t>(o.batch)) { // fewer positions than one batch: a batch is all of them
         std::printf("only %zu training positions: batch size %d lowered to match\n", data.size(), o.batch);
         o.batch = static_cast<int>(data.size());
     }
-    const size_t batchesPerEpoch = std::max<size_t>(1, data.size() / static_cast<size_t>(o.batch));
+    // (streaming: the estimate ignores records the filters drop; it only sets the learning-rate schedule and the report)
+    const size_t batchesPerEpoch = std::max<size_t>(
+        1, (streaming ? stream.blocks.size() * kBlock : data.size()) / static_cast<size_t>(o.batch));
     const long long totalSteps = static_cast<long long>(batchesPerEpoch) * o.epochs;
     const float scaleOut = nnue::kScale / static_cast<float>(o.k);
     long long step = 0;
@@ -349,9 +396,20 @@ int train(Options o) { // (by value: the batch size may be lowered)
 
     for (int epoch = 1; epoch <= o.epochs; epoch++) {
         const auto t0 = std::chrono::steady_clock::now();
-        std::shuffle(order.begin(), order.end(), shuffler);
         double epochLoss = 0;
-        for (size_t b = 0; b < batchesPerEpoch; b++, step++) {
+        size_t epochBatches = 0;
+        if (streaming) std::shuffle(stream.blocks.begin(), stream.blocks.end(), shuffler); // new shard split every epoch
+        for (int shard = 0; shard < (streaming ? o.shards : 1); shard++) {
+        if (streaming) {
+            const size_t n = stream.blocks.size(), s = static_cast<size_t>(o.shards);
+            loadShard(o, stream, n * static_cast<size_t>(shard) / s, n * static_cast<size_t>(shard + 1) / s, data);
+            order.resize(data.size());
+            std::iota(order.begin(), order.end(), size_t(0));
+        }
+        std::shuffle(order.begin(), order.end(), shuffler);
+        const size_t shardBatches = std::max<size_t>(1, data.size() / static_cast<size_t>(o.batch));
+        epochBatches += shardBatches;
+        for (size_t b = 0; b < shardBatches; b++, step++) {
             const size_t first = b * static_cast<size_t>(o.batch);
             double batchLoss = 0;
 #pragma omp parallel num_threads(threads) reduction(+ : batchLoss)
@@ -419,7 +477,7 @@ int train(Options o) { // (by value: the batch size may be lowered)
             epochLoss += batchLoss;
 
             // Adam on the summed gradients (divided by the batch size), cosine learning-rate decay.
-            const double progress = static_cast<double>(step) / static_cast<double>(totalSteps);
+            const double progress = std::min(1.0, static_cast<double>(step) / static_cast<double>(totalSteps));
             const float lr = static_cast<float>(o.lr * (0.01 + 0.99 * 0.5 * (1.0 + std::cos(3.14159265358979323846 * progress))));
             const float b1 = 0.9f, b2 = 0.999f, eps = 1e-8f;
             const float c1 = 1.0f - std::pow(b1, static_cast<float>(step + 1)), c2 = 1.0f - std::pow(b2, static_cast<float>(step + 1));
@@ -440,11 +498,12 @@ int train(Options o) { // (by value: the batch size may be lowered)
                 for (size_t j = Layout::w2; j < Layout::b2; j++) th[j] = std::min(1.98f, std::max(-1.98f, th[j]));
             }
         }
+        } // shards
         const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        const double trainLoss = epochLoss / static_cast<double>(batchesPerEpoch * static_cast<size_t>(o.batch));
+        const double trainLoss = epochLoss / static_cast<double>(epochBatches * static_cast<size_t>(o.batch));
         std::printf("epoch %d: training loss %.6f, validation loss %.6f (result alone %.6f), %.1f s (%.2f M positions/s)\n", epoch,
                     trainLoss, evaluateLoss(th, valid, o, &validResult), validResult, secs,
-                    static_cast<double>(batchesPerEpoch * static_cast<size_t>(o.batch)) / secs / 1e6);
+                    static_cast<double>(epochBatches * static_cast<size_t>(o.batch)) / secs / 1e6);
         std::fflush(stdout);
         if (!o.out.empty() && !writeNet(th, o.out)) {
             std::fprintf(stderr, "cannot write %s\n", o.out.c_str());
@@ -559,6 +618,7 @@ int main(int argc, char** argv) {
         else if (arg == "--min-depth") o.minDepth = std::atoi(value());
         else if (arg == "--min-ply") o.minPly = std::atoi(value());
         else if (arg == "--max-score") o.maxScore = std::atoi(value());
+        else if (arg == "--shards") o.shards = std::max(1, std::atoi(value()));
         else o.inputs.push_back(arg);
     }
     if (o.inputs.empty()) {
