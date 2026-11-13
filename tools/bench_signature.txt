@@ -1,1 +1,1 @@
-BENCH SIGNATURE: nodes=52572 depth=6 positions=4
+BENCH SIGNATURE: nodes=50944 depth=6 positions=4
