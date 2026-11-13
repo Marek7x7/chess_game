@@ -21,7 +21,7 @@ namespace nnue {
 
 constexpr int kInputs = 768;
 #ifndef CHESS_NNUE_HIDDEN
-#define CHESS_NNUE_HIDDEN 512 // (256 or 512; the network file must be trained at the same width)
+#define CHESS_NNUE_HIDDEN 768 // (256, 512 or 768; the network file must be trained at the same width)
 #endif
 constexpr int kHidden = CHESS_NNUE_HIDDEN;
 constexpr int kBuckets = 8; // output weight sets, by piece count
