@@ -1,6 +1,6 @@
 // Trains the evaluation network (nnue_arch.hpp) on records made by nnue_data (or the engine's datagen mode).
 //
-//   nnue_train train <data.bin>... --out net.nnue [--epochs 20] [--batch 16384] [--lr 1e-3] [--lambda 0.7] [--shards N]
+//   nnue_train train <data.bin>... --out net.nnue [--epochs 20] [--batch 16384] [--lr 1e-3] [--lambda 0.7] [--lambda-end L] [--shards N]
 //                    [--k 173.7] [--min-depth N] [--min-ply N] [--max-score N] [--init net.nnue] [--seed N]
 //   nnue_train eval  <data.bin>... (--net net.nnue | --hce) [--valid-only] [--k 173.7] [same filters]
 //
@@ -45,7 +45,7 @@ struct Options {
     std::string out, init, net;
     bool hce = false, validOnly = false;
     int epochs = 20, batch = 16384, seed = 1, shards = 1; // shards > 1: stream the training data, 1/shards of it in RAM at a time
-    double lr = 1e-3, lambda = 0.7, k = 400.0 / std::log(10.0);
+    double lr = 1e-3, lambda = 0.7, lambdaEnd = -1.0, k = 400.0 / std::log(10.0);
     int minDepth = 0, minPly = 0, maxScore = 3000;
 };
 
@@ -390,6 +390,7 @@ int train(Options o) { // (by value: the batch size may be lowered)
     const long long totalSteps = static_cast<long long>(batchesPerEpoch) * o.epochs;
     const float scaleOut = nnue::kScale / static_cast<float>(o.k);
     long long step = 0;
+    const double lambdaStart = o.lambda; // --lambda-end: lambda moves linearly from --lambda to this over the run
     std::printf("training on %d threads: %d epochs of %zu batches of %d\n", threads, o.epochs, batchesPerEpoch, o.batch);
     double validResult = 0;
     std::printf("epoch 0: validation loss %.6f (against the result alone %.6f)\n", evaluateLoss(th, valid, o, &validResult), validResult);
@@ -411,6 +412,8 @@ int train(Options o) { // (by value: the batch size may be lowered)
         epochBatches += shardBatches;
         for (size_t b = 0; b < shardBatches; b++, step++) {
             const size_t first = b * static_cast<size_t>(o.batch);
+            if (o.lambdaEnd >= 0.0)
+                o.lambda = lambdaStart + (o.lambdaEnd - lambdaStart) * std::min(1.0, static_cast<double>(step) / static_cast<double>(totalSteps));
             double batchLoss = 0;
 #pragma omp parallel num_threads(threads) reduction(+ : batchLoss)
             {
@@ -618,6 +621,7 @@ int main(int argc, char** argv) {
         else if (arg == "--min-depth") o.minDepth = std::atoi(value());
         else if (arg == "--min-ply") o.minPly = std::atoi(value());
         else if (arg == "--max-score") o.maxScore = std::atoi(value());
+        else if (arg == "--lambda-end") o.lambdaEnd = std::atof(value());
         else if (arg == "--shards") o.shards = std::max(1, std::atoi(value()));
         else o.inputs.push_back(arg);
     }
