@@ -378,15 +378,23 @@ void Board::recomputeEval() {
     refreshNnue();
 }
 
-void Board::refreshNnue() {
-    if (!nnue::active()) return;
-    nnue::Accumulator& acc = nnueStack.current();
-    nnue::reset(acc);
+void Board::refreshSide(nnue::Accumulator& acc, int perspective) const {
+    nnue::PieceOnSquare pieces[32];
+    int n = 0;
     for (int x = 0; x < 8; x++)
         for (int y = 0; y < 8; y++) {
             const Piece& p = squares[x][y];
-            if (!p.isEmpty()) nnue::add(acc, p.color, p.type, x, y);
+            if (p.isEmpty() || n == 32) continue;
+            pieces[n++] = {static_cast<int8_t>(p.color == Color::White ? 0 : 1), static_cast<int8_t>(p.type), static_cast<int8_t>(x),
+                           static_cast<int8_t>(y)};
         }
+    nnue::rebuild(acc, perspective, kingX[perspective], kingY[perspective], pieces, n);
+}
+
+void Board::refreshNnue() {
+    if (!nnue::active()) return;
+    nnue::Accumulator& acc = nnueStack.current();
+    for (int p = 0; p < 2; p++) refreshSide(acc, p);
 }
 
 bool Board::nnueMatchesScratch() const {
@@ -1013,6 +1021,10 @@ void Board::makeMoveImpl(const Move& m, bool newAccumulator) {
 
     Piece moving = squares[m.fromX][m.fromY];
     Color color = moving.color;
+    // The mover's king context before the move (king-bucketed inputs: a change of it rebuilds that side's view).
+    const int oldKingCtx = (network && moving.type == PieceType::King)
+                               ? nnue::kingContext(colorIndex(color), kingX[colorIndex(color)], kingY[colorIndex(color)])
+                               : 0;
     Piece captured = squares[m.toX][m.toY];
     halfmoveCount = (moving.type == PieceType::Pawn || !captured.isEmpty()) ? 0 : halfmoveCount + 1;
 
@@ -1092,12 +1104,20 @@ void Board::makeMoveImpl(const Move& m, bool newAccumulator) {
     turn = opponent(color);
 
     if (network) {
+        if constexpr (nnue::kKingBuckets > 1) {
+            for (int p = 0; p < 2; p++) change.ctx[p] = static_cast<int8_t>(nnue::kingContext(p, kingX[p], kingY[p]));
+            if (moving.type == PieceType::King && change.ctx[colorIndex(color)] != oldKingCtx) change.refresh[colorIndex(color)] = true;
+        }
         if (newAccumulator) {
-            nnueStack.push(); // computed when something asks for it
+            nnueStack.push(); // computed when something asks for it (a rebuilt side is computed now)
+            for (int p = 0; p < 2; p++)
+                if (change.refresh[p]) refreshSide(nnueStack.newest(), p);
         } else {
             nnue::Accumulator& now = nnueStack.current();
             const nnue::Accumulator before = now;
             nnue::apply(now, before, change);
+            for (int p = 0; p < 2; p++)
+                if (change.refresh[p]) refreshSide(now, p);
         }
     }
 }

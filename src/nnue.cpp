@@ -155,34 +155,29 @@ void reset(Accumulator& acc) {
     for (int p = 0; p < 2; p++) std::memcpy(acc.v[p], g_net->featureBias, sizeof acc.v[p]);
 }
 
-namespace {
-
-// acc.v[p] += sign * (the weights of one feature): the loops are plain so that the compiler vectorizes them
-// for whatever the target allows.
-template <int Sign>
-inline void update(Accumulator& acc, Color c, PieceType t, int x, int y) {
-    const int type = static_cast<int>(t);
-    const int pieceColor = c == Color::White ? 0 : 1;
-    for (int p = 0; p < 2; p++) {
-        const int16_t* __restrict w = g_net->featureWeights[featureIndex(p, pieceColor, type, x, y)];
-        int16_t* __restrict a = acc.v[p];
-        for (int i = 0; i < kHidden; i++) a[i] = static_cast<int16_t>(a[i] + Sign * w[i]);
+void rebuild(Accumulator& acc, int perspective, int kingX, int kingY, const PieceOnSquare* pieces, int count) {
+    const int ctx = kingContext(perspective, kingX, kingY);
+    int16_t* __restrict a = acc.v[perspective];
+    std::memcpy(a, g_net->featureBias, sizeof acc.v[perspective]);
+    for (int k = 0; k < count; k++) {
+        const PieceOnSquare& f = pieces[k];
+        const int16_t* __restrict w = g_net->featureWeights[featureIndex(perspective, f.color, f.type, f.x, f.y, ctx)];
+        for (int i = 0; i < kHidden; i++) a[i] = static_cast<int16_t>(a[i] + w[i]);
     }
 }
 
-} // namespace
-
 void apply(Accumulator& dst, const Accumulator& src, const Change& change) {
     for (int p = 0; p < 2; p++) {
+        if (change.refresh[p]) continue; // already rebuilt by the caller
         const int16_t* __restrict add[2];
         const int16_t* __restrict sub[2];
         for (int i = 0; i < change.numAdds; i++) {
             const Change::Feature& f = change.adds[i];
-            add[i] = g_net->featureWeights[featureIndex(p, f.color, f.type, f.x, f.y)];
+            add[i] = g_net->featureWeights[featureIndex(p, f.color, f.type, f.x, f.y, change.ctx[p])];
         }
         for (int i = 0; i < change.numSubs; i++) {
             const Change::Feature& f = change.subs[i];
-            sub[i] = g_net->featureWeights[featureIndex(p, f.color, f.type, f.x, f.y)];
+            sub[i] = g_net->featureWeights[featureIndex(p, f.color, f.type, f.x, f.y, change.ctx[p])];
         }
         int16_t* __restrict d = dst.v[p];
         const int16_t* __restrict s = src.v[p];
@@ -200,9 +195,6 @@ void apply(Accumulator& dst, const Accumulator& src, const Change& change) {
         }
     }
 }
-
-void add(Accumulator& acc, Color c, PieceType t, int x, int y) { update<+1>(acc, c, t, x, y); }
-void sub(Accumulator& acc, Color c, PieceType t, int x, int y) { update<-1>(acc, c, t, x, y); }
 
 const char* kernelName() {
 #if defined(__AVX512VNNI__) && defined(__AVX512BW__)

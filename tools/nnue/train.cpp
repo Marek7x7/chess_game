@@ -60,9 +60,14 @@ bool isValidationBlock(size_t block) {
 float sigmoid(float x) { return 1.0f / (1.0f + std::exp(-x)); }
 
 // All parameters in one array so Adam can treat them alike.
+// Feature-transformer rows in training. With king buckets there is one more set of kPieceInputs rows, the
+// "factoriser": it is active for every position whatever the king region, so rare regions still learn from all
+// the data. The export adds it into each region's rows.
+constexpr size_t kTrainRows = size_t(nnue::kInputs) + (nnue::kKingBuckets > 1 ? size_t(nnue::kPieceInputs) : 0);
+
 struct Layout {
     static constexpr size_t ftW = 0;
-    static constexpr size_t ftB = ftW + size_t(nnue::kInputs) * H;
+    static constexpr size_t ftB = ftW + kTrainRows * H;
     static constexpr size_t ow = ftB + H;
     static constexpr size_t ob = ow + size_t(nnue::kBuckets) * 2 * H;
     // second layer (nnue::kL2 > 0; the single-layer output weights above are then unused)
@@ -76,16 +81,37 @@ struct Layout {
 
 struct Active {
     int n[2];
-    int f[2][32];
+    int f[2][64]; // up to 32 pieces, twice with the factoriser
 };
 
 // The input features of a record from both sides' points of view.
 inline void features(const Record& r, Active& a) {
     a.n[0] = a.n[1] = 0;
+    int ctx[2] = {0, 0};
+    if constexpr (nnue::kKingBuckets > 1) {
+        nnue::data::forEachPiece(r, [&](int sq, int color, int type) {
+            if (type == static_cast<int>(PieceType::King)) ctx[color] = nnue::kingContext(color, sq / 8, sq % 8);
+        });
+    }
     nnue::data::forEachPiece(r, [&](int sq, int color, int type) {
         const int x = sq / 8, y = sq % 8;
-        for (int p = 0; p < 2; p++) a.f[p][a.n[p]++] = nnue::featureIndex(p, color, type, x, y);
+        for (int p = 0; p < 2; p++) {
+            a.f[p][a.n[p]++] = nnue::featureIndex(p, color, type, x, y, ctx[p]);
+            if constexpr (nnue::kKingBuckets > 1)
+                a.f[p][a.n[p]++] = nnue::kInputs + nnue::featureIndex(p, color, type, x, y, ctx[p] & 1); // factoriser row
+        }
     });
+}
+
+// The engine's accumulator for a record, built from scratch (both sides' views), for checks against the float net.
+void rebuildFromRecord(nnue::Accumulator& acc, const Record& r) {
+    nnue::PieceOnSquare pieces[32];
+    int n = 0, kx[2] = {0, 0}, ky[2] = {0, 0};
+    nnue::data::forEachPiece(r, [&](int sq, int color, int type) {
+        if (n < 32) pieces[n++] = {static_cast<int8_t>(color), static_cast<int8_t>(type), static_cast<int8_t>(sq / 8), static_cast<int8_t>(sq % 8)};
+        if (type == static_cast<int>(PieceType::King)) kx[color] = sq / 8, ky[color] = sq % 8;
+    });
+    for (int p = 0; p < 2; p++) nnue::rebuild(acc, p, kx[p], ky[p], pieces, n);
 }
 
 struct Forward {
@@ -262,7 +288,11 @@ bool writeNet(const std::vector<float>& th, const std::string& path) {
     h.scale = nnue::kScale;
     std::fwrite(&h, sizeof h, 1, f);
     std::vector<int16_t> w(size_t(nnue::kInputs) * H);
-    for (size_t i = 0; i < w.size(); i++) w[i] = q16(th[Layout::ftW + i], nnue::kQA);
+    for (size_t i = 0; i < w.size(); i++) {
+        float v = th[Layout::ftW + i];
+        if constexpr (nnue::kKingBuckets > 1) v += th[Layout::ftW + size_t(nnue::kInputs) * H + i % (size_t(nnue::kPieceInputs) * H)];
+        w[i] = q16(v, nnue::kQA);
+    }
     std::fwrite(w.data(), 2, w.size(), f);
     std::vector<int16_t> b(H);
     for (int i = 0; i < H; i++) b[i] = q16(th[Layout::ftB + i], nnue::kQA);
@@ -360,7 +390,7 @@ int train(Options o) { // (by value: the batch size may be lowered)
     } else {
         std::mt19937 rng(static_cast<unsigned>(o.seed));
         std::normal_distribution<float> gw(0.0f, 0.10f), go(0.0f, 0.05f);
-        for (size_t i = 0; i < size_t(nnue::kInputs) * H; i++) th[Layout::ftW + i] = gw(rng);
+        for (size_t i = 0; i < kTrainRows * H; i++) th[Layout::ftW + i] = gw(rng);
         for (int i = 0; i < H; i++) th[Layout::ftB + i] = 0.5f;
         for (size_t i = 0; i < size_t(nnue::kBuckets) * 2 * H; i++) th[Layout::ow + i] = go(rng);
         if constexpr (Layout::L > 0) {
@@ -533,10 +563,7 @@ int train(Options o) { // (by value: the batch size may be lowered)
             forward(th, valid[i], a, fw);
             forward(rounded, valid[i], a, fwRounded);
             nnue::Accumulator acc;
-            nnue::reset(acc);
-            nnue::data::forEachPiece(valid[i], [&](int sq, int color, int type) {
-                nnue::add(acc, color == 0 ? Color::White : Color::Black, static_cast<PieceType>(type), sq / 8, sq % 8);
-            });
+            rebuildFromRecord(acc, valid[i]);
             const int q = nnue::evaluate(acc, valid[i].stm == 0 ? Color::White : Color::Black, nnue::data::pieceCount(valid[i]));
             const double d = std::abs(q - fw.out * nnue::kScale);
             sumAbs += d;
@@ -578,10 +605,7 @@ int evaluateSet(const Options& o) {
             if (r.stm == 1) cp = -cp;
         } else {
             nnue::Accumulator acc;
-            nnue::reset(acc);
-            nnue::data::forEachPiece(r, [&](int sq, int color, int type) {
-                nnue::add(acc, color == 0 ? Color::White : Color::Black, static_cast<PieceType>(type), sq / 8, sq % 8);
-            });
+            rebuildFromRecord(acc, r);
             cp = nnue::evaluate(acc, r.stm == 0 ? Color::White : Color::Black, nnue::data::pieceCount(r));
         }
         const double pred = 1.0 / (1.0 + std::exp(-cp / o.k));

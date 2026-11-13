@@ -26,6 +26,11 @@ struct Change {
     };
     Feature adds[2], subs[2];
     int8_t numAdds = 0, numSubs = 0;
+    // King-bucketed inputs (nnue_arch.hpp): each side's king context after the move, and whether that side's view
+    // has to be rebuilt from scratch (its own king changed region or mirror). Board::makeMove fills in the
+    // rebuilt side straight away; apply() leaves that side alone.
+    int8_t ctx[2] = {0, 0};
+    bool refresh[2] = {false, false};
     void add(Color c, PieceType t, int x, int y) {
         adds[numAdds++] = {static_cast<int8_t>(c == Color::White ? 0 : 1), static_cast<int8_t>(t), static_cast<int8_t>(x), static_cast<int8_t>(y)};
     }
@@ -34,7 +39,15 @@ struct Change {
     }
 };
 
-// dst = src with `change` applied. They must be different accumulators.
+// One piece of a position, for rebuilding a view from scratch.
+struct PieceOnSquare {
+    int8_t color, type, x, y;
+};
+// Rebuilds one side's view (acc.v[perspective]) from scratch: the biases plus every piece. kingX/kingY is the
+// square of that side's own king.
+void rebuild(Accumulator& acc, int perspective, int kingX, int kingY, const PieceOnSquare* pieces, int count);
+
+// dst = src with `change` applied (except for the sides it marks as refreshed). They must be different accumulators.
 void apply(Accumulator& dst, const Accumulator& src, const Change& change);
 
 // The accumulators along the line of moves being played: the top slot belongs to the current position. A move
@@ -76,9 +89,13 @@ public:
         }
         Change& c = changes[top + 1];
         c.numAdds = c.numSubs = 0;
+        c.refresh[0] = c.refresh[1] = false;
+        c.ctx[0] = c.ctx[1] = 0;
         return c;
     }
     void push() { ++top; }
+    // The newest slot, to be filled in by hand for a refreshed side (right after push()).
+    Accumulator& newest() { return slots[top]; }
     void pop() {
         if (--top < clean) clean = top;
     }
@@ -106,9 +123,6 @@ const std::string& netName();
 
 // An accumulator holding no pieces (just the biases).
 void reset(Accumulator& acc);
-// Adds or removes the feature "a piece of colour c and type t on file x, rank y".
-void add(Accumulator& acc, Color c, PieceType t, int x, int y);
-void sub(Accumulator& acc, Color c, PieceType t, int x, int y);
 // The evaluation, in centipawns from the point of view of `sideToMove`, for a position with the given
 // accumulator and number of pieces on the board.
 int evaluate(const Accumulator& acc, Color sideToMove, int pieceCount);

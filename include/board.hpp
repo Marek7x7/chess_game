@@ -74,6 +74,8 @@ public:
     // for a board that already exists. nnueMatchesScratch() is verification only.
     const nnue::Accumulator& nnueAccumulator() const { return nnueStack.current(); }
     void refreshNnue();
+    // Rebuilds one side's view (0 White, 1 Black) of an accumulator from the squares, for the king-bucketed inputs.
+    void refreshSide(nnue::Accumulator& acc, int perspective) const;
     bool nnueMatchesScratch() const;
 
     // Recomputes rawEval() from scratch by scanning every square, ignoring

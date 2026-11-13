@@ -19,7 +19,19 @@
 // kQB, the output bias by kQA * kQB.
 namespace nnue {
 
-constexpr int kInputs = 768;
+// King-aware inputs (build with -DCHESS_NNUE_KB=8; 1, the default, is the plain 768 inputs). Each side's view
+// is then indexed by where THAT side's own king stands: the board is mirrored left-right when that king is on
+// files e-h (so the king is always on files a-d), and the king square picks one of 8 regions (rank 1 / rank 2 /
+// ranks 3-4 / ranks 5-8, times files a-b / c-d), each with its own copy of the 768 piece-square inputs. The network
+// then learns piece placement relative to the king. A king move that changes region or mirror rebuilds that side's
+// accumulator from scratch (see Board::makeMove).
+#ifndef CHESS_NNUE_KB
+#define CHESS_NNUE_KB 1
+#endif
+constexpr int kKingBuckets = CHESS_NNUE_KB;
+static_assert(kKingBuckets == 1 || kKingBuckets == 8, "king buckets: 1 or 8");
+constexpr int kPieceInputs = 768;
+constexpr int kInputs = kPieceInputs * kKingBuckets;
 #ifndef CHESS_NNUE_HIDDEN
 #define CHESS_NNUE_HIDDEN 768 // (256, 512 or 768; the network file must be trained at the same width)
 #endif
@@ -44,8 +56,22 @@ static_assert(kL2 == 0 || (int64_t(kZ) * kZ) >> 13 == kH, "kH");
 
 // A piece of colour `pieceColor` (0 White, 1 Black) and type `type` (1 Pawn .. 6 King) on file x, rank y (0..7),
 // seen by the side `perspective` (0 White, 1 Black).
-constexpr int featureIndex(int perspective, int pieceColor, int type, int x, int y) {
-    return ((pieceColor == perspective ? 0 : 1) * 6 + (type - 1)) * 64 + x * 8 + (perspective == 0 ? y : 7 - y);
+// `ctx` is the side's king context (kingContext below; 0 without king buckets).
+constexpr int featureIndex(int perspective, int pieceColor, int type, int x, int y, int ctx = 0) {
+    const int xm = (ctx & 1) ? 7 - x : x;
+    return (ctx >> 1) * kPieceInputs + ((pieceColor == perspective ? 0 : 1) * 6 + (type - 1)) * 64 + xm * 8 +
+           (perspective == 0 ? y : 7 - y);
+}
+
+// The king context of the side `perspective` (0 White, 1 Black) whose own king stands on file kx, rank ky:
+// region * 2 + (1 if the board is mirrored left-right). Always 0 without king buckets.
+constexpr int kingContext(int perspective, int kx, int ky) {
+    if (kKingBuckets == 1) return 0;
+    const bool mirror = kx >= 4;
+    const int fx = mirror ? 7 - kx : kx;
+    const int ry = perspective == 0 ? ky : 7 - ky;
+    const int rankGroup = ry == 0 ? 0 : (ry == 1 ? 1 : (ry <= 3 ? 2 : 3));
+    return (rankGroup * 2 + (fx < 2 ? 0 : 1)) * 2 + (mirror ? 1 : 0);
 }
 
 // Which set of output weights to use, from the number of pieces on the board (2..32).
