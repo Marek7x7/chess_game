@@ -166,6 +166,32 @@ void rebuild(Accumulator& acc, int perspective, int kingX, int kingY, const Piec
     }
 }
 
+void rebuildCached(Accumulator& acc, int perspective, int kingX, int kingY, const int8_t* codes, RefreshCache& cache) {
+    const int ctx = kingContext(perspective, kingX, kingY);
+    RefreshCache::Entry& en = cache.e[perspective][ctx];
+    if (!en.valid) {
+        std::memcpy(en.v, g_net->featureBias, sizeof en.v);
+        std::memset(en.sq, 0, sizeof en.sq);
+        en.valid = true;
+    }
+    for (int i = 0; i < 64; i++) {
+        if (en.sq[i] == codes[i]) continue;
+        const int x = i >> 3, y = i & 7;
+        if (en.sq[i]) {
+            const int c = en.sq[i] - 1;
+            const int16_t* __restrict w = g_net->featureWeights[featureIndex(perspective, c / 6, c % 6 + 1, x, y, ctx)];
+            for (int k = 0; k < kHidden; k++) en.v[k] = static_cast<int16_t>(en.v[k] - w[k]);
+        }
+        if (codes[i]) {
+            const int c = codes[i] - 1;
+            const int16_t* __restrict w = g_net->featureWeights[featureIndex(perspective, c / 6, c % 6 + 1, x, y, ctx)];
+            for (int k = 0; k < kHidden; k++) en.v[k] = static_cast<int16_t>(en.v[k] + w[k]);
+        }
+        en.sq[i] = codes[i];
+    }
+    std::memcpy(acc.v[perspective], en.v, sizeof en.v);
+}
+
 void apply(Accumulator& dst, const Accumulator& src, const Change& change) {
     for (int p = 0; p < 2; p++) {
         if (change.refresh[p]) continue; // already rebuilt by the caller

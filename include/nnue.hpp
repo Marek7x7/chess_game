@@ -47,6 +47,21 @@ struct PieceOnSquare {
 // square of that side's own king.
 void rebuild(Accumulator& acc, int perspective, int kingX, int kingY, const PieceOnSquare* pieces, int count);
 
+// A cache of finished views, one per (side, king context): the view as it was when that context was last rebuilt, and
+// the board it was built from. Rebuilding a view after a king move then only costs the pieces that moved since,
+// instead of every piece (Stockfish calls this a "Finny table"). Only used when kKingBuckets > 1.
+struct RefreshCache {
+    struct Entry {
+        alignas(64) int16_t v[kHidden];
+        int8_t sq[64]; // 0 = empty, else 1 + colour * 6 + (type - 1), indexed x * 8 + y
+        bool valid;
+    };
+    Entry e[2][16];
+    void clear() { for (auto& side : e) for (auto& entry : side) entry.valid = false; }
+};
+// Like rebuild(), but from the 64 square codes of the board and through the cache. Same result, bit for bit.
+void rebuildCached(Accumulator& acc, int perspective, int kingX, int kingY, const int8_t* codes, RefreshCache& cache);
+
 // dst = src with `change` applied (except for the sides it marks as refreshed). They must be different accumulators.
 void apply(Accumulator& dst, const Accumulator& src, const Change& change);
 

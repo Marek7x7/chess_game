@@ -379,6 +379,16 @@ void Board::recomputeEval() {
 }
 
 void Board::refreshSide(nnue::Accumulator& acc, int perspective) const {
+    if constexpr (nnue::kKingBuckets > 1) {
+        int8_t codes[64];
+        for (int x = 0; x < 8; x++)
+            for (int y = 0; y < 8; y++) {
+                const Piece& p = squares[x][y];
+                codes[x * 8 + y] = p.isEmpty() ? 0 : static_cast<int8_t>(1 + (p.color == Color::White ? 0 : 6) + (static_cast<int>(p.type) - 1));
+            }
+        nnue::rebuildCached(acc, perspective, kingX[perspective], kingY[perspective], codes, refreshCache);
+        return;
+    }
     nnue::PieceOnSquare pieces[32];
     int n = 0;
     for (int x = 0; x < 8; x++)
@@ -393,6 +403,7 @@ void Board::refreshSide(nnue::Accumulator& acc, int perspective) const {
 
 void Board::refreshNnue() {
     if (!nnue::active()) return;
+    refreshCache.clear();
     nnue::Accumulator& acc = nnueStack.current();
     for (int p = 0; p < 2; p++) refreshSide(acc, p);
 }

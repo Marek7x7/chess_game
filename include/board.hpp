@@ -191,6 +191,7 @@ private:
     // see nnueAccumulator(); a move pushes, unmakeMove() pops (only while a network is loaded). Mutable: asking for the
     // accumulator of a position computes it first if its moves were only recorded.
     mutable nnue::AccumulatorStack nnueStack;
+    mutable nnue::RefreshCache refreshCache; // used only with king buckets; cleared by refreshNnue()
 
     // makeMove() for both overloads: with `newAccumulator` the network's accumulator is written to a fresh stack
     // slot (to be popped by unmakeMove()), otherwise it is updated where it is.
