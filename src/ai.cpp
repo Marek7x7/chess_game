@@ -788,9 +788,6 @@ struct SearchContext {
     int prevMove[kMaxPly + 1]{};
     // The corrected static eval of the node at each ply on the current line (INT_MIN: none was computed).
     int evalStack[kMaxPly + 1]{};
-    // Set by whoever searches the node at this ply: is it expected to fail high (a "cut node")? Zero-window children
-    // of a cut node are all nodes and vice versa; PV nodes are neither.
-    bool cutAt[kMaxPly + 1]{};
     // Stop (as at the deadline) once this thread has searched this many nodes.
     long long nodeLimit = std::numeric_limits<long long>::max();
     // Where this thread publishes its node count (every 4096 nodes) for the others to add up.
@@ -1259,7 +1256,6 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
 
     int origAlpha = alpha;
     bool pvNode = beta - alpha > 1; // searched with an open window: its exact score matters
-    const bool cutNode = !pvNode && ply <= kMaxPly && ctx.cutAt[ply];
     Move ttMove{};
     TTEntry ttEntry;
     bool haveTTMove = false;
@@ -1341,7 +1337,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
         Board::NullMoveUndo nu;
         board.makeNullMove(nu);
         ctx.tt.prefetch(board.hashKey()); // the child's table entry loads while its first steps run
-        if (ply + 1 <= kMaxPly) { ctx.prevMove[ply + 1] = -1; ctx.cutAt[ply + 1] = !cutNode; }
+        if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = -1;
         int nullScore =
             -negamax(board, depth - 1 - nullMoveReduction - std::min(3, (staticEval - beta) / 200), ply + 1, -beta, -beta + 1, opponent(color), ctx, 0);
         board.unmakeNullMove(nu);
@@ -1365,7 +1361,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
                     board.unmakeMove(m, undo);
                     continue;
                 }
-                if (ply + 1 <= kMaxPly) { ctx.prevMove[ply + 1] = encodeMove(m); ctx.cutAt[ply + 1] = !cutNode; }
+                if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
                 int v = -quiescence(board, -probBeta, -probBeta + 1, opponent(color), ply + 1, ctx);
                 if (v >= probBeta)
                     v = -negamax(board, depth - 4, ply + 1, -probBeta, -probBeta + 1, opponent(color), ctx, extensionsLeft);
@@ -1495,10 +1491,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             continue;
         }
         anyLegal = true;
-        if (ply + 1 <= kMaxPly) {
-            ctx.prevMove[ply + 1] = encodeMove(m);
-            ctx.cutAt[ply + 1] = pvNode ? moveIndex > 0 : !cutNode;
-        }
+        if (ply + 1 <= kMaxPly) ctx.prevMove[ply + 1] = encodeMove(m);
         const int extension = sameMove(m, ttMove) ? singularExtension : 0;
         if (prunable && !board.isInCheck(opponent(color))) { // the moves that might be illegal, made to find out
             board.unmakeMove(m, undo);
@@ -1523,7 +1516,7 @@ int negamax(Board& board, int depth, int ply, int alpha, int beta, Color color, 
             // into quiescence; a PV node gets one ply less.
             // A move with a good history reduces less, one with a bad history more.
             const int h = ctx.history[colorIdx(color)][m.fromX][m.fromY][m.toX][m.toY];
-            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) + (cutNode ? 1 : 0) - h / spLmrHistDiv + (improving || !haveStaticEval ? 0 : 1), 1, depth - 2);
+            reduction = std::clamp(lmrReduction(depth, moveIndex + 1) - (pvNode ? 1 : 0) - h / spLmrHistDiv + (improving || !haveStaticEval ? 0 : 1), 1, depth - 2);
         }
 
         // PVS: the first move (typically the TT move / best-ordered guess)
@@ -1696,11 +1689,9 @@ RootSearchResult searchRootFull(Board& board, Color aiColor, const std::vector<M
                     // better, re-searched in full when one might be.
                     int score;
                     if (first) {
-                        ctx.cutAt[1] = false;
                         score = -negamax(board, depth - 1, 1, -hi, -lo, opponent(aiColor), ctx, kMaxCheckExtensions);
                         first = false;
                     } else {
-                        ctx.cutAt[1] = true;
                         score =
                             -negamax(board, depth - 1, 1, -lo - 1, -lo, opponent(aiColor), ctx, kMaxCheckExtensions);
                         if (score > lo && score < hi) {
