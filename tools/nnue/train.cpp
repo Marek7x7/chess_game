@@ -63,7 +63,11 @@ float sigmoid(float x) { return 1.0f / (1.0f + std::exp(-x)); }
 // Feature-transformer rows in training. With king buckets there is one more set of kPieceInputs rows, the
 // "factoriser": it is active for every position whatever the king region, so rare regions still learn from all
 // the data. The export adds it into each region's rows.
-constexpr size_t kTrainRows = size_t(nnue::kInputs) + (nnue::kKingBuckets > 1 ? size_t(nnue::kPieceInputs) : 0);
+#ifndef CHESS_TRAIN_FACTORISER
+#define CHESS_TRAIN_FACTORISER 0 // -DCHESS_TRAIN_FACTORISER=1: shared rows (about 2x slower; for scarce data)
+#endif
+constexpr bool kFactoriser = nnue::kKingBuckets > 1 && CHESS_TRAIN_FACTORISER;
+constexpr size_t kTrainRows = size_t(nnue::kInputs) + (kFactoriser ? size_t(nnue::kPieceInputs) : 0);
 
 struct Layout {
     static constexpr size_t ftW = 0;
@@ -97,7 +101,7 @@ inline void features(const Record& r, Active& a) {
         const int x = sq / 8, y = sq % 8;
         for (int p = 0; p < 2; p++) {
             a.f[p][a.n[p]++] = nnue::featureIndex(p, color, type, x, y, ctx[p]);
-            if constexpr (nnue::kKingBuckets > 1)
+            if constexpr (kFactoriser)
                 a.f[p][a.n[p]++] = nnue::kInputs + nnue::featureIndex(p, color, type, x, y, ctx[p] & 1); // factoriser row
         }
     });
@@ -290,7 +294,7 @@ bool writeNet(const std::vector<float>& th, const std::string& path) {
     std::vector<int16_t> w(size_t(nnue::kInputs) * H);
     for (size_t i = 0; i < w.size(); i++) {
         float v = th[Layout::ftW + i];
-        if constexpr (nnue::kKingBuckets > 1) v += th[Layout::ftW + size_t(nnue::kInputs) * H + i % (size_t(nnue::kPieceInputs) * H)];
+        if constexpr (kFactoriser) v += th[Layout::ftW + size_t(nnue::kInputs) * H + i % (size_t(nnue::kPieceInputs) * H)];
         w[i] = q16(v, nnue::kQA);
     }
     std::fwrite(w.data(), 2, w.size(), f);
@@ -405,6 +409,11 @@ int train(Options o) { // (by value: the batch size may be lowered)
     std::vector<float> m(Layout::total, 0.0f), v(Layout::total, 0.0f);
     const int threads = omp_get_max_threads();
     std::vector<std::vector<float>> grads(threads, std::vector<float>(Layout::total, 0.0f));
+    // Feature-transformer rows a thread touched in the current batch: with king buckets the table is big (9x), and
+    // clearing and summing all of it every batch was 9x slower; untouched rows have a zero gradient.
+    std::vector<std::vector<uint8_t>> rowMark(threads, std::vector<uint8_t>(kTrainRows, 0));
+    std::vector<std::vector<uint32_t>> rowList(threads);
+    std::vector<uint8_t> rowUsed(kTrainRows, 0);
     std::vector<float> g(Layout::total);
     std::vector<size_t> order(data.size());
     std::iota(order.begin(), order.end(), size_t(0));
@@ -447,8 +456,16 @@ int train(Options o) { // (by value: the batch size may be lowered)
             double batchLoss = 0;
 #pragma omp parallel num_threads(threads) reduction(+ : batchLoss)
             {
-                float* grad = grads[omp_get_thread_num()].data();
-                std::memset(grad, 0, Layout::total * sizeof(float));
+                const int tid = omp_get_thread_num();
+                float* grad = grads[tid].data();
+                uint8_t* mark = rowMark[tid].data();
+                std::vector<uint32_t>& list = rowList[tid];
+                for (uint32_t row : list) { // clear what the previous batch wrote
+                    std::memset(grad + Layout::ftW + size_t(row) * H, 0, H * sizeof(float));
+                    mark[row] = 0;
+                }
+                list.clear();
+                std::memset(grad + Layout::ftB, 0, (Layout::total - Layout::ftB) * sizeof(float));
                 Active a;
                 Forward fw;
                 float dh[2][H];
@@ -502,7 +519,12 @@ int train(Options o) { // (by value: the batch size may be lowered)
                     for (int i = 0; i < H; i++) gb[i] += dh[0][i] + dh[1][i];
                     for (int p = 0; p < 2; p++)
                         for (int j = 0; j < a.n[p]; j++) {
-                            float* gw = grad + Layout::ftW + size_t(a.f[p][j]) * H;
+                            const int row = a.f[p][j];
+                            if (!mark[row]) {
+                                mark[row] = 1;
+                                list.push_back(static_cast<uint32_t>(row));
+                            }
+                            float* gw = grad + Layout::ftW + size_t(row) * H;
                             for (int i = 0; i < H; i++) gw[i] += dh[p][i];
                         }
                 }
@@ -515,15 +537,20 @@ int train(Options o) { // (by value: the batch size may be lowered)
             const float b1 = 0.9f, b2 = 0.999f, eps = 1e-8f;
             const float c1 = 1.0f - std::pow(b1, static_cast<float>(step + 1)), c2 = 1.0f - std::pow(b2, static_cast<float>(step + 1));
             const float inv = 1.0f / static_cast<float>(o.batch);
+            for (int t = 0; t < threads; t++)
+                for (uint32_t row : rowList[t]) rowUsed[row] = 1;
 #pragma omp parallel for schedule(static)
             for (long long j = 0; j < static_cast<long long>(Layout::total); j++) {
                 float sum = 0;
-                for (int t = 0; t < threads; t++) sum += grads[t][static_cast<size_t>(j)];
+                if (static_cast<size_t>(j) >= Layout::ftB || rowUsed[static_cast<size_t>(j) / H])
+                    for (int t = 0; t < threads; t++) sum += grads[t][static_cast<size_t>(j)];
                 const float gj = sum * inv;
                 m[j] = b1 * m[j] + (1 - b1) * gj;
                 v[j] = b2 * v[j] + (1 - b2) * gj * gj;
                 th[j] -= lr * (m[j] / c1) / (std::sqrt(v[j] / c2) + eps);
             }
+            for (int t = 0; t < threads; t++)
+                for (uint32_t row : rowList[t]) rowUsed[row] = 0;
             // The integer code needs these ranges (see writeNet).
             for (size_t j = Layout::ow; j < Layout::ob; j++) th[j] = std::min(1.98f, std::max(-1.98f, th[j]));
             if constexpr (Layout::L > 0) { // int8 weights
