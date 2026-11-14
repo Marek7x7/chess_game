@@ -26,14 +26,14 @@ namespace nnue {
 // then learns piece placement relative to the king. A king move that changes region or mirror rebuilds that side's
 // accumulator from scratch (see Board::makeMove).
 #ifndef CHESS_NNUE_KB
-#define CHESS_NNUE_KB 8
+#define CHESS_NNUE_KB 1
 #endif
 constexpr int kKingBuckets = CHESS_NNUE_KB;
 static_assert(kKingBuckets == 1 || kKingBuckets == 8, "king buckets: 1 or 8");
 constexpr int kPieceInputs = 768;
 constexpr int kInputs = kPieceInputs * kKingBuckets;
 #ifndef CHESS_NNUE_HIDDEN
-#define CHESS_NNUE_HIDDEN 512 // (256, 512 or 768; the network file must be trained at the same width)
+#define CHESS_NNUE_HIDDEN 768 // (256, 512 or 768; the network file must be trained at the same width)
 #endif
 constexpr int kHidden = CHESS_NNUE_HIDDEN;
 constexpr int kBuckets = 8; // output weight sets, by piece count
